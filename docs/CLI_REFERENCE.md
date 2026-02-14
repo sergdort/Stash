@@ -41,6 +41,15 @@ Run compiled CLI:
 node dist/cli.js --help
 ```
 
+Command help:
+
+```bash
+stash --help
+stash save --help
+stash list --help
+stash db --help
+```
+
 ## Global Installation
 
 Local development global link (before npm publish):

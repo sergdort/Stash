@@ -297,7 +297,37 @@ program
     process.env.STASH_DB_PATH ?? DEFAULT_DB_PATH
   );
 
+program.addHelpText(
+  "afterAll",
+  `
+Quick Reference:
+  stash save <url> [--title <text>] [--tag <name> ...] [--json]
+  stash list [--status unread|read|archived] [--tag <name> ...] [--tag-mode any|all] [--limit <n>] [--offset <n>] [--json]
+  stash tags list [--limit <n>] [--offset <n>] [--json]
+  stash tag add <id> <tag> [--json]
+  stash tag rm <id> <tag> [--json]
+  stash mark read <id> [--json]
+  stash mark unread <id> [--json]
+  stash read <id> [--json]
+  stash unread <id> [--json]
+  stash db migrate [--json] [--migrations-dir <path>]
+  stash db doctor [--json] [--migrations-dir <path>] [--limit <n>]
+
+Use \`stash <command> --help\` for detailed options and examples.
+`
+);
+
 const dbCommand = program.command("db").description("Database utilities");
+
+dbCommand.addHelpText(
+  "after",
+  `
+Examples:
+  stash db migrate --json
+  stash db doctor --json
+  stash db doctor --limit 20
+`
+);
 
 dbCommand
   .command("migrate")
@@ -568,6 +598,15 @@ program
 
 const tagsCommand = program.command("tags").description("Tag utilities");
 
+tagsCommand.addHelpText(
+  "after",
+  `
+Examples:
+  stash tags list
+  stash tags list --limit 100 --offset 0 --json
+`
+);
+
 tagsCommand
   .command("list")
   .description("List all available tags")
@@ -618,6 +657,15 @@ tagsCommand
   });
 
 const tagCommand = program.command("tag").description("Manage item tags");
+
+tagCommand.addHelpText(
+  "after",
+  `
+Examples:
+  stash tag add 1 ai
+  stash tag rm 1 ai --json
+`
+);
 
 tagCommand
   .command("add <id> <tag>")
@@ -722,6 +770,15 @@ function markItemStatus(status: Exclude<ItemStatus, "archived">, itemId: number)
 }
 
 const markCommand = program.command("mark").description("Mark item states");
+
+markCommand.addHelpText(
+  "after",
+  `
+Examples:
+  stash mark read 1
+  stash mark unread 1 --json
+`
+);
 
 markCommand
   .command("read <id>")
