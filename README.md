@@ -21,6 +21,30 @@ pnpm rebuild better-sqlite3
 pnpm run setup
 ```
 
+## Global Install
+
+For local development (before publishing):
+
+```bash
+pnpm install
+pnpm run setup
+pnpm link --global
+stash --version
+```
+
+Remove global dev link:
+
+```bash
+pnpm unlink --global stash
+```
+
+After publishing to npm:
+
+```bash
+npm install -g stash
+stash --version
+```
+
 ## Database
 
 Default database path is `~/.stash/stash.db`. Override with `--db-path`.

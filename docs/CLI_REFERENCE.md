@@ -41,6 +41,30 @@ Run compiled CLI:
 node dist/cli.js --help
 ```
 
+## Global Installation
+
+Local development global link (before npm publish):
+
+```bash
+pnpm install
+pnpm run setup
+pnpm link --global
+stash --version
+```
+
+Remove global dev link:
+
+```bash
+pnpm unlink --global stash
+```
+
+Global install after publish:
+
+```bash
+npm install -g stash
+stash --version
+```
+
 ## Database Path
 
 Default DB:
