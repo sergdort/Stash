@@ -1,0 +1,39 @@
+{
+  "name": "stash",
+  "version": "0.1.0",
+  "description": "Pocket-like local-first CLI for saving and organizing links.",
+  "type": "module",
+  "packageManager": "pnpm@10.16.1",
+  "bin": {
+    "stash": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
+    "db:generate": "drizzle-kit generate",
+    "predb:migrate": "pnpm run build",
+    "db:migrate": "node dist/cli.js db migrate",
+    "predb:doctor": "pnpm run build",
+    "db:doctor": "node dist/cli.js db doctor"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "commander": "^13.1.0",
+    "drizzle-orm": "^0.39.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "drizzle-kit": "^0.30.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
+  }
+}
