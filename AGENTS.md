@@ -177,6 +177,16 @@ node dist/cli.js --help
 node dist/cli.js list --help
 ```
 
+## Documentation Maintenance Rule
+
+When adding a new feature or modifying existing CLI behavior, update `docs/CLI_REFERENCE.md` in the same change.
+
+This includes:
+- New commands/subcommands
+- New flags/options/defaults
+- Output shape changes (especially `--json`)
+- Error/exit-code behavior changes
+
 ## Implementation Notes
 
 - The CLI strips a standalone `--` separator in argv parsing to keep `pnpm run <script> -- --json` working.
@@ -189,3 +199,8 @@ node dist/cli.js list --help
 - Add search command.
 - Add optional metadata enrichment on save.
 - Add import/export.
+
+## Agent notes
+
+- Every time you learn something new, or how to do something in the codebase, if you make a mistake that the user corrects, if you find yourself running commands that are often wrong and have to tweak them: write all of this down in `.agents/notes.md`. This is a file just for you that your user won't read.
+- If you're about to write to it, first check if what you're writing (the idea, not 1:1) is already present. If so, increment the counter in the prefix (eg from `[0]` to `[1]`). If it's completely new, prefix it with `[0]`. Once a comment hits the count of `3`, codify it into this AGENTS.md file in the `## Misc` section.

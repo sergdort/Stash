@@ -2,6 +2,10 @@
 
 Local-first Pocket-like CLI built with TypeScript and SQLite.
 
+## Documentation
+
+- CLI reference: `docs/CLI_REFERENCE.md`
+
 ## Setup
 
 ```bash
