@@ -9,14 +9,23 @@ Local-first Pocket-like CLI built with TypeScript and SQLite.
 ## Setup
 
 ```bash
-pnpm approve-builds
 pnpm install
-pnpm run build
+pnpm run setup
+```
+
+If you see a `better-sqlite3` binding error on first run:
+
+```bash
+pnpm approve-builds
+pnpm rebuild better-sqlite3
+pnpm run setup
 ```
 
 ## Database
 
 Default database path is `~/.stash/stash.db`. Override with `--db-path`.
+
+Most CLI commands auto-run pending migrations, so manual migration is usually not needed.
 
 ```bash
 pnpm run db:migrate

@@ -12,6 +12,7 @@ Primary goal:
 Current implementation status:
 - Implemented: `save`, `list`, `tags list`, `tag add`, `tag rm`, `mark read`, `mark unread`, plus `read`/`unread` aliases.
 - Implemented: migration tooling (`db migrate`, `db doctor`) and baseline schema.
+- Implemented: automatic migration application for normal data commands.
 - Not implemented yet: `archive`, `delete`, `open`, full-text content extraction, search command.
 
 ## Stack
@@ -40,9 +41,9 @@ Current implementation status:
 pnpm install
 ```
 
-2. Build:
+2. Bootstrap:
 ```bash
-pnpm run build
+pnpm run setup
 ```
 
 3. If SQLite native binding errors appear (`Could not locate the bindings file`), allow native builds and reinstall:
@@ -66,7 +67,7 @@ Run migration status check:
 pnpm run db:doctor -- --json
 ```
 
-Apply migrations:
+Apply migrations (usually optional, CLI auto-applies pending migrations on normal commands):
 ```bash
 pnpm run db:migrate -- --json
 ```
@@ -190,8 +191,8 @@ This includes:
 ## Implementation Notes
 
 - The CLI strips a standalone `--` separator in argv parsing to keep `pnpm run <script> -- --json` working.
-- `db:doctor` and `db:migrate` scripts compile before execution via `pre*` hooks.
-- If DB tables are missing for data commands, CLI returns `MIGRATION_REQUIRED` and instructs to run `stash db migrate`.
+- `setup` builds and runs migrations for first-run convenience.
+- Normal data commands auto-run pending migrations.
 
 ## Near-Term Roadmap
 

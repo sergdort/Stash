@@ -73,14 +73,19 @@ test("integration: stash CLI lifecycle", { concurrency: false }, (t) => {
   const dbPath = path.join(tempDir, "stash.db");
 
   try {
-    const preMigrationList = runJson(dbPath, ["list"], 2);
-    assert.strictEqual(preMigrationList.ok, false);
-    assert.strictEqual(preMigrationList.error.code, "MIGRATION_REQUIRED");
+    const preMigrationList = runJson(dbPath, ["list"]);
+    assert.strictEqual(preMigrationList.ok, true);
+    assert.deepStrictEqual(preMigrationList.items, []);
+
+    const migrationStatus = runJson(dbPath, ["db", "doctor"]);
+    assert.strictEqual(migrationStatus.ok, true);
+    assert.strictEqual(migrationStatus.applied_count, 1);
+    assert.strictEqual(migrationStatus.pending_count, 0);
 
     const firstMigrate = runJson(dbPath, ["db", "migrate"]);
     assert.strictEqual(firstMigrate.ok, true);
-    assert.strictEqual(firstMigrate.applied_count, 1);
-    assert.deepStrictEqual(firstMigrate.applied, ["0000_init.sql"]);
+    assert.strictEqual(firstMigrate.applied_count, 0);
+    assert.deepStrictEqual(firstMigrate.applied, []);
 
     const secondMigrate = runJson(dbPath, ["db", "migrate"]);
     assert.strictEqual(secondMigrate.ok, true);

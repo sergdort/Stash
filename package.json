@@ -8,6 +8,7 @@
     "stash": "dist/cli.js"
   },
   "scripts": {
+    "setup": "pnpm run build && node dist/cli.js db migrate --json",
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/cli.ts",
     "test": "pnpm run test:integration",

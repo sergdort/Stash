@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { Command, InvalidArgumentError } from "commander";
 
 import { openSqlite } from "./db/client.js";
 import { getMigrationStatus, runMigrations } from "./db/migrate.js";
 import { DEFAULT_DB_PATH, resolveDbPath } from "./lib/paths.js";
+
+const CLI_DIR = path.dirname(fileURLToPath(import.meta.url));
+const DEFAULT_MIGRATIONS_DIR = path.resolve(CLI_DIR, "../drizzle");
 
 type ItemStatus = "unread" | "read" | "archived";
 type TagMode = "any" | "all";
@@ -155,9 +159,18 @@ function handleActionError(error: unknown, jsonMode: boolean): never {
   }
 
   const message = error instanceof Error ? error.message : "Unknown error";
+  if (message.includes("Could not locate the bindings file") || message.includes("better_sqlite3.node")) {
+    printError(
+      "SQLite native bindings are missing for better-sqlite3. Run `pnpm approve-builds`, then `pnpm rebuild better-sqlite3`.",
+      jsonMode,
+      "SQLITE_BINDINGS_MISSING",
+      2
+    );
+  }
+
   if (message.includes("no such table")) {
     printError(
-      "Database schema is not initialized. Run `stash db migrate` first.",
+      "Database schema is not initialized. Run `stash db migrate`.",
       jsonMode,
       "MIGRATION_REQUIRED",
       2
@@ -175,6 +188,31 @@ function withDb<T>(dbPath: string, action: (sqlite: ReturnType<typeof openSqlite
   } finally {
     sqlite.close();
   }
+}
+
+function resolveMigrationsDir(value?: string): string {
+  if (!value || value.trim().length === 0) {
+    return DEFAULT_MIGRATIONS_DIR;
+  }
+  return path.resolve(value);
+}
+
+function ensureMigrationsDirExists(migrationsDir: string): void {
+  if (!fs.existsSync(migrationsDir)) {
+    throw new CliError(`Migrations directory not found: ${migrationsDir}`, "MIGRATIONS_DIR_NOT_FOUND", 2);
+  }
+}
+
+function ensureDbReady(dbPath: string): void {
+  const migrationsDir = resolveMigrationsDir();
+  ensureMigrationsDirExists(migrationsDir);
+  ensureDbDirectory(dbPath);
+  runMigrations(dbPath, migrationsDir);
+}
+
+function withReadyDb<T>(dbPath: string, action: (sqlite: ReturnType<typeof openSqlite>) => T): T {
+  ensureDbReady(dbPath);
+  return withDb(dbPath, action);
 }
 
 function getItemRowById(sqlite: ReturnType<typeof openSqlite>, id: number): ItemRow | undefined {
@@ -265,83 +303,83 @@ dbCommand
   .command("migrate")
   .description("Run pending SQL migrations")
   .option("--json", "Print machine-readable JSON output")
-  .option("--migrations-dir <path>", "Path to migrations directory", path.resolve(process.cwd(), "drizzle"))
+  .option("--migrations-dir <path>", "Path to migrations directory", DEFAULT_MIGRATIONS_DIR)
   .action((options: { json?: boolean; migrationsDir: string }) => {
     const jsonMode = Boolean(options.json);
-    const dbPath = resolveDbPath(program.opts().dbPath as string);
-    const migrationsDir = path.resolve(options.migrationsDir);
+    runDbAction(jsonMode, () => {
+      const dbPath = resolveDbPath(program.opts().dbPath as string);
+      const migrationsDir = resolveMigrationsDir(options.migrationsDir);
 
-    if (!fs.existsSync(migrationsDir)) {
-      printError(`Migrations directory not found: ${migrationsDir}`, jsonMode, "MIGRATIONS_DIR_NOT_FOUND", 2);
-    }
+      ensureMigrationsDirExists(migrationsDir);
 
-    ensureDbDirectory(dbPath);
-    const result = runMigrations(dbPath, migrationsDir);
+      ensureDbDirectory(dbPath);
+      const result = runMigrations(dbPath, migrationsDir);
 
-    if (jsonMode) {
-      printJson({
-        ok: true,
-        db_path: dbPath,
-        migrations_dir: migrationsDir,
-        applied_count: result.appliedCount,
-        applied: result.applied
-      });
-      return;
-    }
+      if (jsonMode) {
+        printJson({
+          ok: true,
+          db_path: dbPath,
+          migrations_dir: migrationsDir,
+          applied_count: result.appliedCount,
+          applied: result.applied
+        });
+        return;
+      }
 
-    process.stdout.write(`Applied ${result.appliedCount} migration(s).\n`);
-    if (result.applied.length > 0) {
-      process.stdout.write(`${result.applied.join("\n")}\n`);
-    }
+      process.stdout.write(`Applied ${result.appliedCount} migration(s).\n`);
+      if (result.applied.length > 0) {
+        process.stdout.write(`${result.applied.join("\n")}\n`);
+      }
+    });
   });
 
 dbCommand
   .command("doctor")
   .description("Inspect database and migration status")
   .option("--json", "Print machine-readable JSON output")
-  .option("--migrations-dir <path>", "Path to migrations directory", path.resolve(process.cwd(), "drizzle"))
+  .option("--migrations-dir <path>", "Path to migrations directory", DEFAULT_MIGRATIONS_DIR)
   .option("--limit <n>", "Limit rows returned for preview output", parsePositiveInt, 5)
   .action((options: { json?: boolean; migrationsDir: string; limit: number }) => {
     const jsonMode = Boolean(options.json);
-    const dbPath = resolveDbPath(program.opts().dbPath as string);
-    const migrationsDir = path.resolve(options.migrationsDir);
+    runDbAction(jsonMode, () => {
+      const dbPath = resolveDbPath(program.opts().dbPath as string);
+      const migrationsDir = resolveMigrationsDir(options.migrationsDir);
 
-    if (!fs.existsSync(migrationsDir)) {
-      printError(`Migrations directory not found: ${migrationsDir}`, jsonMode, "MIGRATIONS_DIR_NOT_FOUND", 2);
-    }
+      ensureMigrationsDirExists(migrationsDir);
 
-    const dbExists = fs.existsSync(dbPath);
-    const status = dbExists
-      ? getMigrationStatus(dbPath, migrationsDir)
-      : {
-          applied: [],
-          pending: fs
-            .readdirSync(migrationsDir)
-            .filter((name) => name.endsWith(".sql"))
-            .sort((a, b) => a.localeCompare(b))
-        };
+      const dbExists = fs.existsSync(dbPath);
+      const status = dbExists
+        ? getMigrationStatus(dbPath, migrationsDir)
+        : {
+            applied: [],
+            pending: fs
+              .readdirSync(migrationsDir)
+              .filter((name) => name.endsWith(".sql"))
+              .sort((a, b) => a.localeCompare(b))
+          };
 
-    if (jsonMode) {
-      printJson({
-        ok: true,
-        db_path: dbPath,
-        db_exists: dbExists,
-        migrations_dir: migrationsDir,
-        applied_count: status.applied.length,
-        pending_count: status.pending.length,
-        applied: status.applied.slice(-options.limit),
-        pending: status.pending.slice(0, options.limit)
-      });
-      return;
-    }
+      if (jsonMode) {
+        printJson({
+          ok: true,
+          db_path: dbPath,
+          db_exists: dbExists,
+          migrations_dir: migrationsDir,
+          applied_count: status.applied.length,
+          pending_count: status.pending.length,
+          applied: status.applied.slice(-options.limit),
+          pending: status.pending.slice(0, options.limit)
+        });
+        return;
+      }
 
-    process.stdout.write(`db_path: ${dbPath}\n`);
-    process.stdout.write(`db_exists: ${dbExists}\n`);
-    process.stdout.write(`applied: ${status.applied.length}\n`);
-    process.stdout.write(`pending: ${status.pending.length}\n`);
-    if (status.pending.length > 0) {
-      process.stdout.write(`pending_preview:\n${status.pending.slice(0, options.limit).join("\n")}\n`);
-    }
+      process.stdout.write(`db_path: ${dbPath}\n`);
+      process.stdout.write(`db_exists: ${dbExists}\n`);
+      process.stdout.write(`applied: ${status.applied.length}\n`);
+      process.stdout.write(`pending: ${status.pending.length}\n`);
+      if (status.pending.length > 0) {
+        process.stdout.write(`pending_preview:\n${status.pending.slice(0, options.limit).join("\n")}\n`);
+      }
+    });
   });
 
 program
@@ -354,7 +392,7 @@ program
     const jsonMode = Boolean(options.json);
 
     runDbAction(jsonMode, () =>
-      withDb(resolveDbPath(program.opts().dbPath as string), (sqlite) => {
+      withReadyDb(resolveDbPath(program.opts().dbPath as string), (sqlite) => {
         const parsedUrl = parseUrl(url);
         const normalizedTags = normalizeTags(options.tag ?? []);
         const existing = sqlite.prepare("SELECT * FROM items WHERE url = ?").get(parsedUrl.toString()) as
@@ -444,7 +482,7 @@ program
       }
 
       runDbAction(jsonMode, () =>
-        withDb(resolveDbPath(program.opts().dbPath as string), (sqlite) => {
+        withReadyDb(resolveDbPath(program.opts().dbPath as string), (sqlite) => {
           const tags = normalizeTags(options.tag ?? []);
           const where: string[] = [];
           const params: unknown[] = [];
@@ -540,7 +578,7 @@ tagsCommand
     const jsonMode = Boolean(options.json);
 
     runDbAction(jsonMode, () =>
-      withDb(resolveDbPath(program.opts().dbPath as string), (sqlite) => {
+      withReadyDb(resolveDbPath(program.opts().dbPath as string), (sqlite) => {
         const rows = sqlite
           .prepare(
             `SELECT t.name AS name, COUNT(it.item_id) AS item_count
@@ -589,7 +627,7 @@ tagCommand
     const jsonMode = Boolean(options.json);
 
     runDbAction(jsonMode, () =>
-      withDb(resolveDbPath(program.opts().dbPath as string), (sqlite) => {
+      withReadyDb(resolveDbPath(program.opts().dbPath as string), (sqlite) => {
         const itemId = parseItemId(id);
         const normalizedTag = normalizeTag(tag);
         ensureItemExists(sqlite, itemId);
@@ -626,7 +664,7 @@ tagCommand
     const jsonMode = Boolean(options.json);
 
     runDbAction(jsonMode, () =>
-      withDb(resolveDbPath(program.opts().dbPath as string), (sqlite) => {
+      withReadyDb(resolveDbPath(program.opts().dbPath as string), (sqlite) => {
         const itemId = parseItemId(id);
         const normalizedTag = normalizeTag(tag);
         ensureItemExists(sqlite, itemId);
@@ -660,7 +698,7 @@ tagCommand
 function markItemStatus(status: Exclude<ItemStatus, "archived">, itemId: number): { itemId: number; status: ItemStatus } {
   const dbPath = resolveDbPath(program.opts().dbPath as string);
 
-  return withDb(dbPath, (sqlite) => {
+  return withReadyDb(dbPath, (sqlite) => {
     const timestamp = nowMs();
     const update =
       status === "read"

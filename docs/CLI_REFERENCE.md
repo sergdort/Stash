@@ -24,7 +24,7 @@ Install:
 
 ```bash
 pnpm install
-pnpm run build
+pnpm run setup
 ```
 
 If native SQLite bindings are missing:
@@ -32,7 +32,7 @@ If native SQLite bindings are missing:
 ```bash
 pnpm approve-builds
 pnpm rebuild better-sqlite3
-pnpm install
+pnpm run setup
 ```
 
 Run compiled CLI:
@@ -65,6 +65,8 @@ stash --db-path <path> <command>
 ```
 
 ## Database Commands
+
+Most commands auto-run pending migrations, so you usually do not need to run migration commands manually.
 
 Run pending migrations:
 
@@ -212,7 +214,7 @@ Typical list response:
 
 ## Examples
 
-Initialize DB:
+Initialize DB manually (optional):
 
 ```bash
 stash db migrate --json
