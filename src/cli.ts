@@ -8,6 +8,7 @@ import { Command, InvalidArgumentError } from "commander";
 import { openSqlite } from "./db/client.js";
 import { getMigrationStatus, runMigrations } from "./db/migrate.js";
 import { DEFAULT_DB_PATH, resolveDbPath } from "./lib/paths.js";
+import { extractContent } from "./lib/extract.js";
 
 const CLI_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_MIGRATIONS_DIR = path.resolve(CLI_DIR, "../drizzle");
@@ -190,6 +191,16 @@ function withDb<T>(dbPath: string, action: (sqlite: ReturnType<typeof openSqlite
   }
 }
 
+async function withDbAsync<T>(dbPath: string, action: (sqlite: ReturnType<typeof openSqlite>) => Promise<T>): Promise<T> {
+  ensureDbDirectory(dbPath);
+  const sqlite = openSqlite(dbPath);
+  try {
+    return await action(sqlite);
+  } finally {
+    sqlite.close();
+  }
+}
+
 function resolveMigrationsDir(value?: string): string {
   if (!value || value.trim().length === 0) {
     return DEFAULT_MIGRATIONS_DIR;
@@ -213,6 +224,11 @@ function ensureDbReady(dbPath: string): void {
 function withReadyDb<T>(dbPath: string, action: (sqlite: ReturnType<typeof openSqlite>) => T): T {
   ensureDbReady(dbPath);
   return withDb(dbPath, action);
+}
+
+async function withReadyDbAsync<T>(dbPath: string, action: (sqlite: ReturnType<typeof openSqlite>) => Promise<T>): Promise<T> {
+  ensureDbReady(dbPath);
+  return withDbAsync(dbPath, action);
 }
 
 function getItemRowById(sqlite: ReturnType<typeof openSqlite>, id: number): ItemRow | undefined {
@@ -417,12 +433,13 @@ program
   .description("Save a URL to stash")
   .option("--title <text>", "Optional title")
   .option("--tag <name>", "Tag to attach (repeatable)", collectValues, [])
+  .option("--no-extract", "Skip content extraction")
   .option("--json", "Print machine-readable JSON output")
-  .action((url: string, options: { title?: string; tag: string[]; json?: boolean }) => {
+  .action(async (url: string, options: { title?: string; tag: string[]; extract?: boolean; json?: boolean }) => {
     const jsonMode = Boolean(options.json);
 
-    runDbAction(jsonMode, () =>
-      withReadyDb(resolveDbPath(program.opts().dbPath as string), (sqlite) => {
+    runDbAction(jsonMode, async () =>
+      withReadyDbAsync(resolveDbPath(program.opts().dbPath as string), async (sqlite) => {
         const parsedUrl = parseUrl(url);
         const normalizedTags = normalizeTags(options.tag ?? []);
         const existing = sqlite.prepare("SELECT * FROM items WHERE url = ?").get(parsedUrl.toString()) as
@@ -466,6 +483,30 @@ program
         if (!row) {
           throw new CliError("Saved item could not be reloaded.", "INTERNAL_ERROR", 1);
         }
+        
+        // Extract content if not disabled
+        if (options.extract !== false && created) {
+          try {
+            const extracted = await extractContent(parsedUrl.toString());
+            if (extracted && extracted.textContent) {
+              // Save to notes table
+              sqlite
+                .prepare("INSERT OR REPLACE INTO notes (item_id, content, updated_at) VALUES (?, ?, ?)")
+                .run(itemId!, extracted.textContent, timestamp);
+                
+              // Update title if we got a better one
+              if (extracted.title && !options.title) {
+                sqlite
+                  .prepare("UPDATE items SET title = ?, updated_at = ? WHERE id = ?")
+                  .run(extracted.title, timestamp, itemId!);
+              }
+            }
+          } catch (error) {
+            console.error("Failed to extract content:", error);
+            // Continue without extraction on error
+          }
+        }
+        
         const item = serializeItem(row, getItemTags(sqlite, row.id));
 
         if (jsonMode) {

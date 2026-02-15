@@ -24,9 +24,11 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@mozilla/readability": "^0.6.0",
     "better-sqlite3": "^11.8.1",
     "commander": "^13.1.0",
-    "drizzle-orm": "^0.39.3"
+    "drizzle-orm": "^0.39.3",
+    "linkedom": "^0.18.12"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
