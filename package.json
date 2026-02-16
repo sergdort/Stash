@@ -17,7 +17,7 @@
     "format": "biome format . --write",
     "format:check": "biome format .",
     "test": "pnpm run test:integration",
-    "test:integration": "pnpm run build && node --test test/integration.test.mjs",
+    "test:integration": "pnpm run build && vitest run test/integration.test.ts",
     "start": "node dist/cli.js",
     "db:generate": "drizzle-kit generate",
     "predb:migrate": "pnpm run build",
@@ -41,7 +41,8 @@
     "@types/node": "^22.13.10",
     "drizzle-kit": "^0.30.4",
     "tsx": "^4.19.3",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "vitest": "^3.2.4"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
