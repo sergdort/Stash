@@ -84,8 +84,8 @@ function printError(message: string, jsonMode: boolean, code: string, exitCode: 
       ok: false,
       error: {
         code,
-        message
-      }
+        message,
+      },
     });
   } else {
     process.stderr.write(`${message}\n`);
@@ -150,7 +150,7 @@ function serializeItem(row: ItemRow, tags: string[]): StashItem {
     created_at: toIso(row.created_at) as string,
     updated_at: toIso(row.updated_at) as string,
     read_at: toIso(row.read_at),
-    archived_at: toIso(row.archived_at)
+    archived_at: toIso(row.archived_at),
   };
 }
 
@@ -160,12 +160,15 @@ function handleActionError(error: unknown, jsonMode: boolean): never {
   }
 
   const message = error instanceof Error ? error.message : "Unknown error";
-  if (message.includes("Could not locate the bindings file") || message.includes("better_sqlite3.node")) {
+  if (
+    message.includes("Could not locate the bindings file") ||
+    message.includes("better_sqlite3.node")
+  ) {
     printError(
       "SQLite native bindings are missing for better-sqlite3. Run `pnpm approve-builds`, then `pnpm rebuild better-sqlite3`.",
       jsonMode,
       "SQLITE_BINDINGS_MISSING",
-      2
+      2,
     );
   }
 
@@ -174,7 +177,7 @@ function handleActionError(error: unknown, jsonMode: boolean): never {
       "Database schema is not initialized. Run `stash db migrate`.",
       jsonMode,
       "MIGRATION_REQUIRED",
-      2
+      2,
     );
   }
 
@@ -191,7 +194,10 @@ function withDb<T>(dbPath: string, action: (sqlite: ReturnType<typeof openSqlite
   }
 }
 
-async function withDbAsync<T>(dbPath: string, action: (sqlite: ReturnType<typeof openSqlite>) => Promise<T>): Promise<T> {
+async function withDbAsync<T>(
+  dbPath: string,
+  action: (sqlite: ReturnType<typeof openSqlite>) => Promise<T>,
+): Promise<T> {
   ensureDbDirectory(dbPath);
   const sqlite = openSqlite(dbPath);
   try {
@@ -210,7 +216,11 @@ function resolveMigrationsDir(value?: string): string {
 
 function ensureMigrationsDirExists(migrationsDir: string): void {
   if (!fs.existsSync(migrationsDir)) {
-    throw new CliError(`Migrations directory not found: ${migrationsDir}`, "MIGRATIONS_DIR_NOT_FOUND", 2);
+    throw new CliError(
+      `Migrations directory not found: ${migrationsDir}`,
+      "MIGRATIONS_DIR_NOT_FOUND",
+      2,
+    );
   }
 }
 
@@ -226,7 +236,10 @@ function withReadyDb<T>(dbPath: string, action: (sqlite: ReturnType<typeof openS
   return withDb(dbPath, action);
 }
 
-async function withReadyDbAsync<T>(dbPath: string, action: (sqlite: ReturnType<typeof openSqlite>) => Promise<T>): Promise<T> {
+async function withReadyDbAsync<T>(
+  dbPath: string,
+  action: (sqlite: ReturnType<typeof openSqlite>) => Promise<T>,
+): Promise<T> {
   ensureDbReady(dbPath);
   return withDbAsync(dbPath, action);
 }
@@ -242,13 +255,16 @@ function getItemTags(sqlite: ReturnType<typeof openSqlite>, itemId: number): str
        FROM item_tags it
        JOIN tags t ON t.id = it.tag_id
        WHERE it.item_id = ?
-       ORDER BY t.name ASC`
+       ORDER BY t.name ASC`,
     )
     .all(itemId) as Array<{ name: string }>;
   return rows.map((row) => row.name);
 }
 
-function getTagsMap(sqlite: ReturnType<typeof openSqlite>, itemIds: number[]): Map<number, string[]> {
+function getTagsMap(
+  sqlite: ReturnType<typeof openSqlite>,
+  itemIds: number[],
+): Map<number, string[]> {
   const map = new Map<number, string[]>();
   if (itemIds.length === 0) {
     return map;
@@ -261,7 +277,7 @@ function getTagsMap(sqlite: ReturnType<typeof openSqlite>, itemIds: number[]): M
        FROM item_tags it
        JOIN tags t ON t.id = it.tag_id
        WHERE it.item_id IN (${placeholders})
-       ORDER BY t.name ASC`
+       ORDER BY t.name ASC`,
     )
     .all(...itemIds) as Array<{ item_id: number; name: string }>;
 
@@ -279,7 +295,9 @@ function ensureTagId(sqlite: ReturnType<typeof openSqlite>, tag: string): number
   sqlite
     .prepare("INSERT INTO tags (name, created_at) VALUES (?, ?) ON CONFLICT(name) DO NOTHING")
     .run(tag, createdAt);
-  const row = sqlite.prepare("SELECT id FROM tags WHERE name = ?").get(tag) as { id: number } | undefined;
+  const row = sqlite.prepare("SELECT id FROM tags WHERE name = ?").get(tag) as
+    | { id: number }
+    | undefined;
   if (!row) {
     throw new CliError(`Could not resolve tag '${tag}'.`, "INTERNAL_ERROR", 1);
   }
@@ -287,7 +305,9 @@ function ensureTagId(sqlite: ReturnType<typeof openSqlite>, tag: string): number
 }
 
 function ensureItemExists(sqlite: ReturnType<typeof openSqlite>, itemId: number): void {
-  const row = sqlite.prepare("SELECT id FROM items WHERE id = ?").get(itemId) as { id: number } | undefined;
+  const row = sqlite.prepare("SELECT id FROM items WHERE id = ?").get(itemId) as
+    | { id: number }
+    | undefined;
   if (!row) {
     throw new CliError(`Item ${itemId} not found.`, "NOT_FOUND", 3);
   }
@@ -310,7 +330,7 @@ program
   .option(
     "--db-path <path>",
     "Path to SQLite database file",
-    process.env.STASH_DB_PATH ?? DEFAULT_DB_PATH
+    process.env.STASH_DB_PATH ?? DEFAULT_DB_PATH,
   );
 
 program.addHelpText(
@@ -330,7 +350,7 @@ Quick Reference:
   stash db doctor [--json] [--migrations-dir <path>] [--limit <n>]
 
 Use \`stash <command> --help\` for detailed options and examples.
-`
+`,
 );
 
 const dbCommand = program.command("db").description("Database utilities");
@@ -342,7 +362,7 @@ Examples:
   stash db migrate --json
   stash db doctor --json
   stash db doctor --limit 20
-`
+`,
 );
 
 dbCommand
@@ -367,7 +387,7 @@ dbCommand
           db_path: dbPath,
           migrations_dir: migrationsDir,
           applied_count: result.appliedCount,
-          applied: result.applied
+          applied: result.applied,
         });
         return;
       }
@@ -401,7 +421,7 @@ dbCommand
             pending: fs
               .readdirSync(migrationsDir)
               .filter((name) => name.endsWith(".sql"))
-              .sort((a, b) => a.localeCompare(b))
+              .sort((a, b) => a.localeCompare(b)),
           };
 
       if (jsonMode) {
@@ -413,7 +433,7 @@ dbCommand
           applied_count: status.applied.length,
           pending_count: status.pending.length,
           applied: status.applied.slice(-options.limit),
-          pending: status.pending.slice(0, options.limit)
+          pending: status.pending.slice(0, options.limit),
         });
         return;
       }
@@ -423,7 +443,9 @@ dbCommand
       process.stdout.write(`applied: ${status.applied.length}\n`);
       process.stdout.write(`pending: ${status.pending.length}\n`);
       if (status.pending.length > 0) {
-        process.stdout.write(`pending_preview:\n${status.pending.slice(0, options.limit).join("\n")}\n`);
+        process.stdout.write(
+          `pending_preview:\n${status.pending.slice(0, options.limit).join("\n")}\n`,
+        );
       }
     });
   });
@@ -435,93 +457,112 @@ program
   .option("--tag <name>", "Tag to attach (repeatable)", collectValues, [])
   .option("--no-extract", "Skip content extraction")
   .option("--json", "Print machine-readable JSON output")
-  .action(async (url: string, options: { title?: string; tag: string[]; extract?: boolean; json?: boolean }) => {
-    const jsonMode = Boolean(options.json);
+  .action(
+    async (
+      url: string,
+      options: { title?: string; tag: string[]; extract?: boolean; json?: boolean },
+    ) => {
+      const jsonMode = Boolean(options.json);
 
-    runDbAction(jsonMode, async () =>
-      withReadyDbAsync(resolveDbPath(program.opts().dbPath as string), async (sqlite) => {
-        const parsedUrl = parseUrl(url);
-        const normalizedTags = normalizeTags(options.tag ?? []);
-        const existing = sqlite.prepare("SELECT * FROM items WHERE url = ?").get(parsedUrl.toString()) as
-          | ItemRow
-          | undefined;
-        const timestamp = nowMs();
-        let created = false;
-        let itemId: number;
+      runDbAction(jsonMode, async () =>
+        withReadyDbAsync(resolveDbPath(program.opts().dbPath as string), async (sqlite) => {
+          const parsedUrl = parseUrl(url);
+          const normalizedTags = normalizeTags(options.tag ?? []);
+          const existing = sqlite
+            .prepare("SELECT * FROM items WHERE url = ?")
+            .get(parsedUrl.toString()) as ItemRow | undefined;
+          const timestamp = nowMs();
+          let created = false;
+          let itemId: number | undefined;
 
-        const tx = sqlite.transaction(() => {
-          if (existing) {
-            itemId = existing.id;
-            if (!existing.title && options.title) {
-              sqlite
-                .prepare("UPDATE items SET title = ?, updated_at = ? WHERE id = ?")
-                .run(options.title.trim(), timestamp, existing.id);
-            }
-          } else {
-            const result = sqlite
-              .prepare(
-                `INSERT INTO items
-                 (url, title, domain, status, is_starred, created_at, updated_at, read_at, archived_at)
-                 VALUES (?, ?, ?, 'unread', 0, ?, ?, NULL, NULL)`
-              )
-              .run(parsedUrl.toString(), options.title?.trim() || null, parsedUrl.hostname, timestamp, timestamp);
-            itemId = Number(result.lastInsertRowid);
-            created = true;
-          }
-
-          for (const tag of normalizedTags) {
-            const tagId = ensureTagId(sqlite, tag);
-            sqlite
-              .prepare("INSERT OR IGNORE INTO item_tags (item_id, tag_id, created_at) VALUES (?, ?, ?)")
-              .run(itemId, tagId, timestamp);
-          }
-        });
-
-        tx();
-
-        const row = getItemRowById(sqlite, itemId!);
-        if (!row) {
-          throw new CliError("Saved item could not be reloaded.", "INTERNAL_ERROR", 1);
-        }
-        
-        // Extract content if not disabled
-        if (options.extract !== false && created) {
-          try {
-            const extracted = await extractContent(parsedUrl.toString());
-            if (extracted && extracted.textContent) {
-              // Save to notes table
-              sqlite
-                .prepare("INSERT OR REPLACE INTO notes (item_id, content, updated_at) VALUES (?, ?, ?)")
-                .run(itemId!, extracted.textContent, timestamp);
-                
-              // Update title if we got a better one
-              if (extracted.title && !options.title) {
+          const tx = sqlite.transaction(() => {
+            if (existing) {
+              itemId = existing.id;
+              if (!existing.title && options.title) {
                 sqlite
                   .prepare("UPDATE items SET title = ?, updated_at = ? WHERE id = ?")
-                  .run(extracted.title, timestamp, itemId!);
+                  .run(options.title.trim(), timestamp, existing.id);
               }
+            } else {
+              const result = sqlite
+                .prepare(
+                  `INSERT INTO items
+                 (url, title, domain, status, is_starred, created_at, updated_at, read_at, archived_at)
+                 VALUES (?, ?, ?, 'unread', 0, ?, ?, NULL, NULL)`,
+                )
+                .run(
+                  parsedUrl.toString(),
+                  options.title?.trim() || null,
+                  parsedUrl.hostname,
+                  timestamp,
+                  timestamp,
+                );
+              itemId = Number(result.lastInsertRowid);
+              created = true;
             }
-          } catch (error) {
-            console.error("Failed to extract content:", error);
-            // Continue without extraction on error
-          }
-        }
-        
-        const item = serializeItem(row, getItemTags(sqlite, row.id));
 
-        if (jsonMode) {
-          printJson({
-            ok: true,
-            created,
-            item
+            for (const tag of normalizedTags) {
+              const tagId = ensureTagId(sqlite, tag);
+              sqlite
+                .prepare(
+                  "INSERT OR IGNORE INTO item_tags (item_id, tag_id, created_at) VALUES (?, ?, ?)",
+                )
+                .run(itemId, tagId, timestamp);
+            }
           });
-          return;
-        }
 
-        process.stdout.write(`${created ? "saved" : "exists"} #${item.id} ${item.url}\n`);
-      })
-    );
-  });
+          tx();
+
+          if (itemId === undefined) {
+            throw new CliError("Saved item id could not be determined.", "INTERNAL_ERROR", 1);
+          }
+
+          const row = getItemRowById(sqlite, itemId);
+          if (!row) {
+            throw new CliError("Saved item could not be reloaded.", "INTERNAL_ERROR", 1);
+          }
+
+          // Extract content if not disabled
+          if (options.extract !== false && created) {
+            try {
+              const extracted = await extractContent(parsedUrl.toString());
+              if (extracted?.textContent) {
+                // Save to notes table
+                sqlite
+                  .prepare(
+                    "INSERT OR REPLACE INTO notes (item_id, content, updated_at) VALUES (?, ?, ?)",
+                  )
+                  .run(itemId, extracted.textContent, timestamp);
+
+                // Update title if we got a better one
+                if (extracted.title && !options.title) {
+                  sqlite
+                    .prepare("UPDATE items SET title = ?, updated_at = ? WHERE id = ?")
+                    .run(extracted.title, timestamp, itemId);
+                }
+              }
+            } catch (error) {
+              console.error("Failed to extract content:", error);
+              // Continue without extraction on error
+            }
+          }
+
+          const item = serializeItem(row, getItemTags(sqlite, row.id));
+
+          if (jsonMode) {
+            printJson({
+              ok: true,
+              created,
+              item,
+            });
+            return;
+          }
+
+          process.stdout.write(`${created ? "saved" : "exists"} #${item.id} ${item.url}\n`);
+        }),
+      );
+    },
+  );
 
 program
   .command("list")
@@ -546,7 +587,12 @@ program
       const status = options.status as ItemStatus | undefined;
 
       if (status && !["unread", "read", "archived"].includes(status)) {
-        printError("Invalid status. Use unread, read, or archived.", jsonMode, "VALIDATION_ERROR", 2);
+        printError(
+          "Invalid status. Use unread, read, or archived.",
+          jsonMode,
+          "VALIDATION_ERROR",
+          2,
+        );
       }
       if (!["any", "all"].includes(tagMode)) {
         printError("Invalid tag mode. Use any or all.", jsonMode, "VALIDATION_ERROR", 2);
@@ -573,7 +619,7 @@ program
                    JOIN tags t ON t.id = it.tag_id
                    WHERE it.item_id = i.id
                      AND t.name IN (${placeholders})
-                 )`
+                 )`,
               );
               params.push(...tags);
             } else {
@@ -585,7 +631,7 @@ program
                      JOIN tags t ON t.id = it.tag_id
                      WHERE it.item_id = i.id
                        AND t.name = ?
-                   )`
+                   )`,
                 );
                 params.push(tag);
               }
@@ -599,13 +645,13 @@ program
                FROM items i
                ${whereClause}
                ORDER BY i.created_at DESC, i.id DESC
-               LIMIT ? OFFSET ?`
+               LIMIT ? OFFSET ?`,
             )
             .all(...params, options.limit, options.offset) as ItemRow[];
 
           const tagsMap = getTagsMap(
             sqlite,
-            rows.map((row) => row.id)
+            rows.map((row) => row.id),
           );
           const items = rows.map((row) => serializeItem(row, tagsMap.get(row.id) ?? []));
 
@@ -616,8 +662,8 @@ program
               paging: {
                 limit: options.limit,
                 offset: options.offset,
-                returned: items.length
-              }
+                returned: items.length,
+              },
             });
             return;
           }
@@ -632,9 +678,9 @@ program
             const displayTags = item.tags.length > 0 ? ` [${item.tags.join(", ")}]` : "";
             process.stdout.write(`#${item.id} ${item.status} ${displayTitle}${displayTags}\n`);
           }
-        })
+        }),
       );
-    }
+    },
   );
 
 const tagsCommand = program.command("tags").description("Tag utilities");
@@ -645,7 +691,7 @@ tagsCommand.addHelpText(
 Examples:
   stash tags list
   stash tags list --limit 100 --offset 0 --json
-`
+`,
 );
 
 tagsCommand
@@ -666,7 +712,7 @@ tagsCommand
              LEFT JOIN item_tags it ON it.tag_id = t.id
              GROUP BY t.id
              ORDER BY t.name ASC
-             LIMIT ? OFFSET ?`
+             LIMIT ? OFFSET ?`,
           )
           .all(options.limit, options.offset) as Array<{ name: string; item_count: number }>;
 
@@ -679,8 +725,8 @@ tagsCommand
             paging: {
               limit: options.limit,
               offset: options.offset,
-              returned: tags.length
-            }
+              returned: tags.length,
+            },
           });
           return;
         }
@@ -693,7 +739,7 @@ tagsCommand
         for (const tag of tags) {
           process.stdout.write(`${tag.name}\t${tag.item_count}\n`);
         }
-      })
+      }),
     );
   });
 
@@ -705,7 +751,7 @@ tagCommand.addHelpText(
 Examples:
   stash tag add 1 ai
   stash tag rm 1 ai --json
-`
+`,
 );
 
 tagCommand
@@ -724,7 +770,9 @@ tagCommand
         const tx = sqlite.transaction(() => {
           const tagId = ensureTagId(sqlite, normalizedTag);
           return sqlite
-            .prepare("INSERT OR IGNORE INTO item_tags (item_id, tag_id, created_at) VALUES (?, ?, ?)")
+            .prepare(
+              "INSERT OR IGNORE INTO item_tags (item_id, tag_id, created_at) VALUES (?, ?, ?)",
+            )
             .run(itemId, tagId, timestamp);
         });
         const result = tx() as { changes: number };
@@ -735,13 +783,15 @@ tagCommand
             ok: true,
             item_id: itemId,
             tag: normalizedTag,
-            added
+            added,
           });
           return;
         }
 
-        process.stdout.write(`${added ? "added" : "exists"} tag '${normalizedTag}' on #${itemId}\n`);
-      })
+        process.stdout.write(
+          `${added ? "added" : "exists"} tag '${normalizedTag}' on #${itemId}\n`,
+        );
+      }),
     );
   });
 
@@ -774,17 +824,22 @@ tagCommand
             ok: true,
             item_id: itemId,
             tag: normalizedTag,
-            removed
+            removed,
           });
           return;
         }
 
-        process.stdout.write(`${removed ? "removed" : "missing"} tag '${normalizedTag}' on #${itemId}\n`);
-      })
+        process.stdout.write(
+          `${removed ? "removed" : "missing"} tag '${normalizedTag}' on #${itemId}\n`,
+        );
+      }),
     );
   });
 
-function markItemStatus(status: Exclude<ItemStatus, "archived">, itemId: number): { itemId: number; status: ItemStatus } {
+function markItemStatus(
+  status: Exclude<ItemStatus, "archived">,
+  itemId: number,
+): { itemId: number; status: ItemStatus } {
   const dbPath = resolveDbPath(program.opts().dbPath as string);
 
   return withReadyDb(dbPath, (sqlite) => {
@@ -793,12 +848,12 @@ function markItemStatus(status: Exclude<ItemStatus, "archived">, itemId: number)
       status === "read"
         ? sqlite
             .prepare(
-              "UPDATE items SET status = 'read', read_at = ?, archived_at = NULL, updated_at = ? WHERE id = ?"
+              "UPDATE items SET status = 'read', read_at = ?, archived_at = NULL, updated_at = ? WHERE id = ?",
             )
             .run(timestamp, timestamp, itemId)
         : sqlite
             .prepare(
-              "UPDATE items SET status = 'unread', read_at = NULL, archived_at = NULL, updated_at = ? WHERE id = ?"
+              "UPDATE items SET status = 'unread', read_at = NULL, archived_at = NULL, updated_at = ? WHERE id = ?",
             )
             .run(timestamp, itemId);
 
@@ -818,7 +873,7 @@ markCommand.addHelpText(
 Examples:
   stash mark read 1
   stash mark unread 1 --json
-`
+`,
 );
 
 markCommand
@@ -836,7 +891,7 @@ markCommand
           ok: true,
           item_id: result.itemId,
           action: "mark_read",
-          status: result.status
+          status: result.status,
         });
         return;
       }
@@ -859,7 +914,7 @@ markCommand
           ok: true,
           item_id: result.itemId,
           action: "mark_unread",
-          status: result.status
+          status: result.status,
         });
         return;
       }
@@ -881,7 +936,7 @@ program
           ok: true,
           item_id: result.itemId,
           action: "mark_read",
-          status: result.status
+          status: result.status,
         });
         return;
       }
@@ -903,7 +958,7 @@ program
           ok: true,
           item_id: result.itemId,
           action: "mark_unread",
-          status: result.status
+          status: result.status,
         });
         return;
       }
@@ -914,7 +969,7 @@ program
 program.configureOutput({
   outputError: (str, write) => {
     write(str);
-  }
+  },
 });
 
 try {

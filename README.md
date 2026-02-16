@@ -21,6 +21,21 @@ pnpm rebuild better-sqlite3
 pnpm run setup
 ```
 
+## Code Quality
+
+```bash
+pnpm run lint
+pnpm run format:check
+pnpm run check
+```
+
+To apply formatting and safe lint fixes:
+
+```bash
+pnpm run format
+pnpm run lint:fix
+```
+
 ## Global Install
 
 For local development (before publishing):

@@ -15,7 +15,7 @@ function ensureMigrationTable(sqlite: ReturnType<typeof openSqlite>): void {
     `CREATE TABLE IF NOT EXISTS ${MIGRATIONS_TABLE} (
       name TEXT PRIMARY KEY,
       applied_at INTEGER NOT NULL
-    )`
+    )`,
   );
 }
 
@@ -36,7 +36,9 @@ export function getMigrationStatus(dbPath: string, migrationsDir: string): Migra
     ensureMigrationTable(sqlite);
 
     const migrationFiles = getMigrationFiles(migrationsDir);
-    const rows = sqlite.prepare(`SELECT name FROM ${MIGRATIONS_TABLE} ORDER BY name`).all() as Array<{
+    const rows = sqlite
+      .prepare(`SELECT name FROM ${MIGRATIONS_TABLE} ORDER BY name`)
+      .all() as Array<{
       name: string;
     }>;
     const appliedSet = new Set(rows.map((row) => row.name));
@@ -50,12 +52,17 @@ export function getMigrationStatus(dbPath: string, migrationsDir: string): Migra
   }
 }
 
-export function runMigrations(dbPath: string, migrationsDir: string): { appliedCount: number; applied: string[] } {
+export function runMigrations(
+  dbPath: string,
+  migrationsDir: string,
+): { appliedCount: number; applied: string[] } {
   const sqlite = openSqlite(dbPath);
   try {
     ensureMigrationTable(sqlite);
     const migrationFiles = getMigrationFiles(migrationsDir);
-    const rows = sqlite.prepare(`SELECT name FROM ${MIGRATIONS_TABLE} ORDER BY name`).all() as Array<{
+    const rows = sqlite
+      .prepare(`SELECT name FROM ${MIGRATIONS_TABLE} ORDER BY name`)
+      .all() as Array<{
       name: string;
     }>;
     const appliedSet = new Set(rows.map((row) => row.name));

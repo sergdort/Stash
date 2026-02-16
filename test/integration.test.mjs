@@ -17,8 +17,8 @@ function runCli(dbPath, args, expectedCode = 0) {
     encoding: "utf8",
     env: {
       ...process.env,
-      STASH_DB_PATH: dbPath
-    }
+      STASH_DB_PATH: dbPath,
+    },
   });
 
   if (result.error) {
@@ -28,12 +28,12 @@ function runCli(dbPath, args, expectedCode = 0) {
   assert.strictEqual(
     result.status,
     expectedCode,
-    `Command failed: node dist/cli.js ${args.join(" ")}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+    `Command failed: node dist/cli.js ${args.join(" ")}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
   );
 
   return {
     stdout: result.stdout.trim(),
-    stderr: result.stderr.trim()
+    stderr: result.stderr.trim(),
   };
 }
 
@@ -48,13 +48,13 @@ function probeSqliteBinding() {
     process.execPath,
     [
       "-e",
-      "import('better-sqlite3').then((mod) => { const Database = mod.default; const db = new Database(':memory:'); db.close(); process.exit(0); }).catch((error) => { console.error(error?.message ?? String(error)); process.exit(1); })"
+      "import('better-sqlite3').then((mod) => { const Database = mod.default; const db = new Database(':memory:'); db.close(); process.exit(0); }).catch((error) => { console.error(error?.message ?? String(error)); process.exit(1); })",
     ],
     {
       cwd: repoRoot,
       encoding: "utf8",
-      env: process.env
-    }
+      env: process.env,
+    },
   );
 }
 
@@ -99,19 +99,14 @@ test("integration: stash CLI lifecycle", { concurrency: false }, (t) => {
       "--tag",
       "AI",
       "--tag",
-      "cli"
+      "cli",
     ]);
     assert.strictEqual(firstSave.ok, true);
     assert.strictEqual(firstSave.created, true);
     assert.strictEqual(firstSave.item.status, "unread");
     assert.deepStrictEqual(firstSave.item.tags, ["ai", "cli"]);
 
-    const secondSave = runJson(dbPath, [
-      "save",
-      "https://example.com/article",
-      "--tag",
-      "news"
-    ]);
+    const secondSave = runJson(dbPath, ["save", "https://example.com/article", "--tag", "news"]);
     assert.strictEqual(secondSave.ok, true);
     assert.strictEqual(secondSave.created, false);
     assert.deepStrictEqual(secondSave.item.tags, ["ai", "cli", "news"]);
@@ -128,7 +123,7 @@ test("integration: stash CLI lifecycle", { concurrency: false }, (t) => {
       "--tag",
       "missing",
       "--tag-mode",
-      "any"
+      "any",
     ]);
     assert.strictEqual(anyTagList.items.length, 1);
 
@@ -139,7 +134,7 @@ test("integration: stash CLI lifecycle", { concurrency: false }, (t) => {
       "--tag",
       "news",
       "--tag-mode",
-      "all"
+      "all",
     ]);
     assert.strictEqual(allTagList.items.length, 1);
 
@@ -150,7 +145,7 @@ test("integration: stash CLI lifecycle", { concurrency: false }, (t) => {
       "--tag",
       "missing",
       "--tag-mode",
-      "all"
+      "all",
     ]);
     assert.strictEqual(nonMatchingAllTagList.items.length, 0);
 
@@ -158,7 +153,7 @@ test("integration: stash CLI lifecycle", { concurrency: false }, (t) => {
     assert.deepStrictEqual(tagsBeforeMutation.tags, [
       { name: "ai", item_count: 1 },
       { name: "cli", item_count: 1 },
-      { name: "news", item_count: 1 }
+      { name: "news", item_count: 1 },
     ]);
 
     const addTag = runJson(dbPath, ["tag", "add", "1", "productivity"]);
@@ -174,7 +169,7 @@ test("integration: stash CLI lifecycle", { concurrency: false }, (t) => {
       { name: "ai", item_count: 1 },
       { name: "cli", item_count: 1 },
       { name: "news", item_count: 1 },
-      { name: "productivity", item_count: 1 }
+      { name: "productivity", item_count: 1 },
     ]);
 
     const removeTag = runJson(dbPath, ["tag", "rm", "1", "productivity"]);

@@ -10,7 +10,12 @@
   "scripts": {
     "setup": "pnpm run build && node dist/cli.js db migrate --json",
     "build": "tsc -p tsconfig.json",
+    "check": "pnpm run lint && pnpm run format:check && pnpm run build",
     "dev": "tsx src/cli.ts",
+    "lint": "biome lint . --error-on-warnings",
+    "lint:fix": "biome lint . --write --error-on-warnings",
+    "format": "biome format . --write",
+    "format:check": "biome format .",
     "test": "pnpm run test:integration",
     "test:integration": "pnpm run build && node --test test/integration.test.mjs",
     "start": "node dist/cli.js",
@@ -31,6 +36,8 @@
     "linkedom": "^0.18.12"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.13.10",
     "drizzle-kit": "^0.30.4",
     "tsx": "^4.19.3",

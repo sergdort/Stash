@@ -5,6 +5,6 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "sqlite",
   dbCredentials: {
-    url: "./.local/stash.db"
-  }
+    url: "./.local/stash.db",
+  },
 });
