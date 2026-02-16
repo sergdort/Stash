@@ -11,18 +11,24 @@ CREATE TABLE IF NOT EXISTS items (
   archived_at INTEGER,
   CONSTRAINT items_status_check CHECK (status IN ('unread', 'read', 'archived'))
 );
+--> statement-breakpoint
 
 CREATE UNIQUE INDEX IF NOT EXISTS items_url_unique ON items(url);
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_items_status_created ON items(status, created_at, id);
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_items_created ON items(created_at, id);
+--> statement-breakpoint
 
 CREATE TABLE IF NOT EXISTS tags (
   id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
   name TEXT NOT NULL,
   created_at INTEGER NOT NULL
 );
+--> statement-breakpoint
 
 CREATE UNIQUE INDEX IF NOT EXISTS tags_name_unique ON tags(name);
+--> statement-breakpoint
 
 CREATE TABLE IF NOT EXISTS item_tags (
   item_id INTEGER NOT NULL,
@@ -32,8 +38,10 @@ CREATE TABLE IF NOT EXISTS item_tags (
   FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
   FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
 );
+--> statement-breakpoint
 
 CREATE INDEX IF NOT EXISTS idx_item_tags_tag_item ON item_tags(tag_id, item_id);
+--> statement-breakpoint
 
 CREATE TABLE IF NOT EXISTS notes (
   item_id INTEGER PRIMARY KEY NOT NULL,
