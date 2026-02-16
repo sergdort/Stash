@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { sql } from "drizzle-orm"
 import {
   check,
   index,
@@ -7,7 +7,7 @@ import {
   sqliteTable,
   text,
   uniqueIndex,
-} from "drizzle-orm/sqlite-core";
+} from "drizzle-orm/sqlite-core"
 
 export const items = sqliteTable(
   "items",
@@ -29,7 +29,7 @@ export const items = sqliteTable(
     index("idx_items_status_created").on(table.status, table.createdAt, table.id),
     index("idx_items_created").on(table.createdAt, table.id),
   ],
-);
+)
 
 export const tags = sqliteTable(
   "tags",
@@ -40,7 +40,7 @@ export const tags = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   },
   (table) => [uniqueIndex("tags_name_unique").on(table.name)],
-);
+)
 
 export const itemTags = sqliteTable(
   "item_tags",
@@ -57,7 +57,7 @@ export const itemTags = sqliteTable(
     primaryKey({ columns: [table.itemId, table.tagId] }),
     index("idx_item_tags_tag_item").on(table.tagId, table.itemId),
   ],
-);
+)
 
 export const notes = sqliteTable("notes", {
   itemId: integer("item_id")
@@ -65,4 +65,4 @@ export const notes = sqliteTable("notes", {
     .references(() => items.id, { onDelete: "cascade" }),
   content: text("content").notNull().default(""),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
-});
+})

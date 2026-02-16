@@ -1,81 +1,74 @@
 #!/usr/bin/env node
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import fs from "node:fs"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
 
-import { Command, InvalidArgumentError } from "commander";
+import { Command, InvalidArgumentError } from "commander"
+import { and, asc, desc, eq, exists, inArray, sql, type SQL } from "drizzle-orm"
 
-import { openSqlite } from "./db/client.js";
-import { getMigrationStatus, runMigrations } from "./db/migrate.js";
-import { DEFAULT_DB_PATH, resolveDbPath } from "./lib/paths.js";
-import { extractContent } from "./lib/extract.js";
+import { openDb, type StashDb } from "./db/client.js"
+import { getMigrationStatus, runMigrations } from "./db/migrate.js"
+import * as schema from "./db/schema.js"
+import { DEFAULT_DB_PATH, resolveDbPath } from "./lib/paths.js"
+import { extractContent } from "./lib/extract.js"
 
-const CLI_DIR = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_MIGRATIONS_DIR = path.resolve(CLI_DIR, "../drizzle");
+const CLI_DIR = path.dirname(fileURLToPath(import.meta.url))
+const DEFAULT_MIGRATIONS_DIR = path.resolve(CLI_DIR, "../drizzle")
 
-type ItemStatus = "unread" | "read" | "archived";
-type TagMode = "any" | "all";
+type ItemStatus = "unread" | "read" | "archived"
+type TagMode = "any" | "all"
 
-type ItemRow = {
-  id: number;
-  url: string;
-  title: string | null;
-  domain: string | null;
-  status: ItemStatus;
-  is_starred: number;
-  created_at: number;
-  updated_at: number;
-  read_at: number | null;
-  archived_at: number | null;
-};
+type ItemRow = typeof schema.items.$inferSelect & { status: ItemStatus }
+type Db = StashDb
+type DbExecutor = Pick<Db, "insert" | "select">
 
 type StashItem = {
-  id: number;
-  url: string;
-  title: string | null;
-  domain: string | null;
-  status: ItemStatus;
-  is_starred: boolean;
-  tags: string[];
-  created_at: string;
-  updated_at: string;
-  read_at: string | null;
-  archived_at: string | null;
-};
+  id: number
+  url: string
+  title: string | null
+  domain: string | null
+  status: ItemStatus
+  is_starred: boolean
+  tags: string[]
+  created_at: string
+  updated_at: string
+  read_at: string | null
+  archived_at: string | null
+}
 
 class CliError extends Error {
-  code: string;
-  exitCode: number;
+  code: string
+  exitCode: number
 
   constructor(message: string, code: string, exitCode: number) {
-    super(message);
-    this.code = code;
-    this.exitCode = exitCode;
+    super(message)
+    this.code = code
+    this.exitCode = exitCode
   }
 }
 
 function parsePositiveInt(value: string): number {
-  const parsed = Number.parseInt(value, 10);
+  const parsed = Number.parseInt(value, 10)
   if (!Number.isInteger(parsed) || parsed < 1) {
-    throw new InvalidArgumentError("Expected a positive integer.");
+    throw new InvalidArgumentError("Expected a positive integer.")
   }
-  return parsed;
+  return parsed
 }
 
 function parseNonNegativeInt(value: string): number {
-  const parsed = Number.parseInt(value, 10);
+  const parsed = Number.parseInt(value, 10)
   if (!Number.isInteger(parsed) || parsed < 0) {
-    throw new InvalidArgumentError("Expected a non-negative integer.");
+    throw new InvalidArgumentError("Expected a non-negative integer.")
   }
-  return parsed;
+  return parsed
 }
 
 function collectValues(value: string, previous: string[]): string[] {
-  return [...previous, value];
+  return [...previous, value]
 }
 
 function printJson(value: unknown): void {
-  process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify(value, null, 2)}\n`)
 }
 
 function printError(message: string, jsonMode: boolean, code: string, exitCode: number): never {
@@ -86,55 +79,55 @@ function printError(message: string, jsonMode: boolean, code: string, exitCode: 
         code,
         message,
       },
-    });
+    })
   } else {
-    process.stderr.write(`${message}\n`);
+    process.stderr.write(`${message}\n`)
   }
-  process.exit(exitCode);
+  process.exit(exitCode)
 }
 
 function ensureDbDirectory(dbPath: string): void {
-  const dir = path.dirname(dbPath);
-  fs.mkdirSync(dir, { recursive: true });
+  const dir = path.dirname(dbPath)
+  fs.mkdirSync(dir, { recursive: true })
 }
 
 function nowMs(): number {
-  return Date.now();
+  return Date.now()
 }
 
-function toIso(value: number | null): string | null {
+function toIso(value: Date | number | null): string | null {
   if (value === null) {
-    return null;
+    return null
   }
-  return new Date(value).toISOString();
+  return (value instanceof Date ? value : new Date(value)).toISOString()
 }
 
 function normalizeTag(tag: string): string {
-  const normalized = tag.trim().toLowerCase();
+  const normalized = tag.trim().toLowerCase()
   if (normalized.length === 0) {
-    throw new CliError("Tag cannot be empty.", "VALIDATION_ERROR", 2);
+    throw new CliError("Tag cannot be empty.", "VALIDATION_ERROR", 2)
   }
-  return normalized;
+  return normalized
 }
 
 function normalizeTags(tags: string[]): string[] {
-  const values = tags.map(normalizeTag);
-  return [...new Set(values)];
+  const values = tags.map(normalizeTag)
+  return [...new Set(values)]
 }
 
 function parseItemId(value: string): number {
-  const parsed = Number.parseInt(value, 10);
+  const parsed = Number.parseInt(value, 10)
   if (!Number.isInteger(parsed) || parsed < 1) {
-    throw new CliError("Item id must be a positive integer.", "VALIDATION_ERROR", 2);
+    throw new CliError("Item id must be a positive integer.", "VALIDATION_ERROR", 2)
   }
-  return parsed;
+  return parsed
 }
 
 function parseUrl(value: string): URL {
   try {
-    return new URL(value);
+    return new URL(value)
   } catch {
-    throw new CliError(`Invalid URL: ${value}`, "VALIDATION_ERROR", 2);
+    throw new CliError(`Invalid URL: ${value}`, "VALIDATION_ERROR", 2)
   }
 }
 
@@ -145,21 +138,21 @@ function serializeItem(row: ItemRow, tags: string[]): StashItem {
     title: row.title,
     domain: row.domain,
     status: row.status,
-    is_starred: Boolean(row.is_starred),
+    is_starred: row.isStarred,
     tags,
-    created_at: toIso(row.created_at) as string,
-    updated_at: toIso(row.updated_at) as string,
-    read_at: toIso(row.read_at),
-    archived_at: toIso(row.archived_at),
-  };
+    created_at: toIso(row.createdAt) as string,
+    updated_at: toIso(row.updatedAt) as string,
+    read_at: toIso(row.readAt),
+    archived_at: toIso(row.archivedAt),
+  }
 }
 
 function handleActionError(error: unknown, jsonMode: boolean): never {
   if (error instanceof CliError) {
-    printError(error.message, jsonMode, error.code, error.exitCode);
+    printError(error.message, jsonMode, error.code, error.exitCode)
   }
 
-  const message = error instanceof Error ? error.message : "Unknown error";
+  const message = error instanceof Error ? error.message : "Unknown error"
   if (
     message.includes("Could not locate the bindings file") ||
     message.includes("better_sqlite3.node")
@@ -169,7 +162,7 @@ function handleActionError(error: unknown, jsonMode: boolean): never {
       jsonMode,
       "SQLITE_BINDINGS_MISSING",
       2,
-    );
+    )
   }
 
   if (message.includes("no such table")) {
@@ -178,40 +171,37 @@ function handleActionError(error: unknown, jsonMode: boolean): never {
       jsonMode,
       "MIGRATION_REQUIRED",
       2,
-    );
+    )
   }
 
-  printError(message, jsonMode, "INTERNAL_ERROR", 1);
+  printError(message, jsonMode, "INTERNAL_ERROR", 1)
 }
 
-function withDb<T>(dbPath: string, action: (sqlite: ReturnType<typeof openSqlite>) => T): T {
-  ensureDbDirectory(dbPath);
-  const sqlite = openSqlite(dbPath);
+function withDb<T>(dbPath: string, action: (db: Db) => T): T {
+  ensureDbDirectory(dbPath)
+  const { db, sqlite } = openDb(dbPath)
   try {
-    return action(sqlite);
+    return action(db)
   } finally {
-    sqlite.close();
+    sqlite.close()
   }
 }
 
-async function withDbAsync<T>(
-  dbPath: string,
-  action: (sqlite: ReturnType<typeof openSqlite>) => Promise<T>,
-): Promise<T> {
-  ensureDbDirectory(dbPath);
-  const sqlite = openSqlite(dbPath);
+async function withDbAsync<T>(dbPath: string, action: (db: Db) => Promise<T>): Promise<T> {
+  ensureDbDirectory(dbPath)
+  const { db, sqlite } = openDb(dbPath)
   try {
-    return await action(sqlite);
+    return await action(db)
   } finally {
-    sqlite.close();
+    sqlite.close()
   }
 }
 
 function resolveMigrationsDir(value?: string): string {
   if (!value || value.trim().length === 0) {
-    return DEFAULT_MIGRATIONS_DIR;
+    return DEFAULT_MIGRATIONS_DIR
   }
-  return path.resolve(value);
+  return path.resolve(value)
 }
 
 function ensureMigrationsDirExists(migrationsDir: string): void {
@@ -220,108 +210,108 @@ function ensureMigrationsDirExists(migrationsDir: string): void {
       `Migrations directory not found: ${migrationsDir}`,
       "MIGRATIONS_DIR_NOT_FOUND",
       2,
-    );
+    )
   }
 }
 
 function ensureDbReady(dbPath: string): void {
-  const migrationsDir = resolveMigrationsDir();
-  ensureMigrationsDirExists(migrationsDir);
-  ensureDbDirectory(dbPath);
-  runMigrations(dbPath, migrationsDir);
+  const migrationsDir = resolveMigrationsDir()
+  ensureMigrationsDirExists(migrationsDir)
+  ensureDbDirectory(dbPath)
+  runMigrations(dbPath, migrationsDir)
 }
 
-function withReadyDb<T>(dbPath: string, action: (sqlite: ReturnType<typeof openSqlite>) => T): T {
-  ensureDbReady(dbPath);
-  return withDb(dbPath, action);
+function withReadyDb<T>(dbPath: string, action: (db: Db) => T): T {
+  ensureDbReady(dbPath)
+  return withDb(dbPath, action)
 }
 
-async function withReadyDbAsync<T>(
-  dbPath: string,
-  action: (sqlite: ReturnType<typeof openSqlite>) => Promise<T>,
-): Promise<T> {
-  ensureDbReady(dbPath);
-  return withDbAsync(dbPath, action);
+async function withReadyDbAsync<T>(dbPath: string, action: (db: Db) => Promise<T>): Promise<T> {
+  ensureDbReady(dbPath)
+  return withDbAsync(dbPath, action)
 }
 
-function getItemRowById(sqlite: ReturnType<typeof openSqlite>, id: number): ItemRow | undefined {
-  return sqlite.prepare("SELECT * FROM items WHERE id = ?").get(id) as ItemRow | undefined;
+function getItemRowById(db: Db, id: number): ItemRow | undefined {
+  return db.select().from(schema.items).where(eq(schema.items.id, id)).get() as ItemRow | undefined
 }
 
-function getItemTags(sqlite: ReturnType<typeof openSqlite>, itemId: number): string[] {
-  const rows = sqlite
-    .prepare(
-      `SELECT t.name
-       FROM item_tags it
-       JOIN tags t ON t.id = it.tag_id
-       WHERE it.item_id = ?
-       ORDER BY t.name ASC`,
-    )
-    .all(itemId) as Array<{ name: string }>;
-  return rows.map((row) => row.name);
+function getItemTags(db: Db, itemId: number): string[] {
+  const rows = db
+    .select({ name: schema.tags.name })
+    .from(schema.itemTags)
+    .innerJoin(schema.tags, eq(schema.tags.id, schema.itemTags.tagId))
+    .where(eq(schema.itemTags.itemId, itemId))
+    .orderBy(asc(schema.tags.name))
+    .all()
+  return rows.map((row) => row.name)
 }
 
-function getTagsMap(
-  sqlite: ReturnType<typeof openSqlite>,
-  itemIds: number[],
-): Map<number, string[]> {
-  const map = new Map<number, string[]>();
+function getTagsMap(db: Db, itemIds: number[]): Map<number, string[]> {
+  const map = new Map<number, string[]>()
   if (itemIds.length === 0) {
-    return map;
+    return map
   }
 
-  const placeholders = itemIds.map(() => "?").join(", ");
-  const rows = sqlite
-    .prepare(
-      `SELECT it.item_id AS item_id, t.name AS name
-       FROM item_tags it
-       JOIN tags t ON t.id = it.tag_id
-       WHERE it.item_id IN (${placeholders})
-       ORDER BY t.name ASC`,
-    )
-    .all(...itemIds) as Array<{ item_id: number; name: string }>;
+  const rows = db
+    .select({
+      itemId: schema.itemTags.itemId,
+      name: schema.tags.name,
+    })
+    .from(schema.itemTags)
+    .innerJoin(schema.tags, eq(schema.tags.id, schema.itemTags.tagId))
+    .where(inArray(schema.itemTags.itemId, itemIds))
+    .orderBy(asc(schema.tags.name))
+    .all()
 
   for (const row of rows) {
-    const values = map.get(row.item_id) ?? [];
-    values.push(row.name);
-    map.set(row.item_id, values);
+    const values = map.get(row.itemId) ?? []
+    values.push(row.name)
+    map.set(row.itemId, values)
   }
 
-  return map;
+  return map
 }
 
-function ensureTagId(sqlite: ReturnType<typeof openSqlite>, tag: string): number {
-  const createdAt = nowMs();
-  sqlite
-    .prepare("INSERT INTO tags (name, created_at) VALUES (?, ?) ON CONFLICT(name) DO NOTHING")
-    .run(tag, createdAt);
-  const row = sqlite.prepare("SELECT id FROM tags WHERE name = ?").get(tag) as
-    | { id: number }
-    | undefined;
+function ensureTagId(db: DbExecutor, tag: string, createdAt: Date): number {
+  db.insert(schema.tags)
+    .values({
+      name: tag,
+      createdAt,
+    })
+    .onConflictDoNothing({ target: schema.tags.name })
+    .run()
+
+  const row = db
+    .select({ id: schema.tags.id })
+    .from(schema.tags)
+    .where(eq(schema.tags.name, tag))
+    .get()
   if (!row) {
-    throw new CliError(`Could not resolve tag '${tag}'.`, "INTERNAL_ERROR", 1);
+    throw new CliError(`Could not resolve tag '${tag}'.`, "INTERNAL_ERROR", 1)
   }
-  return row.id;
+  return row.id
 }
 
-function ensureItemExists(sqlite: ReturnType<typeof openSqlite>, itemId: number): void {
-  const row = sqlite.prepare("SELECT id FROM items WHERE id = ?").get(itemId) as
-    | { id: number }
-    | undefined;
+function ensureItemExists(db: Db, itemId: number): void {
+  const row = db
+    .select({ id: schema.items.id })
+    .from(schema.items)
+    .where(eq(schema.items.id, itemId))
+    .get()
   if (!row) {
-    throw new CliError(`Item ${itemId} not found.`, "NOT_FOUND", 3);
+    throw new CliError(`Item ${itemId} not found.`, "NOT_FOUND", 3)
   }
 }
 
 function runDbAction<T>(jsonMode: boolean, action: () => T): T {
   try {
-    return action();
+    return action()
   } catch (error) {
-    handleActionError(error, jsonMode);
+    handleActionError(error, jsonMode)
   }
 }
 
-const program = new Command();
+const program = new Command()
 
 program
   .name("stash")
@@ -331,7 +321,7 @@ program
     "--db-path <path>",
     "Path to SQLite database file",
     process.env.STASH_DB_PATH ?? DEFAULT_DB_PATH,
-  );
+  )
 
 program.addHelpText(
   "afterAll",
@@ -351,9 +341,9 @@ Quick Reference:
 
 Use \`stash <command> --help\` for detailed options and examples.
 `,
-);
+)
 
-const dbCommand = program.command("db").description("Database utilities");
+const dbCommand = program.command("db").description("Database utilities")
 
 dbCommand.addHelpText(
   "after",
@@ -363,7 +353,7 @@ Examples:
   stash db doctor --json
   stash db doctor --limit 20
 `,
-);
+)
 
 dbCommand
   .command("migrate")
@@ -371,15 +361,15 @@ dbCommand
   .option("--json", "Print machine-readable JSON output")
   .option("--migrations-dir <path>", "Path to migrations directory", DEFAULT_MIGRATIONS_DIR)
   .action((options: { json?: boolean; migrationsDir: string }) => {
-    const jsonMode = Boolean(options.json);
+    const jsonMode = Boolean(options.json)
     runDbAction(jsonMode, () => {
-      const dbPath = resolveDbPath(program.opts().dbPath as string);
-      const migrationsDir = resolveMigrationsDir(options.migrationsDir);
+      const dbPath = resolveDbPath(program.opts().dbPath as string)
+      const migrationsDir = resolveMigrationsDir(options.migrationsDir)
 
-      ensureMigrationsDirExists(migrationsDir);
+      ensureMigrationsDirExists(migrationsDir)
 
-      ensureDbDirectory(dbPath);
-      const result = runMigrations(dbPath, migrationsDir);
+      ensureDbDirectory(dbPath)
+      const result = runMigrations(dbPath, migrationsDir)
 
       if (jsonMode) {
         printJson({
@@ -388,16 +378,16 @@ dbCommand
           migrations_dir: migrationsDir,
           applied_count: result.appliedCount,
           applied: result.applied,
-        });
-        return;
+        })
+        return
       }
 
-      process.stdout.write(`Applied ${result.appliedCount} migration(s).\n`);
+      process.stdout.write(`Applied ${result.appliedCount} migration(s).\n`)
       if (result.applied.length > 0) {
-        process.stdout.write(`${result.applied.join("\n")}\n`);
+        process.stdout.write(`${result.applied.join("\n")}\n`)
       }
-    });
-  });
+    })
+  })
 
 dbCommand
   .command("doctor")
@@ -406,14 +396,14 @@ dbCommand
   .option("--migrations-dir <path>", "Path to migrations directory", DEFAULT_MIGRATIONS_DIR)
   .option("--limit <n>", "Limit rows returned for preview output", parsePositiveInt, 5)
   .action((options: { json?: boolean; migrationsDir: string; limit: number }) => {
-    const jsonMode = Boolean(options.json);
+    const jsonMode = Boolean(options.json)
     runDbAction(jsonMode, () => {
-      const dbPath = resolveDbPath(program.opts().dbPath as string);
-      const migrationsDir = resolveMigrationsDir(options.migrationsDir);
+      const dbPath = resolveDbPath(program.opts().dbPath as string)
+      const migrationsDir = resolveMigrationsDir(options.migrationsDir)
 
-      ensureMigrationsDirExists(migrationsDir);
+      ensureMigrationsDirExists(migrationsDir)
 
-      const dbExists = fs.existsSync(dbPath);
+      const dbExists = fs.existsSync(dbPath)
       const status = dbExists
         ? getMigrationStatus(dbPath, migrationsDir)
         : {
@@ -422,7 +412,7 @@ dbCommand
               .readdirSync(migrationsDir)
               .filter((name) => name.endsWith(".sql"))
               .sort((a, b) => a.localeCompare(b)),
-          };
+          }
 
       if (jsonMode) {
         printJson({
@@ -434,21 +424,21 @@ dbCommand
           pending_count: status.pending.length,
           applied: status.applied.slice(-options.limit),
           pending: status.pending.slice(0, options.limit),
-        });
-        return;
+        })
+        return
       }
 
-      process.stdout.write(`db_path: ${dbPath}\n`);
-      process.stdout.write(`db_exists: ${dbExists}\n`);
-      process.stdout.write(`applied: ${status.applied.length}\n`);
-      process.stdout.write(`pending: ${status.pending.length}\n`);
+      process.stdout.write(`db_path: ${dbPath}\n`)
+      process.stdout.write(`db_exists: ${dbExists}\n`)
+      process.stdout.write(`applied: ${status.applied.length}\n`)
+      process.stdout.write(`pending: ${status.pending.length}\n`)
       if (status.pending.length > 0) {
         process.stdout.write(
           `pending_preview:\n${status.pending.slice(0, options.limit).join("\n")}\n`,
-        );
+        )
       }
-    });
-  });
+    })
+  })
 
 program
   .command("save <url>")
@@ -462,107 +452,132 @@ program
       url: string,
       options: { title?: string; tag: string[]; extract?: boolean; json?: boolean },
     ) => {
-      const jsonMode = Boolean(options.json);
+      const jsonMode = Boolean(options.json)
 
       runDbAction(jsonMode, async () =>
-        withReadyDbAsync(resolveDbPath(program.opts().dbPath as string), async (sqlite) => {
-          const parsedUrl = parseUrl(url);
-          const normalizedTags = normalizeTags(options.tag ?? []);
-          const existing = sqlite
-            .prepare("SELECT * FROM items WHERE url = ?")
-            .get(parsedUrl.toString()) as ItemRow | undefined;
-          const timestamp = nowMs();
-          let created = false;
-          let itemId: number | undefined;
+        withReadyDbAsync(resolveDbPath(program.opts().dbPath as string), async (db) => {
+          const parsedUrl = parseUrl(url)
+          const normalizedTags = normalizeTags(options.tag ?? [])
+          const existing = db
+            .select()
+            .from(schema.items)
+            .where(eq(schema.items.url, parsedUrl.toString()))
+            .get() as ItemRow | undefined
+          const timestamp = new Date(nowMs())
+          let created = false
+          let itemId: number | undefined
 
-          const tx = sqlite.transaction(() => {
+          db.transaction((tx) => {
             if (existing) {
-              itemId = existing.id;
+              itemId = existing.id
               if (!existing.title && options.title) {
-                sqlite
-                  .prepare("UPDATE items SET title = ?, updated_at = ? WHERE id = ?")
-                  .run(options.title.trim(), timestamp, existing.id);
+                tx.update(schema.items)
+                  .set({
+                    title: options.title.trim(),
+                    updatedAt: timestamp,
+                  })
+                  .where(eq(schema.items.id, existing.id))
+                  .run()
               }
             } else {
-              const result = sqlite
-                .prepare(
-                  `INSERT INTO items
-                 (url, title, domain, status, is_starred, created_at, updated_at, read_at, archived_at)
-                 VALUES (?, ?, ?, 'unread', 0, ?, ?, NULL, NULL)`,
-                )
-                .run(
-                  parsedUrl.toString(),
-                  options.title?.trim() || null,
-                  parsedUrl.hostname,
-                  timestamp,
-                  timestamp,
-                );
-              itemId = Number(result.lastInsertRowid);
-              created = true;
+              const result = tx
+                .insert(schema.items)
+                .values({
+                  url: parsedUrl.toString(),
+                  title: options.title?.trim() || null,
+                  domain: parsedUrl.hostname,
+                  status: "unread",
+                  isStarred: false,
+                  createdAt: timestamp,
+                  updatedAt: timestamp,
+                  readAt: null,
+                  archivedAt: null,
+                })
+                .run()
+              itemId = Number(result.lastInsertRowid)
+              created = true
+            }
+
+            if (itemId === undefined) {
+              throw new CliError("Saved item id could not be determined.", "INTERNAL_ERROR", 1)
             }
 
             for (const tag of normalizedTags) {
-              const tagId = ensureTagId(sqlite, tag);
-              sqlite
-                .prepare(
-                  "INSERT OR IGNORE INTO item_tags (item_id, tag_id, created_at) VALUES (?, ?, ?)",
-                )
-                .run(itemId, tagId, timestamp);
+              const tagId = ensureTagId(tx, tag, timestamp)
+              tx.insert(schema.itemTags)
+                .values({
+                  itemId,
+                  tagId,
+                  createdAt: timestamp,
+                })
+                .onConflictDoNothing()
+                .run()
             }
-          });
-
-          tx();
+          })
 
           if (itemId === undefined) {
-            throw new CliError("Saved item id could not be determined.", "INTERNAL_ERROR", 1);
+            throw new CliError("Saved item id could not be determined.", "INTERNAL_ERROR", 1)
           }
 
-          const row = getItemRowById(sqlite, itemId);
+          const row = getItemRowById(db, itemId)
           if (!row) {
-            throw new CliError("Saved item could not be reloaded.", "INTERNAL_ERROR", 1);
+            throw new CliError("Saved item could not be reloaded.", "INTERNAL_ERROR", 1)
           }
 
           // Extract content if not disabled
           if (options.extract !== false && created) {
             try {
-              const extracted = await extractContent(parsedUrl.toString());
+              const extracted = await extractContent(parsedUrl.toString())
               if (extracted?.textContent) {
                 // Save to notes table
-                sqlite
-                  .prepare(
-                    "INSERT OR REPLACE INTO notes (item_id, content, updated_at) VALUES (?, ?, ?)",
-                  )
-                  .run(itemId, extracted.textContent, timestamp);
+                db.insert(schema.notes)
+                  .values({
+                    itemId,
+                    content: extracted.textContent,
+                    updatedAt: timestamp,
+                  })
+                  .onConflictDoUpdate({
+                    target: schema.notes.itemId,
+                    set: {
+                      content: extracted.textContent,
+                      updatedAt: timestamp,
+                    },
+                  })
+                  .run()
 
                 // Update title if we got a better one
                 if (extracted.title && !options.title) {
-                  sqlite
-                    .prepare("UPDATE items SET title = ?, updated_at = ? WHERE id = ?")
-                    .run(extracted.title, timestamp, itemId);
+                  db.update(schema.items)
+                    .set({
+                      title: extracted.title,
+                      updatedAt: timestamp,
+                    })
+                    .where(eq(schema.items.id, itemId))
+                    .run()
                 }
               }
             } catch (error) {
-              console.error("Failed to extract content:", error);
+              console.error("Failed to extract content:", error)
               // Continue without extraction on error
             }
           }
 
-          const item = serializeItem(row, getItemTags(sqlite, row.id));
+          const item = serializeItem(row, getItemTags(db, row.id))
 
           if (jsonMode) {
             printJson({
               ok: true,
               created,
               item,
-            });
-            return;
+            })
+            return
           }
 
-          process.stdout.write(`${created ? "saved" : "exists"} #${item.id} ${item.url}\n`);
+          process.stdout.write(`${created ? "saved" : "exists"} #${item.id} ${item.url}\n`)
         }),
-      );
+      )
     },
-  );
+  )
 
 program
   .command("list")
@@ -575,16 +590,16 @@ program
   .option("--json", "Print machine-readable JSON output")
   .action(
     (options: {
-      status?: string;
-      tag: string[];
-      tagMode: string;
-      limit: number;
-      offset: number;
-      json?: boolean;
+      status?: string
+      tag: string[]
+      tagMode: string
+      limit: number
+      offset: number
+      json?: boolean
     }) => {
-      const jsonMode = Boolean(options.json);
-      const tagMode = options.tagMode as TagMode;
-      const status = options.status as ItemStatus | undefined;
+      const jsonMode = Boolean(options.json)
+      const tagMode = options.tagMode as TagMode
+      const status = options.status as ItemStatus | undefined
 
       if (status && !["unread", "read", "archived"].includes(status)) {
         printError(
@@ -592,68 +607,60 @@ program
           jsonMode,
           "VALIDATION_ERROR",
           2,
-        );
+        )
       }
       if (!["any", "all"].includes(tagMode)) {
-        printError("Invalid tag mode. Use any or all.", jsonMode, "VALIDATION_ERROR", 2);
+        printError("Invalid tag mode. Use any or all.", jsonMode, "VALIDATION_ERROR", 2)
       }
 
       runDbAction(jsonMode, () =>
-        withReadyDb(resolveDbPath(program.opts().dbPath as string), (sqlite) => {
-          const tags = normalizeTags(options.tag ?? []);
-          const where: string[] = [];
-          const params: unknown[] = [];
+        withReadyDb(resolveDbPath(program.opts().dbPath as string), (db) => {
+          const tags = normalizeTags(options.tag ?? [])
+          const conditions: SQL[] = []
 
           if (status) {
-            where.push("i.status = ?");
-            params.push(status);
+            conditions.push(eq(schema.items.status, status))
           }
 
           if (tags.length > 0) {
             if (tagMode === "any") {
-              const placeholders = tags.map(() => "?").join(", ");
-              where.push(
-                `EXISTS (
-                   SELECT 1
-                   FROM item_tags it
-                   JOIN tags t ON t.id = it.tag_id
-                   WHERE it.item_id = i.id
-                     AND t.name IN (${placeholders})
-                 )`,
-              );
-              params.push(...tags);
+              const subquery = db
+                .select({ one: sql<number>`1` })
+                .from(schema.itemTags)
+                .innerJoin(schema.tags, eq(schema.tags.id, schema.itemTags.tagId))
+                .where(
+                  and(eq(schema.itemTags.itemId, schema.items.id), inArray(schema.tags.name, tags)),
+                )
+              conditions.push(exists(subquery))
             } else {
               for (const tag of tags) {
-                where.push(
-                  `EXISTS (
-                     SELECT 1
-                     FROM item_tags it
-                     JOIN tags t ON t.id = it.tag_id
-                     WHERE it.item_id = i.id
-                       AND t.name = ?
-                   )`,
-                );
-                params.push(tag);
+                const subquery = db
+                  .select({ one: sql<number>`1` })
+                  .from(schema.itemTags)
+                  .innerJoin(schema.tags, eq(schema.tags.id, schema.itemTags.tagId))
+                  .where(
+                    and(eq(schema.itemTags.itemId, schema.items.id), eq(schema.tags.name, tag)),
+                  )
+                conditions.push(exists(subquery))
               }
             }
           }
 
-          const whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
-          const rows = sqlite
-            .prepare(
-              `SELECT i.*
-               FROM items i
-               ${whereClause}
-               ORDER BY i.created_at DESC, i.id DESC
-               LIMIT ? OFFSET ?`,
-            )
-            .all(...params, options.limit, options.offset) as ItemRow[];
+          const whereClause = conditions.length > 0 ? and(...conditions) : undefined
+          const rows = db
+            .select()
+            .from(schema.items)
+            .where(whereClause)
+            .orderBy(desc(schema.items.createdAt), desc(schema.items.id))
+            .limit(options.limit)
+            .offset(options.offset)
+            .all() as ItemRow[]
 
           const tagsMap = getTagsMap(
-            sqlite,
+            db,
             rows.map((row) => row.id),
-          );
-          const items = rows.map((row) => serializeItem(row, tagsMap.get(row.id) ?? []));
+          )
+          const items = rows.map((row) => serializeItem(row, tagsMap.get(row.id) ?? []))
 
           if (jsonMode) {
             printJson({
@@ -664,26 +671,26 @@ program
                 offset: options.offset,
                 returned: items.length,
               },
-            });
-            return;
+            })
+            return
           }
 
           if (items.length === 0) {
-            process.stdout.write("No items found.\n");
-            return;
+            process.stdout.write("No items found.\n")
+            return
           }
 
           for (const item of items) {
-            const displayTitle = item.title ?? item.url;
-            const displayTags = item.tags.length > 0 ? ` [${item.tags.join(", ")}]` : "";
-            process.stdout.write(`#${item.id} ${item.status} ${displayTitle}${displayTags}\n`);
+            const displayTitle = item.title ?? item.url
+            const displayTags = item.tags.length > 0 ? ` [${item.tags.join(", ")}]` : ""
+            process.stdout.write(`#${item.id} ${item.status} ${displayTitle}${displayTags}\n`)
           }
         }),
-      );
+      )
     },
-  );
+  )
 
-const tagsCommand = program.command("tags").description("Tag utilities");
+const tagsCommand = program.command("tags").description("Tag utilities")
 
 tagsCommand.addHelpText(
   "after",
@@ -692,7 +699,7 @@ Examples:
   stash tags list
   stash tags list --limit 100 --offset 0 --json
 `,
-);
+)
 
 tagsCommand
   .command("list")
@@ -701,22 +708,24 @@ tagsCommand
   .option("--offset <n>", "Rows to skip", parseNonNegativeInt, 0)
   .option("--json", "Print machine-readable JSON output")
   .action((options: { limit: number; offset: number; json?: boolean }) => {
-    const jsonMode = Boolean(options.json);
+    const jsonMode = Boolean(options.json)
 
     runDbAction(jsonMode, () =>
-      withReadyDb(resolveDbPath(program.opts().dbPath as string), (sqlite) => {
-        const rows = sqlite
-          .prepare(
-            `SELECT t.name AS name, COUNT(it.item_id) AS item_count
-             FROM tags t
-             LEFT JOIN item_tags it ON it.tag_id = t.id
-             GROUP BY t.id
-             ORDER BY t.name ASC
-             LIMIT ? OFFSET ?`,
-          )
-          .all(options.limit, options.offset) as Array<{ name: string; item_count: number }>;
+      withReadyDb(resolveDbPath(program.opts().dbPath as string), (db) => {
+        const rows = db
+          .select({
+            name: schema.tags.name,
+            itemCount: sql<number>`count(${schema.itemTags.itemId})`,
+          })
+          .from(schema.tags)
+          .leftJoin(schema.itemTags, eq(schema.itemTags.tagId, schema.tags.id))
+          .groupBy(schema.tags.id)
+          .orderBy(asc(schema.tags.name))
+          .limit(options.limit)
+          .offset(options.offset)
+          .all()
 
-        const tags = rows.map((row) => ({ name: row.name, item_count: Number(row.item_count) }));
+        const tags = rows.map((row) => ({ name: row.name, item_count: Number(row.itemCount) }))
 
         if (jsonMode) {
           printJson({
@@ -727,23 +736,23 @@ tagsCommand
               offset: options.offset,
               returned: tags.length,
             },
-          });
-          return;
+          })
+          return
         }
 
         if (tags.length === 0) {
-          process.stdout.write("No tags found.\n");
-          return;
+          process.stdout.write("No tags found.\n")
+          return
         }
 
         for (const tag of tags) {
-          process.stdout.write(`${tag.name}\t${tag.item_count}\n`);
+          process.stdout.write(`${tag.name}\t${tag.item_count}\n`)
         }
       }),
-    );
-  });
+    )
+  })
 
-const tagCommand = program.command("tag").description("Manage item tags");
+const tagCommand = program.command("tag").description("Manage item tags")
 
 tagCommand.addHelpText(
   "after",
@@ -752,31 +761,34 @@ Examples:
   stash tag add 1 ai
   stash tag rm 1 ai --json
 `,
-);
+)
 
 tagCommand
   .command("add <id> <tag>")
   .description("Attach a tag to an item")
   .option("--json", "Print machine-readable JSON output")
   .action((id: string, tag: string, options: { json?: boolean }) => {
-    const jsonMode = Boolean(options.json);
+    const jsonMode = Boolean(options.json)
 
     runDbAction(jsonMode, () =>
-      withReadyDb(resolveDbPath(program.opts().dbPath as string), (sqlite) => {
-        const itemId = parseItemId(id);
-        const normalizedTag = normalizeTag(tag);
-        ensureItemExists(sqlite, itemId);
-        const timestamp = nowMs();
-        const tx = sqlite.transaction(() => {
-          const tagId = ensureTagId(sqlite, normalizedTag);
-          return sqlite
-            .prepare(
-              "INSERT OR IGNORE INTO item_tags (item_id, tag_id, created_at) VALUES (?, ?, ?)",
-            )
-            .run(itemId, tagId, timestamp);
-        });
-        const result = tx() as { changes: number };
-        const added = Number(result.changes) > 0;
+      withReadyDb(resolveDbPath(program.opts().dbPath as string), (db) => {
+        const itemId = parseItemId(id)
+        const normalizedTag = normalizeTag(tag)
+        ensureItemExists(db, itemId)
+        const timestamp = new Date(nowMs())
+        const result = db.transaction((tx) => {
+          const tagId = ensureTagId(tx, normalizedTag, timestamp)
+          return tx
+            .insert(schema.itemTags)
+            .values({
+              itemId,
+              tagId,
+              createdAt: timestamp,
+            })
+            .onConflictDoNothing()
+            .run()
+        })
+        const added = Number(result.changes) > 0
 
         if (jsonMode) {
           printJson({
@@ -784,39 +796,40 @@ tagCommand
             item_id: itemId,
             tag: normalizedTag,
             added,
-          });
-          return;
+          })
+          return
         }
 
-        process.stdout.write(
-          `${added ? "added" : "exists"} tag '${normalizedTag}' on #${itemId}\n`,
-        );
+        process.stdout.write(`${added ? "added" : "exists"} tag '${normalizedTag}' on #${itemId}\n`)
       }),
-    );
-  });
+    )
+  })
 
 tagCommand
   .command("rm <id> <tag>")
   .description("Remove a tag from an item")
   .option("--json", "Print machine-readable JSON output")
   .action((id: string, tag: string, options: { json?: boolean }) => {
-    const jsonMode = Boolean(options.json);
+    const jsonMode = Boolean(options.json)
 
     runDbAction(jsonMode, () =>
-      withReadyDb(resolveDbPath(program.opts().dbPath as string), (sqlite) => {
-        const itemId = parseItemId(id);
-        const normalizedTag = normalizeTag(tag);
-        ensureItemExists(sqlite, itemId);
-        const row = sqlite.prepare("SELECT id FROM tags WHERE name = ?").get(normalizedTag) as
-          | { id: number }
-          | undefined;
-        let removed = false;
+      withReadyDb(resolveDbPath(program.opts().dbPath as string), (db) => {
+        const itemId = parseItemId(id)
+        const normalizedTag = normalizeTag(tag)
+        ensureItemExists(db, itemId)
+        const row = db
+          .select({ id: schema.tags.id })
+          .from(schema.tags)
+          .where(eq(schema.tags.name, normalizedTag))
+          .get()
+        let removed = false
 
         if (row) {
-          const result = sqlite
-            .prepare("DELETE FROM item_tags WHERE item_id = ? AND tag_id = ?")
-            .run(itemId, row.id) as { changes: number };
-          removed = Number(result.changes) > 0;
+          const result = db
+            .delete(schema.itemTags)
+            .where(and(eq(schema.itemTags.itemId, itemId), eq(schema.itemTags.tagId, row.id)))
+            .run()
+          removed = Number(result.changes) > 0
         }
 
         if (jsonMode) {
@@ -825,47 +838,57 @@ tagCommand
             item_id: itemId,
             tag: normalizedTag,
             removed,
-          });
-          return;
+          })
+          return
         }
 
         process.stdout.write(
           `${removed ? "removed" : "missing"} tag '${normalizedTag}' on #${itemId}\n`,
-        );
+        )
       }),
-    );
-  });
+    )
+  })
 
 function markItemStatus(
   status: Exclude<ItemStatus, "archived">,
   itemId: number,
 ): { itemId: number; status: ItemStatus } {
-  const dbPath = resolveDbPath(program.opts().dbPath as string);
+  const dbPath = resolveDbPath(program.opts().dbPath as string)
 
-  return withReadyDb(dbPath, (sqlite) => {
-    const timestamp = nowMs();
+  return withReadyDb(dbPath, (db) => {
+    const timestamp = new Date(nowMs())
     const update =
       status === "read"
-        ? sqlite
-            .prepare(
-              "UPDATE items SET status = 'read', read_at = ?, archived_at = NULL, updated_at = ? WHERE id = ?",
-            )
-            .run(timestamp, timestamp, itemId)
-        : sqlite
-            .prepare(
-              "UPDATE items SET status = 'unread', read_at = NULL, archived_at = NULL, updated_at = ? WHERE id = ?",
-            )
-            .run(timestamp, itemId);
+        ? db
+            .update(schema.items)
+            .set({
+              status: "read",
+              readAt: timestamp,
+              archivedAt: null,
+              updatedAt: timestamp,
+            })
+            .where(eq(schema.items.id, itemId))
+            .run()
+        : db
+            .update(schema.items)
+            .set({
+              status: "unread",
+              readAt: null,
+              archivedAt: null,
+              updatedAt: timestamp,
+            })
+            .where(eq(schema.items.id, itemId))
+            .run()
 
     if (Number(update.changes) === 0) {
-      throw new CliError(`Item ${itemId} not found.`, "NOT_FOUND", 3);
+      throw new CliError(`Item ${itemId} not found.`, "NOT_FOUND", 3)
     }
 
-    return { itemId, status };
-  });
+    return { itemId, status }
+  })
 }
 
-const markCommand = program.command("mark").description("Mark item states");
+const markCommand = program.command("mark").description("Mark item states")
 
 markCommand.addHelpText(
   "after",
@@ -874,113 +897,113 @@ Examples:
   stash mark read 1
   stash mark unread 1 --json
 `,
-);
+)
 
 markCommand
   .command("read <id>")
   .description("Mark item as read")
   .option("--json", "Print machine-readable JSON output")
   .action((id: string, options: { json?: boolean }) => {
-    const jsonMode = Boolean(options.json);
+    const jsonMode = Boolean(options.json)
 
     runDbAction(jsonMode, () => {
-      const itemId = parseItemId(id);
-      const result = markItemStatus("read", itemId);
+      const itemId = parseItemId(id)
+      const result = markItemStatus("read", itemId)
       if (jsonMode) {
         printJson({
           ok: true,
           item_id: result.itemId,
           action: "mark_read",
           status: result.status,
-        });
-        return;
+        })
+        return
       }
-      process.stdout.write(`marked #${result.itemId} as read\n`);
-    });
-  });
+      process.stdout.write(`marked #${result.itemId} as read\n`)
+    })
+  })
 
 markCommand
   .command("unread <id>")
   .description("Mark item as unread")
   .option("--json", "Print machine-readable JSON output")
   .action((id: string, options: { json?: boolean }) => {
-    const jsonMode = Boolean(options.json);
+    const jsonMode = Boolean(options.json)
 
     runDbAction(jsonMode, () => {
-      const itemId = parseItemId(id);
-      const result = markItemStatus("unread", itemId);
+      const itemId = parseItemId(id)
+      const result = markItemStatus("unread", itemId)
       if (jsonMode) {
         printJson({
           ok: true,
           item_id: result.itemId,
           action: "mark_unread",
           status: result.status,
-        });
-        return;
+        })
+        return
       }
-      process.stdout.write(`marked #${result.itemId} as unread\n`);
-    });
-  });
+      process.stdout.write(`marked #${result.itemId} as unread\n`)
+    })
+  })
 
 program
   .command("read <id>")
   .description("Alias for mark read")
   .option("--json", "Print machine-readable JSON output")
   .action((id: string, options: { json?: boolean }) => {
-    const jsonMode = Boolean(options.json);
+    const jsonMode = Boolean(options.json)
     runDbAction(jsonMode, () => {
-      const itemId = parseItemId(id);
-      const result = markItemStatus("read", itemId);
+      const itemId = parseItemId(id)
+      const result = markItemStatus("read", itemId)
       if (jsonMode) {
         printJson({
           ok: true,
           item_id: result.itemId,
           action: "mark_read",
           status: result.status,
-        });
-        return;
+        })
+        return
       }
-      process.stdout.write(`marked #${result.itemId} as read\n`);
-    });
-  });
+      process.stdout.write(`marked #${result.itemId} as read\n`)
+    })
+  })
 
 program
   .command("unread <id>")
   .description("Alias for mark unread")
   .option("--json", "Print machine-readable JSON output")
   .action((id: string, options: { json?: boolean }) => {
-    const jsonMode = Boolean(options.json);
+    const jsonMode = Boolean(options.json)
     runDbAction(jsonMode, () => {
-      const itemId = parseItemId(id);
-      const result = markItemStatus("unread", itemId);
+      const itemId = parseItemId(id)
+      const result = markItemStatus("unread", itemId)
       if (jsonMode) {
         printJson({
           ok: true,
           item_id: result.itemId,
           action: "mark_unread",
           status: result.status,
-        });
-        return;
+        })
+        return
       }
-      process.stdout.write(`marked #${result.itemId} as unread\n`);
-    });
-  });
+      process.stdout.write(`marked #${result.itemId} as unread\n`)
+    })
+  })
 
 program.configureOutput({
   outputError: (str, write) => {
-    write(str);
+    write(str)
   },
-});
+})
 
 try {
-  const argv = [...process.argv];
-  const separatorIndex = argv.indexOf("--");
+  const argv = [...process.argv]
+  const separatorIndex = argv.indexOf("--")
   if (separatorIndex !== -1) {
-    argv.splice(separatorIndex, 1);
+    argv.splice(separatorIndex, 1)
   }
-  program.parse(argv);
+  program.parse(argv)
 } catch (error) {
-  const message = error instanceof Error ? error.message : "Unknown error";
-  process.stderr.write(`${message}\n`);
-  process.exit(2);
+  const message = error instanceof Error ? error.message : "Unknown error"
+  process.stderr.write(`${message}\n`)
+  process.exit(2)
 }
