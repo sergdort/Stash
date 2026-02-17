@@ -10,6 +10,7 @@ Local-first Pocket-like CLI built with TypeScript and SQLite.
 
 ```bash
 pnpm install
+cp .env.example .env
 pnpm run setup
 ```
 
@@ -63,6 +64,17 @@ stash --version
 ## Database
 
 Default database path is `~/.stash/stash.db`. Override with `--db-path`.
+
+For local development scripts (`pnpm run dev`, `pnpm run setup`, `pnpm run db:migrate`, `pnpm run db:doctor`, `pnpm run start`), `.env` is auto-loaded. The template sets:
+
+```bash
+STASH_DB_PATH=.db/stash.db
+```
+
+Path precedence is unchanged:
+1. `--db-path <path>`
+2. `STASH_DB_PATH`
+3. `~/.stash/stash.db` fallback
 
 Most CLI commands auto-run pending migrations, so manual migration is usually not needed.
 
@@ -126,6 +138,7 @@ stash tts 1 --out ~/Downloads/article-1.mp3
 - TypeScript
 - Commander (CLI)
 - SQLite (`better-sqlite3`)
+- dotenv (local dev script env loading)
 - Drizzle ORM + Drizzle Kit
 - Mozilla Readability + linkedom (content extraction)
 

@@ -25,6 +25,7 @@ Install:
 
 ```bash
 pnpm install
+cp .env.example .env
 pnpm run setup
 ```
 
@@ -90,6 +91,35 @@ Example:
 ```bash
 STASH_DB_PATH=./.local/stash.db node dist/cli.js list --json
 ```
+
+## Local Dev Environment
+
+The following npm scripts auto-load variables from `.env`:
+- `pnpm run dev`
+- `pnpm run setup`
+- `pnpm run start`
+- `pnpm run db:migrate`
+- `pnpm run db:doctor`
+
+Implementation note:
+- `.env` loading for these scripts is handled by `scripts/with-env.mjs` using `dotenv`.
+
+Recommended setup:
+
+```bash
+cp .env.example .env
+```
+
+Default in `.env.example`:
+
+```bash
+STASH_DB_PATH=.db/stash.db
+```
+
+Path precedence remains:
+1. `--db-path <path>`
+2. `STASH_DB_PATH`
+3. `~/.stash/stash.db`
 
 ## Command Reference
 

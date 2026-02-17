@@ -8,22 +8,22 @@
     "stash": "dist/cli.js"
   },
   "scripts": {
-    "setup": "pnpm run build && node dist/cli.js db migrate --json",
+    "setup": "pnpm run build && node scripts/with-env.mjs node dist/cli.js db migrate --json",
     "build": "tsc -p tsconfig.json",
     "check": "pnpm run lint && pnpm run format:check && pnpm run build",
-    "dev": "tsx src/cli.ts",
+    "dev": "node scripts/with-env.mjs tsx src/cli.ts",
     "lint": "biome lint . --error-on-warnings",
     "lint:fix": "biome lint . --write --error-on-warnings",
     "format": "biome format . --write",
     "format:check": "biome format .",
     "test": "pnpm run build && vitest run",
     "test:integration": "pnpm run build && vitest run test/integration.test.ts",
-    "start": "node dist/cli.js",
+    "start": "node scripts/with-env.mjs node dist/cli.js",
     "db:generate": "drizzle-kit generate",
     "predb:migrate": "pnpm run build",
-    "db:migrate": "node dist/cli.js db migrate",
+    "db:migrate": "node scripts/with-env.mjs node dist/cli.js db migrate",
     "predb:doctor": "pnpm run build",
-    "db:doctor": "node dist/cli.js db doctor"
+    "db:doctor": "node scripts/with-env.mjs node dist/cli.js db doctor"
   },
   "engines": {
     "node": ">=20"
@@ -32,6 +32,7 @@
     "@mozilla/readability": "^0.6.0",
     "better-sqlite3": "^11.8.1",
     "commander": "^13.1.0",
+    "dotenv": "^17.3.1",
     "drizzle-orm": "^0.39.3",
     "linkedom": "^0.18.12"
   },

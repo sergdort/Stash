@@ -23,6 +23,7 @@ Current implementation status:
 - TypeScript
 - Commander (CLI framework)
 - SQLite via `better-sqlite3`
+- dotenv for local script `.env` loading
 - Drizzle ORM + Drizzle Kit (schema/migrations)
 - Package manager: `pnpm`
 - Content extraction: Mozilla Readability + linkedom
@@ -34,6 +35,7 @@ Current implementation status:
 - `src/db/schema.ts`: Drizzle schema definition.
 - `src/db/migrate.ts`: SQL migration runner + migration tracking table.
 - `src/db/client.ts`: SQLite connection setup and PRAGMA config.
+- `scripts/with-env.mjs`: Script wrapper to auto-load `.env` for local npm scripts.
 - `drizzle/`: SQL migration files.
 - `drizzle.config.ts`: Drizzle config.
 - `dist/`: compiled output.
@@ -45,12 +47,17 @@ Current implementation status:
 pnpm install
 ```
 
-2. Bootstrap:
+2. Create local env file:
+```bash
+cp .env.example .env
+```
+
+3. Bootstrap:
 ```bash
 pnpm run setup
 ```
 
-3. If SQLite native binding errors appear (`Could not locate the bindings file`), allow native builds and reinstall:
+4. If SQLite native binding errors appear (`Could not locate the bindings file`), allow native builds and reinstall:
 ```bash
 pnpm approve-builds
 pnpm rebuild better-sqlite3
@@ -65,6 +72,10 @@ Default DB path:
 Override path:
 - CLI flag: `--db-path <path>`
 - or env var: `STASH_DB_PATH=<path>`
+
+Local development default:
+- `.env.example` sets `STASH_DB_PATH=.db/stash.db`
+- scripts `dev`, `setup`, `start`, `db:migrate`, and `db:doctor` auto-load `.env`
 
 Run migration status check:
 ```bash
@@ -229,6 +240,10 @@ Updates should include:
 - The CLI strips a standalone `--` separator in argv parsing to keep `pnpm run <script> -- --json` working.
 - `setup` builds and runs migrations for first-run convenience.
 - Normal data commands auto-run pending migrations.
+- `.env` is git-ignored; `.env.example` is committed as the local template.
+- `.db/` is git-ignored local runtime data for repository-local development.
+- Local npm scripts load `.env` using `dotenv` via `scripts/with-env.mjs`.
+- CLI DB path precedence remains: `--db-path` > `STASH_DB_PATH` > `~/.stash/stash.db`.
 - `tts` output path precedence is: `--out` > `--audio-dir` > `STASH_AUDIO_DIR` > `~/.stash/audio`.
 - `tts` auto-generated filenames use friendly slugs + timestamp + short random suffix and collision fallback (`_2`, `_3`, ...).
 
