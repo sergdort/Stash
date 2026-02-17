@@ -384,6 +384,18 @@ List tags:
 stash tags list --json
 ```
 
+Extract content for an item (useful for old items):
+
+```bash
+stash extract 1 --json
+```
+
+Re-extract content even if it already exists:
+
+```bash
+stash extract 1 --force --json
+```
+
 Generate TTS in default audio directory:
 
 ```bash
