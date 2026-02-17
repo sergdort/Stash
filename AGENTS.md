@@ -224,8 +224,9 @@ Updates should include:
 ## Near-Term Roadmap
 
 - Add `archive`, `delete`, `open`.
-- Add search command (leveraging extracted content).
-- Add TTS export command (using extracted text).
+- Add search command (full-text search leveraging extracted content).
+- Add PDF export for offline reading.
+- Add TTS (text-to-speech) export to generate audio versions of articles.
 - Add import/export.
 
 ## Agent notes

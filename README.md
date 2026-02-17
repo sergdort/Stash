@@ -113,6 +113,25 @@ stash mark unread 1
 - Drizzle ORM + Drizzle Kit
 - Mozilla Readability + linkedom (content extraction)
 
+## Roadmap
+
+### Current Features
+- ✅ Save URLs with titles and tags
+- ✅ List items with filters (status, tags)
+- ✅ Tag management (add, remove, list)
+- ✅ Mark items as read/unread
+- ✅ JSON output mode for automation
+- ✅ Basic content extraction
+
+### Coming Soon
+- 🔍 **Full-text search** - Search across article content
+- 📄 **PDF export** - Save articles for offline reading
+- 🔊 **Text-to-speech** - Generate audio versions of articles
+- 🗄️ Archive & delete commands
+- 📂 Import/export functionality
+- 🔗 Open command for quick access
+- 📊 Enhanced metadata extraction
+
 ## Notes
 
 - Migrations are SQL files in `drizzle/`.
