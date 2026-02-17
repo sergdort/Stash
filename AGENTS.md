@@ -200,13 +200,20 @@ node dist/cli.js list --help
 
 ## Documentation Maintenance Rule
 
-When adding a new feature or modifying existing CLI behavior, update `docs/CLI_REFERENCE.md` in the same change.
+⚠️ **When adding new features or modifying existing CLI behavior, update ALL THREE documentation files in the same change:**
+1. `AGENTS.md` - Technical details and implementation notes
+2. `README.md` - User-facing overview and quick start
+3. `docs/CLI_REFERENCE.md` - Detailed command reference
 
-This includes:
+This ensures all documentation stays in sync.
+
+Updates should include:
 - New commands/subcommands
 - New flags/options/defaults
 - Output shape changes (especially `--json`)
 - Error/exit-code behavior changes
+- Dependencies or stack changes
+- Architectural decisions
 
 ## Implementation Notes
 

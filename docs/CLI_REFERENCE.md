@@ -2,8 +2,6 @@
 
 This document is the user-facing reference for the current `stash` feature set.
 
-⚠️ **Documentation Maintenance Rule**: When adding new features or modifying existing CLI behavior, update this file, `AGENTS.md`, and `README.md` in the same change. This ensures all documentation stays in sync.
-
 `stash` is a local-first CLI for saving and organizing links with SQLite storage and tag-based retrieval.
 
 ## Current Feature Set
