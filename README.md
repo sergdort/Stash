@@ -81,6 +81,7 @@ stash db doctor --json
 - Save URLs with automatic content extraction
 - Organize with tags
 - Mark items as read/unread
+- Generate TTS audio from extracted article content
 - Machine-friendly JSON output
 - Local SQLite storage
 
@@ -96,7 +97,22 @@ stash tag add 1 productivity
 stash tag rm 1 productivity
 stash mark read 1
 stash mark unread 1
+stash tts 1 --json
+stash tts 1 --audio-dir ~/Downloads/audio
+stash tts 1 --out ~/Downloads/article-1.mp3
 ```
+
+## TTS Export
+
+- Command: `stash tts <id> [--voice <name>] [--format mp3|wav] [--out <file>] [--audio-dir <dir>] [--json]`
+- Provider in v1: Edge TTS
+- Default output directory: `~/.stash/audio`
+- Directory override precedence:
+  1. `--out <file>` (exact output file path)
+  2. `--audio-dir <dir>`
+  3. `STASH_AUDIO_DIR`
+  4. `~/.stash/audio`
+- Auto-generated filenames are human-readable and unique to avoid overwriting.
 
 ## Agent-friendly behavior
 
@@ -122,11 +138,11 @@ stash mark unread 1
 - ✅ Mark items as read/unread
 - ✅ JSON output mode for automation
 - ✅ Basic content extraction
+- ✅ TTS export (Edge-first) with friendly unique filenames
 
 ### Coming Soon
 - 🔍 **Full-text search** - Search across article content
 - 📄 **PDF export** - Save articles for offline reading
-- 🔊 **Text-to-speech** - Generate audio versions of articles
 - 🗄️ Archive & delete commands
 - 📂 Import/export functionality
 - 🔗 Open command for quick access

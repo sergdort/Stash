@@ -11,6 +11,7 @@ Primary goal:
 
 Current implementation status:
 - Implemented: `save`, `list`, `tags list`, `tag add`, `tag rm`, `mark read`, `mark unread`, plus `read`/`unread` aliases.
+- Implemented: `tts` export command (Edge-first provider, filesystem output).
 - Implemented: migration tooling (`db migrate`, `db doctor`) and baseline schema.
 - Implemented: automatic migration application for normal data commands.
 - Implemented: content extraction on save using Mozilla Readability (stores in `notes` table).
@@ -25,6 +26,7 @@ Current implementation status:
 - Drizzle ORM + Drizzle Kit (schema/migrations)
 - Package manager: `pnpm`
 - Content extraction: Mozilla Readability + linkedom
+- TTS provider (v1): Edge Read Aloud synthesis endpoint via `fetch`
 
 ## Repository Layout
 
@@ -132,6 +134,13 @@ stash read 1 --json
 stash unread 1 --json
 ```
 
+Generate TTS audio:
+```bash
+stash tts 1 --json
+stash tts 1 --audio-dir ~/Downloads/stash-audio --json
+stash tts 1 --out ~/Downloads/article-1.mp3 --json
+```
+
 ## Agent-Friendly Interface Contract
 
 ### Determinism
@@ -220,13 +229,14 @@ Updates should include:
 - The CLI strips a standalone `--` separator in argv parsing to keep `pnpm run <script> -- --json` working.
 - `setup` builds and runs migrations for first-run convenience.
 - Normal data commands auto-run pending migrations.
+- `tts` output path precedence is: `--out` > `--audio-dir` > `STASH_AUDIO_DIR` > `~/.stash/audio`.
+- `tts` auto-generated filenames use friendly slugs + timestamp + short random suffix and collision fallback (`_2`, `_3`, ...).
 
 ## Near-Term Roadmap
 
 - Add `archive`, `delete`, `open`.
 - Add search command (full-text search leveraging extracted content).
 - Add PDF export for offline reading.
-- Add TTS (text-to-speech) export to generate audio versions of articles.
 - Add import/export.
 
 ## Agent notes

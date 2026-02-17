@@ -16,7 +16,7 @@
     "lint:fix": "biome lint . --write --error-on-warnings",
     "format": "biome format . --write",
     "format:check": "biome format .",
-    "test": "pnpm run test:integration",
+    "test": "pnpm run build && vitest run",
     "test:integration": "pnpm run build && vitest run test/integration.test.ts",
     "start": "node dist/cli.js",
     "db:generate": "drizzle-kit generate",

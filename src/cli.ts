@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from "node:fs"
+import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -9,11 +10,16 @@ import { and, asc, desc, eq, exists, inArray, sql, type SQL } from "drizzle-orm"
 import { openDb, type StashDb } from "./db/client.js"
 import { getMigrationStatus, runMigrations } from "./db/migrate.js"
 import * as schema from "./db/schema.js"
-import { DEFAULT_DB_PATH, resolveDbPath } from "./lib/paths.js"
 import { extractContent } from "./lib/extract.js"
+import { DEFAULT_AUDIO_DIR, DEFAULT_DB_PATH, resolveAudioDir, resolveDbPath } from "./lib/paths.js"
+import { buildFriendlyFilename, ensureUniqueFilePath } from "./lib/tts/files.js"
+import { createEdgeTtsProvider } from "./lib/tts/providers/edge.js"
+import { TtsProviderError, type TtsFormat } from "./lib/tts/types.js"
 
 const CLI_DIR = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_MIGRATIONS_DIR = path.resolve(CLI_DIR, "../drizzle")
+const DEFAULT_TTS_VOICE = "en-US-AriaNeural"
+const edgeTtsProvider = createEdgeTtsProvider()
 
 type ItemStatus = "unread" | "read" | "archived"
 type TagMode = "any" | "all"
@@ -121,6 +127,21 @@ function parseItemId(value: string): number {
     throw new CliError("Item id must be a positive integer.", "VALIDATION_ERROR", 2)
   }
   return parsed
+}
+
+function parseTtsFormat(value: string): TtsFormat {
+  const normalized = value.trim().toLowerCase()
+  if (normalized !== "mp3" && normalized !== "wav") {
+    throw new CliError("Invalid format. Use mp3 or wav.", "VALIDATION_ERROR", 2)
+  }
+  return normalized
+}
+
+function resolveCliPath(input: string): string {
+  if (input.startsWith("~/")) {
+    return path.join(os.homedir(), input.slice(2))
+  }
+  return path.resolve(input)
 }
 
 function parseUrl(value: string): URL {
@@ -303,9 +324,96 @@ function ensureItemExists(db: Db, itemId: number): void {
   }
 }
 
-function runDbAction<T>(jsonMode: boolean, action: () => T): T {
+function getItemTextForTts(db: Db, itemId: number): { title: string | null; text: string } {
+  const row = db
+    .select({
+      id: schema.items.id,
+      title: schema.items.title,
+      content: schema.notes.content,
+    })
+    .from(schema.items)
+    .leftJoin(schema.notes, eq(schema.notes.itemId, schema.items.id))
+    .where(eq(schema.items.id, itemId))
+    .get()
+
+  if (!row) {
+    throw new CliError(`Item ${itemId} not found.`, "NOT_FOUND", 3)
+  }
+
+  const text = row.content?.trim() ?? ""
+  if (text.length === 0) {
+    throw new CliError(
+      `No extracted content found for item ${itemId}. Save without --no-extract or re-save the URL.`,
+      "NO_CONTENT",
+      2,
+    )
+  }
+
+  return {
+    title: row.title,
+    text,
+  }
+}
+
+function resolveTtsOutputPath(
+  itemId: number,
+  title: string | null,
+  voice: string,
+  format: TtsFormat,
+  outputFilePath?: string,
+  audioDirInput?: string,
+): string {
+  if (outputFilePath && outputFilePath.trim().length > 0) {
+    const resolved = resolveCliPath(outputFilePath)
+    const ext = path.extname(resolved).toLowerCase()
+    if (ext.length > 0 && ext !== ".mp3" && ext !== ".wav") {
+      throw new CliError("Output file extension must be .mp3 or .wav.", "VALIDATION_ERROR", 2)
+    }
+
+    if (resolved.endsWith(path.sep)) {
+      throw new CliError(
+        "Output path must include a file name. Use --audio-dir for folder output.",
+        "VALIDATION_ERROR",
+        2,
+      )
+    }
+
+    if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
+      throw new CliError(
+        "Output path points to a directory. Use --audio-dir for folder output.",
+        "VALIDATION_ERROR",
+        2,
+      )
+    }
+
+    const withExtension = ext.length > 0 ? resolved : `${resolved}.${format}`
+    const parentDir = path.dirname(withExtension)
+    fs.mkdirSync(parentDir, { recursive: true })
+    return withExtension
+  }
+
+  const resolvedAudioDir = resolveAudioDir(
+    audioDirInput ?? process.env.STASH_AUDIO_DIR ?? DEFAULT_AUDIO_DIR,
+  )
+  fs.mkdirSync(resolvedAudioDir, { recursive: true })
+
+  const fileName = buildFriendlyFilename({
+    itemId,
+    title,
+    voice,
+    format,
+  })
+
+  return ensureUniqueFilePath(path.join(resolvedAudioDir, fileName))
+}
+
+function runDbAction<T>(jsonMode: boolean, action: () => T | Promise<T>): T | Promise<T> {
   try {
-    return action()
+    const result = action()
+    if (result instanceof Promise) {
+      return result.catch((error: unknown) => handleActionError(error, jsonMode))
+    }
+    return result
   } catch (error) {
     handleActionError(error, jsonMode)
   }
@@ -336,6 +444,7 @@ Quick Reference:
   stash mark unread <id> [--json]
   stash read <id> [--json]
   stash unread <id> [--json]
+  stash tts <id> [--voice <name>] [--format mp3|wav] [--out <file>] [--audio-dir <dir>] [--json]
   stash db migrate [--json] [--migrations-dir <path>]
   stash db doctor [--json] [--migrations-dir <path>] [--limit <n>]
 
@@ -454,7 +563,7 @@ program
     ) => {
       const jsonMode = Boolean(options.json)
 
-      runDbAction(jsonMode, async () =>
+      return runDbAction(jsonMode, async () =>
         withReadyDbAsync(resolveDbPath(program.opts().dbPath as string), async (db) => {
           const parsedUrl = parseUrl(url)
           const normalizedTags = normalizeTags(options.tag ?? [])
@@ -576,6 +685,98 @@ program
           process.stdout.write(`${created ? "saved" : "exists"} #${item.id} ${item.url}\n`)
         }),
       )
+    },
+  )
+
+program
+  .command("tts <id>")
+  .description("Generate TTS audio for an item's extracted content")
+  .option("--voice <name>", "Voice name for synthesis", DEFAULT_TTS_VOICE)
+  .option("--format <format>", "Audio format: mp3|wav", "mp3")
+  .option("--out <file>", "Write audio to an explicit output file path")
+  .option(
+    "--audio-dir <dir>",
+    "Output directory for auto-generated friendly filenames",
+    process.env.STASH_AUDIO_DIR ?? DEFAULT_AUDIO_DIR,
+  )
+  .option("--json", "Print machine-readable JSON output")
+  .action(
+    async (
+      id: string,
+      options: {
+        voice: string
+        format: string
+        out?: string
+        audioDir?: string
+        json?: boolean
+      },
+    ) => {
+      const jsonMode = Boolean(options.json)
+
+      return runDbAction(jsonMode, async () => {
+        const itemId = parseItemId(id)
+        const format = parseTtsFormat(options.format)
+        const voice = options.voice?.trim() ?? DEFAULT_TTS_VOICE
+        if (voice.length === 0) {
+          throw new CliError("Voice cannot be empty.", "VALIDATION_ERROR", 2)
+        }
+
+        const dbPath = resolveDbPath(program.opts().dbPath as string)
+        const { title, text } = withReadyDb(dbPath, (db) => getItemTextForTts(db, itemId))
+
+        let audioBuffer: Buffer
+        let provider = "edge"
+        try {
+          const result = await edgeTtsProvider.synthesize({
+            text,
+            voice,
+            format,
+          })
+          audioBuffer = result.audio
+          provider = result.provider
+        } catch (error) {
+          if (error instanceof TtsProviderError) {
+            if (error.code === "TTS_PROVIDER_UNAVAILABLE") {
+              throw new CliError(
+                `Edge TTS is unavailable. ${error.message}`,
+                "TTS_PROVIDER_UNAVAILABLE",
+                2,
+              )
+            }
+            throw new CliError(`TTS provider error: ${error.message}`, "INTERNAL_ERROR", 1)
+          }
+          throw error
+        }
+
+        const outputPath = resolveTtsOutputPath(
+          itemId,
+          title,
+          voice,
+          format,
+          options.out,
+          options.out ? undefined : options.audioDir,
+        )
+
+        fs.writeFileSync(outputPath, audioBuffer)
+        const fileName = path.basename(outputPath)
+        const bytes = audioBuffer.length
+
+        if (jsonMode) {
+          printJson({
+            ok: true,
+            item_id: itemId,
+            provider,
+            voice,
+            format,
+            output_path: outputPath,
+            file_name: fileName,
+            bytes,
+          })
+          return
+        }
+
+        process.stdout.write(`generated #${itemId} ${outputPath}\n`)
+      })
     },
   )
 

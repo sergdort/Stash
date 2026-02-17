@@ -11,6 +11,7 @@ This document is the user-facing reference for the current `stash` feature set.
 - List available tags with counts
 - Add/remove tags on an item
 - Mark items read/unread
+- Generate TTS audio files from extracted note content
 - Run/inspect DB migrations
 - Machine-friendly JSON output for agent workflows
 
@@ -47,6 +48,7 @@ Command help:
 stash --help
 stash save --help
 stash list --help
+stash tts --help
 stash db --help
 ```
 
@@ -188,6 +190,47 @@ stash read <id> [--json]
 stash unread <id> [--json]
 ```
 
+## TTS Export
+
+Generate audio from extracted content stored in `notes`:
+
+```bash
+stash tts <id> [--voice <name>] [--format mp3|wav] [--out <file>] [--audio-dir <dir>] [--json]
+```
+
+Defaults:
+- Provider: Edge TTS
+- `--voice en-US-AriaNeural`
+- `--format mp3`
+- Default output directory: `~/.stash/audio`
+
+Output path precedence:
+1. `--out <file>` (exact file path)
+2. `--audio-dir <dir>`
+3. `STASH_AUDIO_DIR`
+4. `~/.stash/audio`
+
+Behavior:
+- `tts` requires extracted note content for the item; if not present, returns `NO_CONTENT`.
+- Auto-generated filenames are friendly and collision-safe.
+- JSON success payload includes:
+  - `item_id`, `provider`, `voice`, `format`, `output_path`, `file_name`, `bytes`
+
+Typical JSON response:
+
+```json
+{
+  "ok": true,
+  "item_id": 1,
+  "provider": "edge",
+  "voice": "en-US-AriaNeural",
+  "format": "mp3",
+  "output_path": "/Users/alex/.stash/audio/2026-02-17_example-article_id-1_en-us-arianeural_153045_k9x3vd.mp3",
+  "file_name": "2026-02-17_example-article_id-1_en-us-arianeural_153045_k9x3vd.mp3",
+  "bytes": 48291
+}
+```
+
 ## JSON Output Contract
 
 Most commands support `--json`.
@@ -244,7 +287,7 @@ Typical list response:
 
 - `0` success
 - `1` internal/unexpected error
-- `2` validation or migration-required errors
+- `2` validation, migration-required, or TTS content/provider setup errors (for example `NO_CONTENT`, `TTS_PROVIDER_UNAVAILABLE`)
 - `3` not found
 - `4` reserved for conflict
 
@@ -287,11 +330,28 @@ List tags:
 stash tags list --json
 ```
 
+Generate TTS in default audio directory:
+
+```bash
+stash tts 1 --json
+```
+
+Generate TTS in custom directory:
+
+```bash
+stash tts 1 --audio-dir ~/Downloads/stash-audio --json
+```
+
+Generate TTS to exact file path:
+
+```bash
+stash tts 1 --out ~/Downloads/article-1.mp3 --json
+```
+
 ## Roadmap (Not Implemented Yet)
 
 - `archive`, `delete`, `open`
 - Search command (leveraging extracted content)
-- TTS export (using extracted text)
 - Import/export
 
 ## Publishing Docs to GitHub Pages Later

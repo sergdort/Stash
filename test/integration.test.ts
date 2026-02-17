@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest"
 type RunCliOptions = {
   dbPath: string
   expectedCode?: number
+  env?: NodeJS.ProcessEnv
 }
 
 type CliResult = {
@@ -63,6 +64,17 @@ type MarkResponse = {
   status: "read" | "unread"
 }
 
+type TtsResponse = {
+  ok: boolean
+  item_id: number
+  provider: "edge"
+  voice: string
+  format: "mp3" | "wav"
+  output_path: string
+  file_name: string
+  bytes: number
+}
+
 type ErrorResponse = {
   ok: false
   error: {
@@ -76,14 +88,16 @@ const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, "..")
 const cliPath = path.join(repoRoot, "dist", "cli.js")
 const articleUrl = "https://example.com/article"
+const mockEdgeAudioBase64 = Buffer.from("fake-edge-audio-payload", "utf8").toString("base64")
 
 function runCli(args: string[], options: RunCliOptions): CliResult {
-  const { dbPath, expectedCode = 0 } = options
+  const { dbPath, expectedCode = 0, env = {} } = options
   const result = spawnSync(process.execPath, [cliPath, ...args], {
     cwd: repoRoot,
     encoding: "utf8",
     env: {
       ...process.env,
+      ...env,
       STASH_DB_PATH: dbPath,
     },
   })
@@ -147,6 +161,40 @@ function seedSavedItem(dbPath: string): SaveResponse {
     ["save", articleUrl, "--title", "Example article", "--tag", "AI", "--tag", "cli"],
     { dbPath },
   )
+}
+
+function upsertNoteContent(dbPath: string, itemId: number, content: string): void {
+  const result = spawnSync(
+    process.execPath,
+    [
+      "-e",
+      `import("better-sqlite3").then((mod) => {
+  const Database = mod.default
+  const db = new Database(process.env.DB_PATH)
+  db.prepare(
+    "insert into notes (item_id, content, updated_at) values (?, ?, ?) on conflict(item_id) do update set content=excluded.content, updated_at=excluded.updated_at"
+  ).run(Number(process.env.ITEM_ID), process.env.NOTE_CONTENT ?? "", Date.now())
+  db.close()
+}).catch((error) => {
+  console.error(error?.message ?? String(error))
+  process.exit(1)
+})`,
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        DB_PATH: dbPath,
+        ITEM_ID: String(itemId),
+        NOTE_CONTENT: content,
+      },
+    },
+  )
+
+  if (result.status !== 0) {
+    throw new Error(`Failed to seed note content:\n${result.stdout}\n${result.stderr}`)
+  }
 }
 
 const sqliteProbe = probeSqliteBinding()
@@ -362,6 +410,140 @@ integrationSuite(integrationTitle, () => {
     })
   })
 
+  describe("tts export", () => {
+    it("writes to default ~/.stash/audio when no output overrides are provided", () => {
+      const { dbPath, cleanup } = createTempDb()
+      try {
+        const saved = seedSavedItem(dbPath)
+        upsertNoteContent(dbPath, saved.item.id, "A short article body for synthesized speech.")
+
+        const homeDir = path.dirname(dbPath)
+        const tts = runJson<TtsResponse>(["tts", String(saved.item.id)], {
+          dbPath,
+          env: {
+            HOME: homeDir,
+            STASH_TTS_EDGE_MOCK_BASE64: mockEdgeAudioBase64,
+          },
+        })
+
+        const expectedDir = path.join(homeDir, ".stash", "audio")
+        expect(tts.ok).toBe(true)
+        expect(tts.item_id).toBe(saved.item.id)
+        expect(tts.provider).toBe("edge")
+        expect(tts.output_path.startsWith(expectedDir)).toBe(true)
+        expect(tts.file_name.includes(`id-${saved.item.id}`)).toBe(true)
+        expect(tts.bytes).toBeGreaterThan(0)
+        expect(fs.existsSync(tts.output_path)).toBe(true)
+      } finally {
+        cleanup()
+      }
+    })
+
+    it("supports --audio-dir and STASH_AUDIO_DIR overrides", () => {
+      const { dbPath, cleanup } = createTempDb()
+      try {
+        const saved = seedSavedItem(dbPath)
+        upsertNoteContent(dbPath, saved.item.id, "Audio override test content.")
+        const tempRoot = path.dirname(dbPath)
+        const envDir = path.join(tempRoot, "env-audio")
+        const flagDir = path.join(tempRoot, "flag-audio")
+
+        const envResult = runJson<TtsResponse>(["tts", String(saved.item.id)], {
+          dbPath,
+          env: {
+            STASH_AUDIO_DIR: envDir,
+            STASH_TTS_EDGE_MOCK_BASE64: mockEdgeAudioBase64,
+          },
+        })
+        expect(envResult.output_path.startsWith(envDir)).toBe(true)
+        expect(fs.existsSync(envResult.output_path)).toBe(true)
+
+        const flagResult = runJson<TtsResponse>(
+          ["tts", String(saved.item.id), "--audio-dir", flagDir],
+          {
+            dbPath,
+            env: {
+              STASH_AUDIO_DIR: envDir,
+              STASH_TTS_EDGE_MOCK_BASE64: mockEdgeAudioBase64,
+            },
+          },
+        )
+        expect(flagResult.output_path.startsWith(flagDir)).toBe(true)
+        expect(fs.existsSync(flagResult.output_path)).toBe(true)
+      } finally {
+        cleanup()
+      }
+    })
+
+    it("uses --out as highest-priority output target", () => {
+      const { dbPath, cleanup } = createTempDb()
+      try {
+        const saved = seedSavedItem(dbPath)
+        upsertNoteContent(dbPath, saved.item.id, "Explicit output path test content.")
+        const tempRoot = path.dirname(dbPath)
+        const explicitOutput = path.join(tempRoot, "exports", "article-audio")
+
+        const tts = runJson<TtsResponse>(
+          [
+            "tts",
+            String(saved.item.id),
+            "--out",
+            explicitOutput,
+            "--audio-dir",
+            path.join(tempRoot, "unused-audio-dir"),
+          ],
+          {
+            dbPath,
+            env: {
+              STASH_AUDIO_DIR: path.join(tempRoot, "unused-env-dir"),
+              STASH_TTS_EDGE_MOCK_BASE64: mockEdgeAudioBase64,
+            },
+          },
+        )
+
+        expect(tts.output_path).toBe(`${explicitOutput}.mp3`)
+        expect(fs.existsSync(tts.output_path)).toBe(true)
+      } finally {
+        cleanup()
+      }
+    })
+
+    it("generates unique auto filenames across repeated runs", () => {
+      const { dbPath, cleanup } = createTempDb()
+      try {
+        const saved = seedSavedItem(dbPath)
+        upsertNoteContent(dbPath, saved.item.id, "Unique file naming test content.")
+        const audioDir = path.join(path.dirname(dbPath), "audio")
+
+        const first = runJson<TtsResponse>(
+          ["tts", String(saved.item.id), "--audio-dir", audioDir, "--voice", "en-US-AriaNeural"],
+          {
+            dbPath,
+            env: {
+              STASH_TTS_EDGE_MOCK_BASE64: mockEdgeAudioBase64,
+            },
+          },
+        )
+
+        const second = runJson<TtsResponse>(
+          ["tts", String(saved.item.id), "--audio-dir", audioDir, "--voice", "en-US-AriaNeural"],
+          {
+            dbPath,
+            env: {
+              STASH_TTS_EDGE_MOCK_BASE64: mockEdgeAudioBase64,
+            },
+          },
+        )
+
+        expect(first.output_path).not.toBe(second.output_path)
+        expect(fs.existsSync(first.output_path)).toBe(true)
+        expect(fs.existsSync(second.output_path)).toBe(true)
+      } finally {
+        cleanup()
+      }
+    })
+  })
+
   describe("error contracts", () => {
     it("returns NOT_FOUND with exit code 3 for missing items", () => {
       const { dbPath, cleanup } = createTempDb()
@@ -372,6 +554,44 @@ integrationSuite(integrationTitle, () => {
         })
         expect(missingItem.ok).toBe(false)
         expect(missingItem.error.code).toBe("NOT_FOUND")
+      } finally {
+        cleanup()
+      }
+    })
+
+    it("returns NOT_FOUND with exit code 3 for missing tts items", () => {
+      const { dbPath, cleanup } = createTempDb()
+      try {
+        const missingItem = runJson<ErrorResponse>(["tts", "999"], {
+          dbPath,
+          expectedCode: 3,
+          env: {
+            STASH_TTS_EDGE_MOCK_BASE64: mockEdgeAudioBase64,
+          },
+        })
+        expect(missingItem.ok).toBe(false)
+        expect(missingItem.error.code).toBe("NOT_FOUND")
+      } finally {
+        cleanup()
+      }
+    })
+
+    it("returns NO_CONTENT with exit code 2 when item has no extracted note", () => {
+      const { dbPath, cleanup } = createTempDb()
+      try {
+        const saved = runJson<SaveResponse>(
+          ["save", articleUrl, "--title", "No extract article", "--no-extract"],
+          { dbPath },
+        )
+        const noContent = runJson<ErrorResponse>(["tts", String(saved.item.id)], {
+          dbPath,
+          expectedCode: 2,
+          env: {
+            STASH_TTS_EDGE_MOCK_BASE64: mockEdgeAudioBase64,
+          },
+        })
+        expect(noContent.ok).toBe(false)
+        expect(noContent.error.code).toBe("NO_CONTENT")
       } finally {
         cleanup()
       }
