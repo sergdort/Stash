@@ -91,6 +91,7 @@ stash db doctor --json
 ## Features
 
 - Save URLs with automatic content extraction
+- Extract or re-extract content for existing items
 - Organize with tags
 - Mark items as read/unread
 - Generate TTS audio from extracted article content
@@ -109,6 +110,8 @@ stash tag add 1 productivity
 stash tag rm 1 productivity
 stash mark read 1
 stash mark unread 1
+stash extract 1  # extract content for items saved before extraction was added
+stash extract 1 --force  # re-extract even if content exists
 stash tts 1 --json
 stash tts 1 --audio-dir ~/Downloads/audio
 stash tts 1 --out ~/Downloads/article-1.mp3

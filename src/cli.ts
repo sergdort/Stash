@@ -444,6 +444,7 @@ Quick Reference:
   stash mark unread <id> [--json]
   stash read <id> [--json]
   stash unread <id> [--json]
+  stash extract <id> [--force] [--json]
   stash tts <id> [--voice <name>] [--format mp3|wav] [--out <file>] [--audio-dir <dir>] [--json]
   stash db migrate [--json] [--migrations-dir <path>]
   stash db doctor [--json] [--migrations-dir <path>] [--limit <n>]
@@ -779,6 +780,123 @@ program
       })
     },
   )
+
+program
+  .command("extract <id>")
+  .description("Extract or re-extract content for an item")
+  .option("--force", "Re-extract even if content already exists")
+  .option("--json", "Print machine-readable JSON output")
+  .action(async (id: string, options: { force?: boolean; json?: boolean }) => {
+    const jsonMode = Boolean(options.json)
+
+    return runDbAction(jsonMode, async () =>
+      withReadyDbAsync(resolveDbPath(program.opts().dbPath as string), async (db) => {
+        const itemId = parseItemId(id)
+        
+        // Get the item
+        const item = getItemRowById(db, itemId)
+        if (!item) {
+          throw new CliError(`Item ${itemId} not found.`, "NOT_FOUND", 3)
+        }
+        
+        // Check if content already exists
+        const existing = db
+          .select()
+          .from(schema.notes)
+          .where(eq(schema.notes.itemId, itemId))
+          .get()
+          
+        if (existing && !options.force) {
+          if (jsonMode) {
+            printJson({
+              ok: false,
+              error: {
+                code: "CONTENT_EXISTS",
+                message: `Item ${itemId} already has extracted content. Use --force to re-extract.`,
+              },
+            })
+            return
+          }
+          throw new CliError(
+            `Item ${itemId} already has extracted content. Use --force to re-extract.`,
+            "CONTENT_EXISTS",
+            4,
+          )
+        }
+        
+        // Extract content
+        let extracted = null
+        let extractionError = null
+        try {
+          extracted = await extractContent(item.url)
+        } catch (error) {
+          extractionError = error instanceof Error ? error.message : String(error)
+        }
+        
+        if (!extracted || !extracted.textContent) {
+          if (jsonMode) {
+            printJson({
+              ok: false,
+              error: {
+                code: "EXTRACTION_FAILED",
+                message: extractionError || "Failed to extract content",
+              },
+            })
+            return
+          }
+          throw new CliError(
+            `Failed to extract content: ${extractionError || "No readable content found"}`,
+            "EXTRACTION_FAILED",
+            1,
+          )
+        }
+        
+        // Save to notes table
+        const timestamp = new Date()
+        db.insert(schema.notes)
+          .values({
+            itemId,
+            content: extracted.textContent,
+            updatedAt: timestamp,
+          })
+          .onConflictDoUpdate({
+            target: schema.notes.itemId,
+            set: {
+              content: extracted.textContent,
+              updatedAt: timestamp,
+            },
+          })
+          .run()
+          
+        // Update title if we got a better one and item doesn't have one
+        if (extracted.title && !item.title) {
+          db.update(schema.items)
+            .set({
+              title: extracted.title,
+              updatedAt: timestamp,
+            })
+            .where(eq(schema.items.id, itemId))
+            .run()
+        }
+        
+        if (jsonMode) {
+          printJson({
+            ok: true,
+            item_id: itemId,
+            title_extracted: extracted.title || null,
+            title_updated: Boolean(extracted.title && !item.title),
+            content_length: extracted.textContent.length,
+            updated_at: timestamp.toISOString(),
+          })
+          return
+        }
+
+        process.stdout.write(
+          `extracted #${itemId} ${item.url} (${extracted.textContent.length} chars)\n`,
+        )
+      }),
+    )
+  })
 
 program
   .command("list")

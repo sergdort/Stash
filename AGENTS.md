@@ -15,6 +15,7 @@ Current implementation status:
 - Implemented: migration tooling (`db migrate`, `db doctor`) and baseline schema.
 - Implemented: automatic migration application for normal data commands.
 - Implemented: content extraction on save using Mozilla Readability (stores in `notes` table).
+- Implemented: `extract` command to extract or re-extract content for existing items.
 - Not implemented yet: `archive`, `delete`, `open`, search command.
 
 ## Stack
@@ -150,6 +151,12 @@ Generate TTS audio:
 stash tts 1 --json
 stash tts 1 --audio-dir ~/Downloads/stash-audio --json
 stash tts 1 --out ~/Downloads/article-1.mp3 --json
+```
+
+Extract or re-extract content:
+```bash
+stash extract 1 --json
+stash extract 1 --force --json
 ```
 
 ## Agent-Friendly Interface Contract

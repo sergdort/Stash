@@ -220,6 +220,30 @@ stash read <id> [--json]
 stash unread <id> [--json]
 ```
 
+## Extract Content
+
+Extract or re-extract content for an item:
+
+```bash
+stash extract <id> [--force] [--json]
+```
+
+Behavior:
+- Fetches the URL and extracts readable content using Mozilla Readability
+- Stores extracted text in the `notes` table
+- Updates item title if extraction finds one and item has no title
+- Use `--force` to re-extract even if content already exists
+- Useful for:
+  - Backfilling items saved before extraction was implemented
+  - Retrying failed extractions
+  - Updating content when articles change
+  - Testing extraction improvements
+
+Error codes:
+- `NOT_FOUND` (3): Item ID doesn't exist
+- `CONTENT_EXISTS` (4): Content already extracted (use `--force`)
+- `EXTRACTION_FAILED` (1): Unable to extract readable content
+
 ## TTS Export
 
 Generate audio from extracted content stored in `notes`:
