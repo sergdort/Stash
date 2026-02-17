@@ -76,10 +76,19 @@ stash db migrate --json
 stash db doctor --json
 ```
 
+## Features
+
+- Save URLs with automatic content extraction
+- Organize with tags
+- Mark items as read/unread
+- Machine-friendly JSON output
+- Local SQLite storage
+
 ## Commands
 
 ```bash
 stash save https://example.com --tag typescript --tag cli
+stash save https://example.com --no-extract  # skip content extraction
 stash list --status unread --tag typescript --tag-mode all
 stash list --json
 stash tags list --json
@@ -102,6 +111,7 @@ stash mark unread 1
 - Commander (CLI)
 - SQLite (`better-sqlite3`)
 - Drizzle ORM + Drizzle Kit
+- Mozilla Readability + linkedom (content extraction)
 
 ## Notes
 

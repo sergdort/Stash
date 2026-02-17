@@ -2,11 +2,13 @@
 
 This document is the user-facing reference for the current `stash` feature set.
 
+⚠️ **Documentation Maintenance Rule**: When adding new features or modifying existing CLI behavior, update this file, `AGENTS.md`, and `README.md` in the same change. This ensures all documentation stays in sync.
+
 `stash` is a local-first CLI for saving and organizing links with SQLite storage and tag-based retrieval.
 
 ## Current Feature Set
 
-- Save links
+- Save links with automatic content extraction
 - List links with status and tag filters
 - List available tags with counts
 - Add/remove tags on an item
@@ -118,13 +120,16 @@ stash db doctor [--json] [--migrations-dir <path>] [--limit <n>]
 Save a URL:
 
 ```bash
-stash save <url> [--title <text>] [--tag <name> ...] [--json]
+stash save <url> [--title <text>] [--tag <name> ...] [--no-extract] [--json]
 ```
 
 Behavior:
 - URL is unique
 - Re-saving same URL is idempotent (`created: false`)
 - Tags are normalized (`trim + lowercase`)
+- Content is automatically extracted using Mozilla Readability (unless `--no-extract`)
+- Extracted title updates the item if no `--title` provided
+- Extracted text is stored in the `notes` table for future search/TTS features
 
 ## List
 
@@ -260,6 +265,12 @@ stash save https://example.com/a --title "A" --tag ai --tag reading
 stash save https://example.com/b --title "B" --tag cli
 ```
 
+Save without content extraction (faster, for non-article URLs):
+
+```bash
+stash save https://github.com/some/repo --tag code --no-extract
+```
+
 List unread links tagged `ai`:
 
 ```bash
@@ -281,8 +292,8 @@ stash tags list --json
 ## Roadmap (Not Implemented Yet)
 
 - `archive`, `delete`, `open`
-- Search command
-- Full-text content extraction
+- Search command (leveraging extracted content)
+- TTS export (using extracted text)
 - Import/export
 
 ## Publishing Docs to GitHub Pages Later

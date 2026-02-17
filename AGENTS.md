@@ -13,7 +13,8 @@ Current implementation status:
 - Implemented: `save`, `list`, `tags list`, `tag add`, `tag rm`, `mark read`, `mark unread`, plus `read`/`unread` aliases.
 - Implemented: migration tooling (`db migrate`, `db doctor`) and baseline schema.
 - Implemented: automatic migration application for normal data commands.
-- Not implemented yet: `archive`, `delete`, `open`, full-text content extraction, search command.
+- Implemented: content extraction on save using Mozilla Readability (stores in `notes` table).
+- Not implemented yet: `archive`, `delete`, `open`, search command.
 
 ## Stack
 
@@ -23,6 +24,7 @@ Current implementation status:
 - SQLite via `better-sqlite3`
 - Drizzle ORM + Drizzle Kit (schema/migrations)
 - Package manager: `pnpm`
+- Content extraction: Mozilla Readability + linkedom
 
 ## Repository Layout
 
@@ -77,11 +79,29 @@ Generate new migrations from `src/db/schema.ts` changes:
 pnpm run db:generate
 ```
 
+## Content Extraction
+
+When saving URLs, stash automatically:
+- Fetches the web page
+- Extracts readable content using Mozilla Readability
+- Stores the text in the `notes` table
+- Updates the item title if extraction finds a better one
+
+To skip extraction (for faster saves or non-article URLs):
+```bash
+stash save https://example.com --no-extract
+```
+
 ## Core Commands
 
 Save URL:
 ```bash
 stash save https://example.com --title "Example" --tag ai --tag typescript --json
+```
+
+Save without content extraction:
+```bash
+stash save https://example.com --title "Example" --tag ai --no-extract --json
 ```
 
 List items:
@@ -197,8 +217,8 @@ This includes:
 ## Near-Term Roadmap
 
 - Add `archive`, `delete`, `open`.
-- Add search command.
-- Add optional metadata enrichment on save.
+- Add search command (leveraging extracted content).
+- Add TTS export command (using extracted text).
 - Add import/export.
 
 ## Agent notes
