@@ -253,8 +253,8 @@ stash tts <id> [--voice <name>] [--format mp3|wav] [--out <file>] [--audio-dir <
 ```
 
 Defaults:
-- Provider: Edge TTS
-- `--voice en-US-AriaNeural`
+- Provider: macOS `say` command (built-in)
+- `--voice Samantha` (American female voice)
 - `--format mp3`
 - Default output directory: `~/.stash/audio`
 

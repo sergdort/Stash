@@ -14,11 +14,13 @@ import { extractContent } from "./lib/extract.js"
 import { DEFAULT_AUDIO_DIR, DEFAULT_DB_PATH, resolveAudioDir, resolveDbPath } from "./lib/paths.js"
 import { buildFriendlyFilename, ensureUniqueFilePath } from "./lib/tts/files.js"
 import { createEdgeTtsProvider } from "./lib/tts/providers/edge.js"
+import { coquiTtsProvider } from "./lib/tts/providers/coqui.js"
+import { macOSSayProvider } from "./lib/tts/providers/macos-say.js"
 import { TtsProviderError, type TtsFormat } from "./lib/tts/types.js"
 
 const CLI_DIR = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_MIGRATIONS_DIR = path.resolve(CLI_DIR, "../drizzle")
-const DEFAULT_TTS_VOICE = "en-US-AriaNeural"
+const DEFAULT_TTS_VOICE = "Samantha" // macOS voice
 const edgeTtsProvider = createEdgeTtsProvider()
 
 type ItemStatus = "unread" | "read" | "archived"
@@ -728,7 +730,7 @@ program
         let audioBuffer: Buffer
         let provider = "edge"
         try {
-          const result = await edgeTtsProvider.synthesize({
+          const result = await macOSSayProvider.synthesize({
             text,
             voice,
             format,
@@ -739,7 +741,7 @@ program
           if (error instanceof TtsProviderError) {
             if (error.code === "TTS_PROVIDER_UNAVAILABLE") {
               throw new CliError(
-                `Edge TTS is unavailable. ${error.message}`,
+                `TTS is unavailable. ${error.message}`,
                 "TTS_PROVIDER_UNAVAILABLE",
                 2,
               )

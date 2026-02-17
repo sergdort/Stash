@@ -1,6 +1,6 @@
 export type TtsFormat = "mp3" | "wav"
 
-export type TtsProviderName = "edge"
+export type TtsProviderName = "edge" | "coqui" | "macos-say"
 
 export interface TtsRequest {
   text: string

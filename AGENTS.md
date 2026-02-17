@@ -28,7 +28,8 @@ Current implementation status:
 - Drizzle ORM + Drizzle Kit (schema/migrations)
 - Package manager: `pnpm`
 - Content extraction: Mozilla Readability + linkedom
-- TTS provider (v1): Edge Read Aloud synthesis endpoint via `fetch`
+- TTS provider (v1): macOS `say` command (built-in, no installation)
+- TTS provider (v2): Coqui TTS ready (requires Python setup)
 
 ## Repository Layout
 

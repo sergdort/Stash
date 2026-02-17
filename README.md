@@ -120,6 +120,9 @@ stash tts 1 --out ~/Downloads/article-1.mp3
 ## TTS Export
 
 - Command: `stash tts <id> [--voice <name>] [--format mp3|wav] [--out <file>] [--audio-dir <dir>] [--json]`
+- Provider: macOS `say` command (built-in, no installation required)
+- Voices: Samantha (default), Alex, Daniel, and more
+- See `docs/TTS_MACOS.md` for voice options
 - Provider in v1: Edge TTS
 - Default output directory: `~/.stash/audio`
 - Directory override precedence:
