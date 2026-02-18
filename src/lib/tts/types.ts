@@ -1,6 +1,6 @@
 export type TtsFormat = "mp3" | "wav"
 
-export type TtsProviderName = "edge" | "coqui" | "macos-say"
+export type TtsProviderName = "edge" | "coqui" | "macos-say" | "gtts"
 
 export interface TtsRequest {
   text: string
@@ -20,7 +20,7 @@ export interface TtsProvider {
   synthesize(request: TtsRequest): Promise<TtsResult>
 }
 
-export type TtsProviderErrorCode = "TTS_PROVIDER_UNAVAILABLE" | "TTS_PROVIDER_ERROR"
+export type TtsProviderErrorCode = "TTS_PROVIDER_UNAVAILABLE" | "TTS_PROVIDER_ERROR" | "TTS_NOT_INSTALLED" | "TTS_SYNTHESIS_ERROR"
 
 export class TtsProviderError extends Error {
   code: TtsProviderErrorCode

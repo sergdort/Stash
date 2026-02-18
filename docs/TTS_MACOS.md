@@ -1,4 +1,37 @@
-# macOS TTS Voices
+# TTS Options for Stash
+
+## Google Text-to-Speech (gTTS) - RECOMMENDED
+
+Much better quality than macOS Say! Uses Google's TTS API.
+
+### Installation
+
+```bash
+pip install --user --break-system-packages gtts
+```
+
+### Usage
+
+```bash
+# Default English
+stash tts <id> --format mp3
+
+# Other languages
+stash tts <id> --voice "es" --format mp3  # Spanish
+stash tts <id> --voice "fr" --format mp3  # French
+stash tts <id> --voice "de" --format mp3  # German
+
+# Slower speech
+stash tts <id> --voice "en|slow" --format mp3
+```
+
+### File Sizes
+
+MP3 files are compressed:
+- Short article (3k chars): ~2.4MB
+- Long article (13k chars): ~10-12MB
+
+## macOS TTS Voices (Fallback)
 
 Stash currently uses macOS's built-in `say` command for text-to-speech. No installation required!
 

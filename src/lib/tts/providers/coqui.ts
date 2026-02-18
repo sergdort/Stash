@@ -1,119 +1,126 @@
-import { spawn } from "node:child_process"
-import type { Buffer } from "node:buffer"
 import { promises as fs } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { randomBytes } from "node:crypto"
 import type { TtsProvider, TtsRequest, TtsResult, TtsFormat } from "../types.js"
 import { TtsProviderError } from "../types.js"
+import { resolveBinary, runCommand } from "../command.js"
 
-/**
- * Coqui TTS provider using the Python TTS CLI
- * Requires: pip install TTS
- */
+function resolveCoquiCli(): string {
+  const home = process.env.HOME || ""
+  const cli = resolveBinary({
+    envVar: "STASH_COQUI_TTS_CLI",
+    binaryNames: ["tts"],
+    fallbackPaths: [
+      "/usr/local/Caskroom/miniconda/base/envs/coqui/bin/tts",
+      `${home}/.local/bin/tts`,
+    ],
+  })
+
+  if (!cli) {
+    throw new TtsProviderError(
+      "Coqui TTS CLI not found. Install Coqui TTS and ensure `tts` is in PATH, or set STASH_COQUI_TTS_CLI=/full/path/to/tts.",
+      "TTS_PROVIDER_UNAVAILABLE"
+    )
+  }
+
+  return cli
+}
+
+function ensureEspeakAvailable(): void {
+  const espeak = resolveBinary({
+    envVar: "STASH_ESPEAK_CLI",
+    binaryNames: ["espeak-ng", "espeak"],
+  })
+
+  if (!espeak) {
+    throw new TtsProviderError(
+      "espeak backend is missing. Install with `brew install espeak-ng`, or set STASH_ESPEAK_CLI to your espeak binary.",
+      "TTS_PROVIDER_UNAVAILABLE"
+    )
+  }
+}
+
+function resolveFfmpegCli(): string | null {
+  return resolveBinary({
+    envVar: "STASH_FFMPEG_CLI",
+    binaryNames: ["ffmpeg"],
+  })
+}
+
 export const coquiTtsProvider: TtsProvider = {
   name: "coqui",
 
   async synthesize(request: TtsRequest): Promise<TtsResult> {
     const { text, voice, format } = request
-    
-    // Create temp files
+
     const tempId = randomBytes(8).toString("hex")
     const tempTextFile = join(tmpdir(), `stash-tts-input-${tempId}.txt`)
     const tempAudioFile = join(tmpdir(), `stash-tts-output-${tempId}.wav`)
-    
+    const tempMp3File = join(tmpdir(), `stash-tts-output-${tempId}.mp3`)
+
     try {
-      // Write text to temp file to avoid shell escaping issues
       await fs.writeFile(tempTextFile, text, "utf-8")
-      
-      // Parse voice format: "model_name|speaker_idx" or just "model_name"
+
       const voiceParts = voice.split("|")
       const modelName = voiceParts[0] || voice
       const speakerIdx = voiceParts[1]
-      
-      // Build command args
+
       const args: string[] = [
-        "--model_name", modelName,
-        "--text_file", tempTextFile,
-        "--out_path", tempAudioFile,
-        "--progress_bar", "false"
+        "--model_name",
+        modelName,
+        "--text_file",
+        tempTextFile,
+        "--out_path",
+        tempAudioFile,
+        "--progress_bar",
+        "false",
       ]
-      
-      // Add speaker if multi-speaker model
-      if (speakerIdx) {
-        args.push("--speaker_idx", speakerIdx)
-      }
-      
-      // Run TTS
-      const tts = spawn("tts", args)
-      
-      // Collect stderr for error messages
-      let stderr = ""
-      tts.stderr?.on("data", (chunk: Buffer) => {
-        stderr += chunk.toString()
-      })
-      
-      // Wait for process to complete
-      const exitCode = await new Promise<number>((resolve) => {
-        tts.on("close", (code: number | null) => resolve(code ?? -1))
-      })
-      
-      if (exitCode !== 0) {
-        // Check if TTS is not installed
-        if (stderr.includes("command not found") || stderr.includes("No such file")) {
+
+      if (speakerIdx) args.push("--speaker_idx", speakerIdx)
+
+      ensureEspeakAvailable()
+      const ttsCli = resolveCoquiCli()
+      const ttsResult = await runCommand(ttsCli, args)
+
+      if (ttsResult.code !== 0) {
+        if (ttsResult.stderr.includes("No espeak backend")) {
           throw new TtsProviderError(
-            "Coqui TTS is not installed. Run: pip install TTS",
+            "Coqui needs espeak backend. Install with `brew install espeak-ng`.",
             "TTS_PROVIDER_UNAVAILABLE"
           )
         }
-        
-        // Check if model needs to be downloaded
-        if (stderr.includes("Model not found") || stderr.includes("downloading")) {
-          throw new TtsProviderError(
-            `Model ${modelName} not found. It may need to be downloaded first.`,
-            "TTS_PROVIDER_UNAVAILABLE"
-          )
-        }
-        
+
         throw new TtsProviderError(
-          `TTS failed with exit code ${exitCode}: ${stderr.slice(0, 200)}`,
+          `Coqui TTS failed: ${ttsResult.stderr.slice(0, 300) || `exit code ${ttsResult.code}`}`,
           "TTS_PROVIDER_ERROR"
         )
       }
-      
-      // Read the generated audio
-      const audioBuffer = await fs.readFile(tempAudioFile)
-      
-      // Convert to MP3 if requested (using ffmpeg)
-      let outputBuffer = audioBuffer
+
+      let outputBuffer = await fs.readFile(tempAudioFile)
       let outputFormat: TtsFormat = "wav"
-      
+
       if (format === "mp3") {
-        try {
-          const tempMp3File = join(tmpdir(), `stash-tts-output-${tempId}.mp3`)
-          
-          const ffmpeg = spawn("ffmpeg", [
-            "-i", tempAudioFile,
-            "-acodec", "libmp3lame",
-            "-b:a", "128k",
-            "-y", tempMp3File
+        const ffmpegCli = resolveFfmpegCli()
+        if (ffmpegCli) {
+          const ffmpegResult = await runCommand(ffmpegCli, [
+            "-i",
+            tempAudioFile,
+            "-acodec",
+            "libmp3lame",
+            "-b:a",
+            "128k",
+            "-y",
+            tempMp3File,
           ])
-          
-          const ffmpegExitCode = await new Promise<number>((resolve) => {
-            ffmpeg.on("close", (code: number | null) => resolve(code ?? -1))
-          })
-          
-          if (ffmpegExitCode === 0) {
+
+          if (ffmpegResult.code === 0) {
             outputBuffer = await fs.readFile(tempMp3File)
             outputFormat = "mp3"
-            await fs.unlink(tempMp3File).catch(() => {})
           }
-          // If ffmpeg fails, return WAV
-        } catch {
-          // If ffmpeg not available, return WAV
         }
       }
-      
+
       return {
         audio: outputBuffer,
         provider: "coqui",
@@ -121,9 +128,9 @@ export const coquiTtsProvider: TtsProvider = {
         format: outputFormat,
       }
     } finally {
-      // Cleanup temp files
       await fs.unlink(tempTextFile).catch(() => {})
       await fs.unlink(tempAudioFile).catch(() => {})
+      await fs.unlink(tempMp3File).catch(() => {})
     }
   },
 }

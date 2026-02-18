@@ -16,11 +16,12 @@ import { buildFriendlyFilename, ensureUniqueFilePath } from "./lib/tts/files.js"
 import { createEdgeTtsProvider } from "./lib/tts/providers/edge.js"
 import { coquiTtsProvider } from "./lib/tts/providers/coqui.js"
 import { macOSSayProvider } from "./lib/tts/providers/macos-say.js"
+import { gTtsProvider } from "./lib/tts/providers/gtts.js"
 import { TtsProviderError, type TtsFormat } from "./lib/tts/types.js"
 
 const CLI_DIR = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_MIGRATIONS_DIR = path.resolve(CLI_DIR, "../drizzle")
-const DEFAULT_TTS_VOICE = "Samantha" // macOS voice
+const DEFAULT_TTS_VOICE = "Alex" // macOS male voice
 const edgeTtsProvider = createEdgeTtsProvider()
 
 type ItemStatus = "unread" | "read" | "archived"

@@ -253,8 +253,16 @@ stash tts <id> [--voice <name>] [--format mp3|wav] [--out <file>] [--audio-dir <
 ```
 
 Defaults:
-- Provider: macOS `say` command (built-in)
-- `--voice Samantha` (American female voice)
+- Provider: Google TTS (gtts)
+- `--voice en` (English, use language codes like `es`, `fr`, `de`)
+
+Environment:
+- `STASH_GTTS_CLI` (optional): absolute path to `gtts-cli` if not on PATH
+- `STASH_COQUI_TTS_CLI` (optional): absolute path to Coqui `tts` CLI
+- `STASH_FFMPEG_CLI` (optional): absolute path to `ffmpeg` for mp3/wav conversions
+- `STASH_SAY_CLI` (optional): absolute path to macOS `say`
+- `STASH_AFCONVERT_CLI` (optional): absolute path to macOS `afconvert`
+- `STASH_ESPEAK_CLI` (optional): absolute path to `espeak-ng`/`espeak` for Coqui phonemizer
 - `--format mp3`
 - Default output directory: `~/.stash/audio`
 

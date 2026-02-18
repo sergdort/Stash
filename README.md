@@ -120,9 +120,11 @@ stash tts 1 --out ~/Downloads/article-1.mp3
 ## TTS Export
 
 - Command: `stash tts <id> [--voice <name>] [--format mp3|wav] [--out <file>] [--audio-dir <dir>] [--json]`
-- Provider: macOS `say` command (built-in, no installation required)
-- Voices: Samantha (default), Alex, Daniel, and more
-- See `docs/TTS_MACOS.md` for voice options
+- Provider: Google TTS (gtts) - much better quality than system voices
+- Installation: `pip install --user --break-system-packages gtts`
+- CLI discovery: auto-detects binaries from `PATH` with optional env overrides (`STASH_GTTS_CLI`, `STASH_COQUI_TTS_CLI`, `STASH_FFMPEG_CLI`, etc.)
+- Voices: Language codes (en, es, fr, de, etc.) with optional `|slow` suffix
+- See `docs/TTS_MACOS.md` for all TTS options
 - Provider in v1: Edge TTS
 - Default output directory: `~/.stash/audio`
 - Directory override precedence:

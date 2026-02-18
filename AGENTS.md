@@ -28,8 +28,10 @@ Current implementation status:
 - Drizzle ORM + Drizzle Kit (schema/migrations)
 - Package manager: `pnpm`
 - Content extraction: Mozilla Readability + linkedom
-- TTS provider (v1): macOS `say` command (built-in, no installation)
-- TTS provider (v2): Coqui TTS ready (requires Python setup)
+- TTS provider (v1): Google TTS via gtts (pip install --user gtts)
+- CLI discovery standardized across providers: PATH first, optional env overrides (`STASH_GTTS_CLI`, `STASH_COQUI_TTS_CLI`, `STASH_FFMPEG_CLI`, `STASH_SAY_CLI`, `STASH_AFCONVERT_CLI`, `STASH_ESPEAK_CLI`)
+- TTS provider (v2): macOS `say` command (built-in fallback)
+- TTS provider (v3): Coqui TTS (Python 3.11 + espeak-ng)
 
 ## Repository Layout
 
