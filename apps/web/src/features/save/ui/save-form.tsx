@@ -1,6 +1,17 @@
 import type { JSX } from "react"
 import { useState } from "react"
-import { Box, Button, Checkbox, FormControlLabel, Stack, TextField } from "@mui/material"
+import {
+  Box,
+  Button,
+  Checkbox,
+  FormControlLabel,
+  InputAdornment,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material"
+
+import { AddIcon, ExternalLinkIcon, TagIcon } from "../../../shared/ui/icons"
 
 type SaveFormProps = {
   onSave: (payload: { url: string; title?: string; tags?: string[]; extract?: boolean }) => Promise<void>
@@ -16,7 +27,7 @@ export function SaveForm({ onSave, saving }: SaveFormProps): JSX.Element {
   return (
     <Stack
       component="form"
-      spacing={1.5}
+      spacing={1.75}
       onSubmit={(event) => {
         event.preventDefault()
         const normalizedTags = tags
@@ -36,20 +47,30 @@ export function SaveForm({ onSave, saving }: SaveFormProps): JSX.Element {
         })
       }}
     >
+      <Typography variant="subtitle1">Save a new link</Typography>
       <TextField
         label="URL"
         value={url}
         onChange={(event) => setUrl(event.target.value)}
         placeholder="https://example.com"
+        helperText="Paste any article or page URL."
+        slotProps={{
+          input: {
+            startAdornment: (
+              <InputAdornment position="start">
+                <ExternalLinkIcon fontSize="small" color="secondary" />
+              </InputAdornment>
+            ),
+          },
+        }}
         required
         fullWidth
-        size="small"
       />
 
       <Box
         sx={{
           display: "grid",
-          gap: 1.5,
+          gap: 1.75,
           gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
         }}
       >
@@ -58,8 +79,9 @@ export function SaveForm({ onSave, saving }: SaveFormProps): JSX.Element {
             label="Title (optional)"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
+            placeholder="Override extracted title"
+            helperText="Leave empty to use extracted page title."
             fullWidth
-            size="small"
           />
         </Box>
         <Box>
@@ -67,8 +89,18 @@ export function SaveForm({ onSave, saving }: SaveFormProps): JSX.Element {
             label="Tags (comma separated)"
             value={tags}
             onChange={(event) => setTags(event.target.value)}
+            placeholder="ai, typescript, read-later"
+            helperText="Tags are normalized to lowercase."
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <TagIcon fontSize="small" color="secondary" />
+                  </InputAdornment>
+                ),
+              },
+            }}
             fullWidth
-            size="small"
           />
         </Box>
       </Box>
@@ -84,7 +116,16 @@ export function SaveForm({ onSave, saving }: SaveFormProps): JSX.Element {
         label="Extract content"
       />
 
-      <Button type="submit" variant="contained" disabled={saving || url.trim().length === 0}>
+      <Button
+        type="submit"
+        variant="contained"
+        startIcon={<AddIcon />}
+        disabled={saving || url.trim().length === 0}
+        sx={{
+          alignSelf: { xs: "stretch", sm: "flex-start" },
+          minWidth: { sm: 164 },
+        }}
+      >
         {saving ? "Saving..." : "Save"}
       </Button>
     </Stack>

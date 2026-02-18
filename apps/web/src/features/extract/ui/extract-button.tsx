@@ -1,6 +1,8 @@
 import type { JSX } from "react"
 import { Button } from "@mui/material"
 
+import { ExtractIcon } from "../../../shared/ui/icons"
+
 type ExtractButtonProps = {
   itemId: number
   loading: boolean
@@ -9,7 +11,13 @@ type ExtractButtonProps = {
 
 export function ExtractButton({ itemId, loading, onExtract }: ExtractButtonProps): JSX.Element {
   return (
-    <Button type="button" variant="outlined" disabled={loading} onClick={() => void onExtract(itemId, true)}>
+    <Button
+      type="button"
+      variant="outlined"
+      startIcon={<ExtractIcon />}
+      disabled={loading}
+      onClick={() => void onExtract(itemId, true)}
+    >
       {loading ? "Extracting..." : "Re-extract"}
     </Button>
   )

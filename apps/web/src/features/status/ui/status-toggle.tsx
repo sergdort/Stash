@@ -2,6 +2,7 @@ import type { JSX } from "react"
 import { Button } from "@mui/material"
 
 import type { ItemStatus } from "../../../shared/types"
+import { StatusIcon } from "../../../shared/ui/icons"
 
 type StatusToggleProps = {
   itemId: number
@@ -14,7 +15,14 @@ export function StatusToggle({ itemId, status, loading, onToggle }: StatusToggle
   const nextStatus = status === "read" ? "unread" : "read"
 
   return (
-    <Button type="button" variant="contained" disabled={loading} onClick={() => void onToggle(itemId, nextStatus)}>
+    <Button
+      type="button"
+      variant="contained"
+      color={nextStatus === "read" ? "primary" : "secondary"}
+      startIcon={<StatusIcon />}
+      disabled={loading}
+      onClick={() => void onToggle(itemId, nextStatus)}
+    >
       Mark as {nextStatus}
     </Button>
   )

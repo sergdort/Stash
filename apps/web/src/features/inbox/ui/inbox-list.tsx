@@ -1,15 +1,23 @@
 import type { JSX } from "react"
-import { Box, Stack, Typography } from "@mui/material"
+import { Box, Chip, Stack, Typography } from "@mui/material"
 
+import { formatDateTime } from "../../../shared/lib/date"
 import type { StashItem } from "../../../shared/types"
+import { TimeIcon } from "../../../shared/ui/icons"
 
 type InboxListProps = {
   items: StashItem[]
   selectedItemId: number | null
   onSelect: (itemId: number) => void
+  showCreatedAt?: boolean
 }
 
-export function InboxList({ items, selectedItemId, onSelect }: InboxListProps): JSX.Element {
+export function InboxList({
+  items,
+  selectedItemId,
+  onSelect,
+  showCreatedAt = true,
+}: InboxListProps): JSX.Element {
   if (items.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary">
@@ -33,26 +41,49 @@ export function InboxList({ items, selectedItemId, onSelect }: InboxListProps): 
               textAlign: "left",
               border: "1px solid",
               borderColor: selected ? "primary.main" : "divider",
-              bgcolor: selected ? "primary.50" : "background.paper",
-              borderRadius: 1.5,
+              bgcolor: selected ? "rgba(20, 184, 166, 0.11)" : "background.paper",
+              borderRadius: 1,
               px: 1.5,
-              py: 1.25,
+              py: 1.4,
               cursor: "pointer",
-              transition: "all 120ms ease",
+              transition: "background-color 180ms ease, border-color 180ms ease, transform 180ms ease",
+              minHeight: 96,
               "&:hover": {
-                bgcolor: selected ? "primary.100" : "action.hover",
+                bgcolor: selected ? "rgba(20, 184, 166, 0.17)" : "rgba(15, 23, 42, 0.03)",
+                transform: "translateY(-1px)",
+              },
+              "&:focus-visible": {
+                outline: "3px solid",
+                outlineColor: "rgba(15, 118, 110, 0.35)",
+                outlineOffset: 2,
               },
             }}
           >
-            <Typography variant="subtitle2" noWrap>
-              {item.title ?? item.url}
-            </Typography>
-            <Typography variant="caption" color="text.secondary" noWrap>
-              {item.domain ?? item.url}
-            </Typography>
-            <Typography variant="caption" color="text.disabled" display="block">
-              #{item.id}
-            </Typography>
+            <Stack spacing={1}>
+              <Typography variant="subtitle2" sx={{ lineHeight: 1.35 }}>
+                {item.title ?? item.url}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" noWrap>
+                {item.domain ?? item.url}
+              </Typography>
+              <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" alignItems="center">
+                <Chip size="small" variant="outlined" label={`#${item.id}`} />
+                <Chip
+                  size="small"
+                  color={item.status === "read" ? "success" : "default"}
+                  label={item.status}
+                  variant={item.status === "read" ? "filled" : "outlined"}
+                />
+                {showCreatedAt ? (
+                  <Chip
+                    size="small"
+                    icon={<TimeIcon fontSize="small" />}
+                    label={formatDateTime(item.created_at)}
+                    variant="outlined"
+                  />
+                ) : null}
+              </Stack>
+            </Stack>
           </Box>
         )
       })}
