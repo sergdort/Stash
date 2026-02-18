@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
@@ -98,7 +99,28 @@ async function readJson<T>(response: Response): Promise<T> {
   return (await response.json()) as T
 }
 
-describe("web server API", () => {
+function probeLocalhostListenCapability(): boolean {
+  const result = spawnSync(
+    process.execPath,
+    [
+      "-e",
+      "const net=require('node:net');const server=net.createServer();server.once('error',()=>process.exit(1));server.listen(0,'127.0.0.1',()=>server.close(()=>process.exit(0)));",
+    ],
+    {
+      encoding: "utf8",
+    },
+  )
+
+  return result.status === 0
+}
+
+const canListenOnLocalhost = probeLocalhostListenCapability()
+const webServerSuite = canListenOnLocalhost ? describe : describe.skip
+const webServerSuiteTitle = canListenOnLocalhost
+  ? "web server API"
+  : "web server API (skipped: cannot bind localhost in this environment)"
+
+webServerSuite(webServerSuiteTitle, () => {
   const servers: StartedWebServer[] = []
   const cleanupDirs: string[] = []
 
@@ -220,17 +242,10 @@ describe("web server API", () => {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ format: "mp3" }),
-    }).then((response) =>
-      readJson<
-        { ok: true; download_url: string } | { ok: false; error: { code: string; message: string } }
-      >(response),
-    )
+    }).then((response) => readJson<{ ok: true; download_url: string }>(response))
 
-    if (tts.ok) {
-      expect(tts.download_url).toMatch(/^\/api\/audio\//)
-    } else {
-      expect(["TTS_PROVIDER_UNAVAILABLE", "INTERNAL_ERROR"]).toContain(tts.error.code)
-    }
+    expect(tts.ok).toBe(true)
+    expect(tts.download_url).toMatch(/^\/api\/audio\//)
   })
 
   it("returns NO_CONTENT for tts when notes are missing", async () => {

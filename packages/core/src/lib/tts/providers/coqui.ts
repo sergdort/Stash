@@ -6,6 +6,25 @@ import type { TtsProvider, TtsRequest, TtsResult, TtsFormat } from "../types.js"
 import { TtsProviderError } from "../types.js"
 import { resolveBinary, runCommand } from "../command.js"
 
+function decodeMockAudioBuffer(): Buffer | null {
+  const mockBase64 = process.env.STASH_TTS_MOCK_BASE64?.trim()
+  if (!mockBase64) {
+    return null
+  }
+
+  try {
+    const buffer = Buffer.from(mockBase64, "base64")
+    const normalizedInput = mockBase64.replaceAll(/\s+/g, "").replaceAll(/=+$/g, "")
+    const normalizedOutput = buffer.toString("base64").replaceAll(/=+$/g, "")
+    if (buffer.length === 0 || normalizedInput !== normalizedOutput) {
+      throw new Error("Invalid base64 payload.")
+    }
+    return buffer
+  } catch {
+    throw new TtsProviderError("Invalid STASH_TTS_MOCK_BASE64 value.", "TTS_PROVIDER_ERROR")
+  }
+}
+
 function resolveCoquiCli(): string {
   const home = process.env.HOME || ""
   const cli = resolveBinary({
@@ -20,7 +39,7 @@ function resolveCoquiCli(): string {
   if (!cli) {
     throw new TtsProviderError(
       "Coqui TTS CLI not found. Install Coqui TTS and ensure `tts` is in PATH, or set STASH_COQUI_TTS_CLI=/full/path/to/tts.",
-      "TTS_PROVIDER_UNAVAILABLE"
+      "TTS_PROVIDER_UNAVAILABLE",
     )
   }
 
@@ -36,7 +55,7 @@ function ensureEspeakAvailable(): void {
   if (!espeak) {
     throw new TtsProviderError(
       "espeak backend is missing. Install with `brew install espeak-ng`, or set STASH_ESPEAK_CLI to your espeak binary.",
-      "TTS_PROVIDER_UNAVAILABLE"
+      "TTS_PROVIDER_UNAVAILABLE",
     )
   }
 }
@@ -52,6 +71,16 @@ export const coquiTtsProvider: TtsProvider = {
   name: "coqui",
 
   async synthesize(request: TtsRequest): Promise<TtsResult> {
+    const mockedAudio = decodeMockAudioBuffer()
+    if (mockedAudio) {
+      return {
+        audio: mockedAudio,
+        provider: "coqui",
+        voice: request.voice,
+        format: request.format,
+      }
+    }
+
     const { text, voice, format } = request
 
     const tempId = randomBytes(8).toString("hex")
@@ -87,13 +116,13 @@ export const coquiTtsProvider: TtsProvider = {
         if (ttsResult.stderr.includes("No espeak backend")) {
           throw new TtsProviderError(
             "Coqui needs espeak backend. Install with `brew install espeak-ng`.",
-            "TTS_PROVIDER_UNAVAILABLE"
+            "TTS_PROVIDER_UNAVAILABLE",
           )
         }
 
         throw new TtsProviderError(
           `Coqui TTS failed: ${ttsResult.stderr.slice(0, 300) || `exit code ${ttsResult.code}`}`,
-          "TTS_PROVIDER_ERROR"
+          "TTS_PROVIDER_ERROR",
         )
       }
 

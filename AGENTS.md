@@ -11,7 +11,7 @@ Primary goal:
 
 Current implementation status:
 - Implemented: `save`, `list`, `tags list`, `tag add`, `tag rm`, `mark read`, `mark unread`, plus `read`/`unread` aliases.
-- Implemented: `tts` export command (Edge-first provider, filesystem output).
+- Implemented: `tts` export command (Coqui-first provider, filesystem output).
 - Implemented: migration tooling (`db migrate`, `db doctor`) and baseline schema.
 - Implemented: automatic migration application for normal data commands.
 - Implemented: content extraction on save using Mozilla Readability (stores in `notes` table).
@@ -262,6 +262,7 @@ Updates should include:
 - CLI DB path precedence remains: `--db-path` > `STASH_DB_PATH` > `~/.stash/stash.db`.
 - `tts` output path precedence is: `--out` > `--audio-dir` > `STASH_AUDIO_DIR` > `~/.stash/audio`.
 - `tts` auto-generated filenames use friendly slugs + timestamp + short random suffix and collision fallback (`_2`, `_3`, ...).
+- Vitest sets `STASH_TTS_MOCK_BASE64` in `test/vitest.setup.ts` for deterministic TTS tests; default `pnpm test` does not require local Coqui/espeak binaries.
 
 ## Near-Term Roadmap
 

@@ -6,6 +6,8 @@
 
 [1] Repo-wide `pnpm run lint` and `pnpm run format:check` can fail due pre-existing diagnostics unrelated to current scoped changes; report scoped verification separately when needed.
 
+[0] For integration suites with optional system prerequisites (e.g., Coqui/espeak for TTS), add capability probes and skip only the dependent test group so `pnpm test` remains reliable across developer machines and restricted sandboxes.
+
 [0] When adding features or changing CLI behavior, always update three files: `AGENTS.md`, `README.md`, and `docs/CLI_REFERENCE.md`. This keeps all documentation in sync and helps future developers (including AI agents) understand the current state.
 
 [0] X Articles (long-form content on X/Twitter) cannot be extracted because they require JavaScript execution to render. The content is not in the initial HTML response. Sites that require JS rendering will need either headless browser integration or should be saved with --no-extract.
@@ -23,3 +25,5 @@
 [0] `@types/react-dom` version `^19.2.2` is invalid on npm; use an available range such as `^19.1.9` when setting up React 19 TypeScript support.
 
 [0] If `pnpm install` fails after `Recreating .../node_modules`, local commands like `tsc`/`vite` may disappear until dependencies are successfully restored.
+
+[0] For deterministic CLI/web TTS tests, set `STASH_TTS_MOCK_BASE64` in Vitest setup (not per-test) so child `spawnSync` CLI calls inherit the same mock audio payload.

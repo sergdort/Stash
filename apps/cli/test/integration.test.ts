@@ -67,7 +67,7 @@ type MarkResponse = {
 type TtsResponse = {
   ok: boolean
   item_id: number
-  provider: "edge"
+  provider: string
   voice: string
   format: "mp3" | "wav"
   output_path: string
@@ -88,7 +88,6 @@ const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, "../../..")
 const cliPath = path.join(repoRoot, "dist", "apps", "cli", "src", "cli.js")
 const articleUrl = "https://example.com/article"
-const mockEdgeAudioBase64 = Buffer.from("fake-edge-audio-payload", "utf8").toString("base64")
 
 function runCli(args: string[], options: RunCliOptions): CliResult {
   const { dbPath, expectedCode = 0, env = {} } = options
@@ -421,14 +420,13 @@ integrationSuite(integrationTitle, () => {
           dbPath,
           env: {
             HOME: homeDir,
-            STASH_TTS_EDGE_MOCK_BASE64: mockEdgeAudioBase64,
           },
         })
 
         const expectedDir = path.join(homeDir, ".stash", "audio")
         expect(tts.ok).toBe(true)
         expect(tts.item_id).toBe(saved.item.id)
-        expect(tts.provider).toBe("edge")
+        expect(tts.provider).toBe("coqui")
         expect(tts.output_path.startsWith(expectedDir)).toBe(true)
         expect(tts.file_name.includes(`id-${saved.item.id}`)).toBe(true)
         expect(tts.bytes).toBeGreaterThan(0)
@@ -451,7 +449,6 @@ integrationSuite(integrationTitle, () => {
           dbPath,
           env: {
             STASH_AUDIO_DIR: envDir,
-            STASH_TTS_EDGE_MOCK_BASE64: mockEdgeAudioBase64,
           },
         })
         expect(envResult.output_path.startsWith(envDir)).toBe(true)
@@ -463,7 +460,6 @@ integrationSuite(integrationTitle, () => {
             dbPath,
             env: {
               STASH_AUDIO_DIR: envDir,
-              STASH_TTS_EDGE_MOCK_BASE64: mockEdgeAudioBase64,
             },
           },
         )
@@ -495,7 +491,6 @@ integrationSuite(integrationTitle, () => {
             dbPath,
             env: {
               STASH_AUDIO_DIR: path.join(tempRoot, "unused-env-dir"),
-              STASH_TTS_EDGE_MOCK_BASE64: mockEdgeAudioBase64,
             },
           },
         )
@@ -515,23 +510,13 @@ integrationSuite(integrationTitle, () => {
         const audioDir = path.join(path.dirname(dbPath), "audio")
 
         const first = runJson<TtsResponse>(
-          ["tts", String(saved.item.id), "--audio-dir", audioDir, "--voice", "en-US-AriaNeural"],
-          {
-            dbPath,
-            env: {
-              STASH_TTS_EDGE_MOCK_BASE64: mockEdgeAudioBase64,
-            },
-          },
+          ["tts", String(saved.item.id), "--audio-dir", audioDir],
+          { dbPath },
         )
 
         const second = runJson<TtsResponse>(
-          ["tts", String(saved.item.id), "--audio-dir", audioDir, "--voice", "en-US-AriaNeural"],
-          {
-            dbPath,
-            env: {
-              STASH_TTS_EDGE_MOCK_BASE64: mockEdgeAudioBase64,
-            },
-          },
+          ["tts", String(saved.item.id), "--audio-dir", audioDir],
+          { dbPath },
         )
 
         expect(first.output_path).not.toBe(second.output_path)
@@ -564,9 +549,6 @@ integrationSuite(integrationTitle, () => {
         const missingItem = runJson<ErrorResponse>(["tts", "999"], {
           dbPath,
           expectedCode: 3,
-          env: {
-            STASH_TTS_EDGE_MOCK_BASE64: mockEdgeAudioBase64,
-          },
         })
         expect(missingItem.ok).toBe(false)
         expect(missingItem.error.code).toBe("NOT_FOUND")
@@ -585,9 +567,6 @@ integrationSuite(integrationTitle, () => {
         const noContent = runJson<ErrorResponse>(["tts", String(saved.item.id)], {
           dbPath,
           expectedCode: 2,
-          env: {
-            STASH_TTS_EDGE_MOCK_BASE64: mockEdgeAudioBase64,
-          },
         })
         expect(noContent.ok).toBe(false)
         expect(noContent.error.code).toBe("NO_CONTENT")
