@@ -7,8 +7,8 @@ import { eq } from "drizzle-orm"
 import { drizzle } from "drizzle-orm/better-sqlite3"
 import { afterEach, describe, expect, it } from "vitest"
 
-import * as schema from "../packages/core/src/db/schema.js"
-import { startWebServer, type StartedWebServer } from "../packages/web-server/src/app/server.js"
+import * as schema from "../../core/src/db/schema.js"
+import { startWebServer, type StartedWebServer } from "../src/app/server.js"
 
 function createTempPaths(): { tempDir: string; dbPath: string; audioDir: string } {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "stash-web-"))
@@ -42,7 +42,11 @@ function seedNote(dbPath: string, itemId: number, content: string): void {
   sqlite.close()
 }
 
-function setItemStatus(dbPath: string, itemId: number, status: "unread" | "read" | "archived"): void {
+function setItemStatus(
+  dbPath: string,
+  itemId: number,
+  status: "unread" | "read" | "archived",
+): void {
   const sqlite = new Database(dbPath)
   const db = drizzle(sqlite)
   const timestamp = new Date()
@@ -130,7 +134,9 @@ describe("web server API", () => {
 
     const baseUrl = `http://${server.host}:${server.port}`
 
-    const health = await fetch(`${baseUrl}/api/health`).then((response) => readJson<{ ok: true }>(response))
+    const health = await fetch(`${baseUrl}/api/health`).then((response) =>
+      readJson<{ ok: true }>(response),
+    )
     expect(health).toEqual({ ok: true })
 
     const savePayload = {
@@ -216,8 +222,7 @@ describe("web server API", () => {
       body: JSON.stringify({ format: "mp3" }),
     }).then((response) =>
       readJson<
-        | { ok: true; download_url: string }
-        | { ok: false; error: { code: string; message: string } }
+        { ok: true; download_url: string } | { ok: false; error: { code: string; message: string } }
       >(response),
     )
 
@@ -343,17 +348,17 @@ describe("web server API", () => {
     expect(readOnly.items).toHaveLength(1)
     expect(readOnly.items[0]?.id).toBe(readSave.item.id)
 
-    const tagAny = await fetch(`${baseUrl}/api/items?status=active&tag=ai&tag=backend&tagMode=any`).then(
-      (response) => readJson<{ ok: boolean; items: Array<{ id: number }> }>(response),
-    )
+    const tagAny = await fetch(
+      `${baseUrl}/api/items?status=active&tag=ai&tag=backend&tagMode=any`,
+    ).then((response) => readJson<{ ok: boolean; items: Array<{ id: number }> }>(response))
     expect(tagAny.ok).toBe(true)
     expect(tagAny.items).toHaveLength(2)
     expect(tagAny.items.map((item) => item.id)).toContain(unreadSave.item.id)
     expect(tagAny.items.map((item) => item.id)).toContain(readSave.item.id)
 
-    const tagAll = await fetch(`${baseUrl}/api/items?status=active&tag=tech&tag=backend&tagMode=all`).then(
-      (response) => readJson<{ ok: boolean; items: Array<{ id: number }> }>(response),
-    )
+    const tagAll = await fetch(
+      `${baseUrl}/api/items?status=active&tag=tech&tag=backend&tagMode=all`,
+    ).then((response) => readJson<{ ok: boolean; items: Array<{ id: number }> }>(response))
     expect(tagAll.ok).toBe(true)
     expect(tagAll.items).toHaveLength(1)
     expect(tagAll.items[0]?.id).toBe(readSave.item.id)

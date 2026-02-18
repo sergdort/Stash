@@ -193,5 +193,5 @@ stash tts 1 --out ~/Downloads/article-1.mp3
 ## Notes
 
 - Migrations are SQL files in `drizzle/`.
-- Schema source is `src/db/schema.ts`.
+- Schema source is `packages/core/src/db/schema.ts`.
 - The initial migration creates `items`, `tags`, `item_tags`, and `notes`.

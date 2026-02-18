@@ -36,7 +36,7 @@ Current implementation status:
 
 ## Repository Layout
 
-- `src/cli.ts`: Main CLI command handlers (including `stash web`).
+- `apps/cli/src/cli.ts`: Main CLI command handlers (including `stash web`).
 - `apps/web/`: React web frontend (feature-centered structure).
 - `packages/web-server/`: Local REST API + static web serving.
 - `packages/core/`: Shared DB/domain logic used by CLI + web server.
@@ -97,7 +97,7 @@ Apply migrations (usually optional, CLI auto-applies pending migrations on norma
 pnpm run db:migrate -- --json
 ```
 
-Generate new migrations from `src/db/schema.ts` changes:
+Generate new migrations from `packages/core/src/db/schema.ts` changes:
 ```bash
 pnpm run db:generate
 ```
@@ -222,7 +222,7 @@ Initial SQL migration:
 
 ## Development Workflow
 
-1. Edit code in `src/`.
+1. Edit code in `apps/cli/src/` and `packages/`.
 2. Build with `pnpm run build`.
 3. Run DB checks:
 ```bash

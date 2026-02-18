@@ -54,7 +54,7 @@ echo "Hello world" | tts --model_name tts_models/en/ljspeech/vits --text - --out
 ## 5. Configure stash to use Coqui
 
 We'll need to update the Coqui provider to find the pyenv Python:
-- Update path in `/src/lib/tts/providers/coqui.ts` to use pyenv's tts
+- Update path in `/packages/core/src/lib/tts/providers/coqui.ts` to use pyenv's tts
 - Or create a wrapper script that activates the environment
 
 ## Benefits over gTTS

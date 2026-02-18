@@ -85,7 +85,7 @@ type ErrorResponse = {
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const repoRoot = path.resolve(__dirname, "..")
+const repoRoot = path.resolve(__dirname, "../../..")
 const cliPath = path.join(repoRoot, "dist", "apps", "cli", "src", "cli.js")
 const articleUrl = "https://example.com/article"
 const mockEdgeAudioBase64 = Buffer.from("fake-edge-audio-payload", "utf8").toString("base64")
@@ -276,10 +276,7 @@ integrationSuite(integrationTitle, () => {
       try {
         seedSavedItem(dbPath)
 
-        const secondSave = runJson<SaveResponse>(
-          ["save", articleUrl, "--tag", "news"],
-          { dbPath },
-        )
+        const secondSave = runJson<SaveResponse>(["save", articleUrl, "--tag", "news"], { dbPath })
         expect(secondSave.ok).toBe(true)
         expect(secondSave.created).toBe(false)
         expect(secondSave.item.tags).toEqual(["ai", "cli", "news"])
@@ -352,7 +349,9 @@ integrationSuite(integrationTitle, () => {
           { name: "productivity", item_count: 1 },
         ])
 
-        const removeTag = runJson<TagMutationResponse>(["tag", "rm", "1", "productivity"], { dbPath })
+        const removeTag = runJson<TagMutationResponse>(["tag", "rm", "1", "productivity"], {
+          dbPath,
+        })
         expect(removeTag.ok).toBe(true)
         expect(removeTag.removed).toBe(true)
 

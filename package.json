@@ -18,7 +18,7 @@
     "format": "biome format . --write",
     "format:check": "biome format .",
     "test": "pnpm run build && vitest run",
-    "test:integration": "pnpm run build && vitest run test/integration.test.ts",
+    "test:integration": "pnpm run build && vitest run apps/cli/test/integration.test.ts",
     "start": "node scripts/with-env.mjs node dist/apps/cli/src/cli.js",
     "web": "pnpm run build && pnpm --dir apps/web build && node scripts/with-env.mjs node dist/apps/cli/src/cli.js web",
     "db:generate": "drizzle-kit generate",

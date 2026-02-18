@@ -15,12 +15,12 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": [
-    "src/**/*.ts",
-    "src/**/*.d.ts",
     "apps/cli/src/**/*.ts",
+    "apps/cli/test/**/*.ts",
     "packages/core/src/**/*.ts",
+    "packages/core/test/**/*.ts",
     "packages/web-server/src/**/*.ts",
-    "test/**/*.ts"
+    "packages/web-server/test/**/*.ts"
   ],
   "exclude": ["dist", "node_modules"]
 }
