@@ -8,8 +8,13 @@
   "files": {
     "includes": [
       "src/**/*.ts",
+      "apps/**/*.ts",
+      "apps/**/*.tsx",
+      "packages/**/*.ts",
       "test/**/*.mjs",
+      "test/**/*.ts",
       "drizzle.config.ts",
+      "pnpm-workspace.yaml",
       "package.json",
       "tsconfig.json",
       "README.md",

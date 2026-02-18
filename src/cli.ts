@@ -18,9 +18,23 @@ import { coquiTtsProvider } from "./lib/tts/providers/coqui.js"
 import { macOSSayProvider } from "./lib/tts/providers/macos-say.js"
 import { gTtsProvider } from "./lib/tts/providers/gtts.js"
 import { TtsProviderError, type TtsFormat } from "./lib/tts/types.js"
+import { startWebServer } from "../packages/web-server/src/index.js"
 
 const CLI_DIR = path.dirname(fileURLToPath(import.meta.url))
-const DEFAULT_MIGRATIONS_DIR = path.resolve(CLI_DIR, "../drizzle")
+const DEFAULT_MIGRATIONS_DIR = resolveExistingPath([
+  path.resolve(CLI_DIR, "../drizzle"),
+  path.resolve(CLI_DIR, "../../drizzle"),
+  path.resolve(process.cwd(), "drizzle"),
+])
+const DEFAULT_WEB_DIST_DIR = resolveExistingPath([
+  path.resolve(CLI_DIR, "../apps/web/dist"),
+  path.resolve(CLI_DIR, "../../apps/web/dist"),
+  path.resolve(process.cwd(), "apps/web/dist"),
+])
+const DEFAULT_WEB_HOST = process.env.STASH_WEB_HOST ?? "127.0.0.1"
+const DEFAULT_WEB_PORT = process.env.STASH_WEB_PORT
+  ? parsePositiveInt(process.env.STASH_WEB_PORT)
+  : 4173
 const DEFAULT_TTS_VOICE = "tts_models/en/vctk/vits|p241" // Coqui male voice
 const edgeTtsProvider = createEdgeTtsProvider()
 
@@ -74,6 +88,15 @@ function parseNonNegativeInt(value: string): number {
 
 function collectValues(value: string, previous: string[]): string[] {
   return [...previous, value]
+}
+
+function resolveExistingPath(candidates: string[]): string {
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate
+    }
+  }
+  return candidates[0] as string
 }
 
 function printJson(value: unknown): void {
@@ -138,6 +161,14 @@ function parseTtsFormat(value: string): TtsFormat {
     throw new CliError("Invalid format. Use mp3 or wav.", "VALIDATION_ERROR", 2)
   }
   return normalized
+}
+
+function parsePort(value: string): number {
+  const port = parsePositiveInt(value)
+  if (port > 65535) {
+    throw new InvalidArgumentError("Expected a valid port in range 1..65535.")
+  }
+  return port
 }
 
 function resolveCliPath(input: string): string {
@@ -449,6 +480,7 @@ Quick Reference:
   stash unread <id> [--json]
   stash extract <id> [--force] [--json]
   stash tts <id> [--voice <name>] [--format mp3|wav] [--out <file>] [--audio-dir <dir>] [--json]
+  stash web [--host <host>] [--port <n>]
   stash db migrate [--json] [--migrations-dir <path>]
   stash db doctor [--json] [--migrations-dir <path>] [--limit <n>]
 
@@ -1264,6 +1296,45 @@ markCommand
         return
       }
       process.stdout.write(`marked #${result.itemId} as unread\n`)
+    })
+  })
+
+program
+  .command("web")
+  .description("Run local web frontend + REST API server")
+  .option("--host <host>", "Host to bind web server", DEFAULT_WEB_HOST)
+  .option("--port <n>", "Port to bind web server", parsePort, DEFAULT_WEB_PORT)
+  .action(async (options: { host: string; port: number }) => {
+    return runDbAction(false, async () => {
+      const dbPath = resolveDbPath(program.opts().dbPath as string)
+      const migrationsDir = resolveMigrationsDir()
+      const web = await startWebServer({
+        host: options.host,
+        port: options.port,
+        dbPath,
+        migrationsDir,
+        webDistDir: DEFAULT_WEB_DIST_DIR,
+        audioDir: resolveAudioDir(process.env.STASH_AUDIO_DIR ?? DEFAULT_AUDIO_DIR),
+      })
+
+      process.stdout.write(`stash web running on http://${web.host}:${web.port}\n`)
+
+      await new Promise<void>((resolve) => {
+        const stop = (): void => {
+          web.close()
+            .catch(() => {
+              // Ignore shutdown errors during signal handling.
+            })
+            .finally(() => {
+              process.off("SIGINT", stop)
+              process.off("SIGTERM", stop)
+              resolve()
+            })
+        }
+
+        process.on("SIGINT", stop)
+        process.on("SIGTERM", stop)
+      })
     })
   })
 

@@ -40,7 +40,7 @@ pnpm run setup
 Run compiled CLI:
 
 ```bash
-node dist/cli.js --help
+node dist/apps/cli/src/cli.js --help
 ```
 
 Command help:
@@ -89,7 +89,7 @@ Override with:
 Example:
 
 ```bash
-STASH_DB_PATH=./.local/stash.db node dist/cli.js list --json
+STASH_DB_PATH=./.local/stash.db node dist/apps/cli/src/cli.js list --json
 ```
 
 ## Local Dev Environment
@@ -98,6 +98,7 @@ The following npm scripts auto-load variables from `.env`:
 - `pnpm run dev`
 - `pnpm run setup`
 - `pnpm run start`
+- `pnpm run web`
 - `pnpm run db:migrate`
 - `pnpm run db:doctor`
 
@@ -143,6 +144,20 @@ Inspect migration status:
 
 ```bash
 stash db doctor [--json] [--migrations-dir <path>] [--limit <n>]
+```
+
+## Web App
+
+Run the local web frontend + REST API with one command:
+
+```bash
+pnpm run web
+```
+
+Equivalent CLI form:
+
+```bash
+stash web [--host <host>] [--port <n>]
 ```
 
 ## Save

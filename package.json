@@ -5,25 +5,27 @@
   "type": "module",
   "packageManager": "pnpm@10.16.1",
   "bin": {
-    "stash": "dist/cli.js"
+    "stash": "dist/apps/cli/src/cli.js"
   },
   "scripts": {
-    "setup": "pnpm run build && node scripts/with-env.mjs node dist/cli.js db migrate --json",
+    "setup": "pnpm run build && node scripts/with-env.mjs node dist/apps/cli/src/cli.js db migrate --json",
     "build": "tsc -p tsconfig.json",
     "check": "pnpm run lint && pnpm run format:check && pnpm run build",
-    "dev": "node scripts/with-env.mjs tsx src/cli.ts",
+    "dev": "node scripts/with-env.mjs tsx apps/cli/src/cli.ts",
+    "dev:web": "pnpm --dir apps/web dev",
     "lint": "biome lint . --error-on-warnings",
     "lint:fix": "biome lint . --write --error-on-warnings",
     "format": "biome format . --write",
     "format:check": "biome format .",
     "test": "pnpm run build && vitest run",
     "test:integration": "pnpm run build && vitest run test/integration.test.ts",
-    "start": "node scripts/with-env.mjs node dist/cli.js",
+    "start": "node scripts/with-env.mjs node dist/apps/cli/src/cli.js",
+    "web": "pnpm run build && pnpm --dir apps/web build && node scripts/with-env.mjs node dist/apps/cli/src/cli.js web",
     "db:generate": "drizzle-kit generate",
     "predb:migrate": "pnpm run build",
-    "db:migrate": "node scripts/with-env.mjs node dist/cli.js db migrate",
+    "db:migrate": "node scripts/with-env.mjs node dist/apps/cli/src/cli.js db migrate",
     "predb:doctor": "pnpm run build",
-    "db:doctor": "node scripts/with-env.mjs node dist/cli.js db doctor"
+    "db:doctor": "node scripts/with-env.mjs node dist/apps/cli/src/cli.js db doctor"
   },
   "engines": {
     "node": ">=20"

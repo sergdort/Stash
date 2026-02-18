@@ -35,10 +35,10 @@ Current implementation status:
 
 ## Repository Layout
 
-- `src/cli.ts`: CLI entrypoint and command handlers.
-- `src/db/schema.ts`: Drizzle schema definition.
-- `src/db/migrate.ts`: SQL migration runner + migration tracking table.
-- `src/db/client.ts`: SQLite connection setup and PRAGMA config.
+- `src/cli.ts`: Main CLI command handlers (including `stash web`).
+- `apps/web/`: React web frontend (feature-centered structure).
+- `packages/web-server/`: Local REST API + static web serving.
+- `packages/core/`: Shared DB/domain logic used by CLI + web server.
 - `scripts/with-env.mjs`: Script wrapper to auto-load `.env` for local npm scripts.
 - `drizzle/`: SQL migration files.
 - `drizzle.config.ts`: Drizzle config.
@@ -66,6 +66,11 @@ pnpm run setup
 pnpm approve-builds
 pnpm rebuild better-sqlite3
 pnpm install
+```
+
+5. Run the local web app (single command):
+```bash
+pnpm run web
 ```
 
 ## Database and Migrations

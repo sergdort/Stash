@@ -14,6 +14,16 @@ cp .env.example .env
 pnpm run setup
 ```
 
+## Web App (One Command)
+
+Run the local web frontend + API with a single command:
+
+```bash
+pnpm run web
+```
+
+This script builds the TypeScript backend and React frontend, then starts `stash web` on `http://127.0.0.1:4173`.
+
 If you see a `better-sqlite3` binding error on first run:
 
 ```bash
