@@ -253,8 +253,8 @@ stash tts <id> [--voice <name>] [--format mp3|wav] [--out <file>] [--audio-dir <
 ```
 
 Defaults:
-- Provider: Google TTS (gtts)
-- `--voice en` (English, use language codes like `es`, `fr`, `de`)
+- Provider: Coqui TTS
+- `--voice tts_models/en/vctk/vits|p241` (selected male voice)
 
 Environment:
 - `STASH_GTTS_CLI` (optional): absolute path to `gtts-cli` if not on PATH

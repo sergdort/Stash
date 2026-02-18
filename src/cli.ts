@@ -21,7 +21,7 @@ import { TtsProviderError, type TtsFormat } from "./lib/tts/types.js"
 
 const CLI_DIR = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_MIGRATIONS_DIR = path.resolve(CLI_DIR, "../drizzle")
-const DEFAULT_TTS_VOICE = "Alex" // macOS male voice
+const DEFAULT_TTS_VOICE = "tts_models/en/vctk/vits|p241" // Coqui male voice
 const edgeTtsProvider = createEdgeTtsProvider()
 
 type ItemStatus = "unread" | "read" | "archived"
@@ -729,9 +729,9 @@ program
         const { title, text } = withReadyDb(dbPath, (db) => getItemTextForTts(db, itemId))
 
         let audioBuffer: Buffer
-        let provider = "edge"
+        let provider = "coqui"
         try {
-          const result = await macOSSayProvider.synthesize({
+          const result = await coquiTtsProvider.synthesize({
             text,
             voice,
             format,

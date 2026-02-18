@@ -120,10 +120,11 @@ stash tts 1 --out ~/Downloads/article-1.mp3
 ## TTS Export
 
 - Command: `stash tts <id> [--voice <name>] [--format mp3|wav] [--out <file>] [--audio-dir <dir>] [--json]`
-- Provider: Google TTS (gtts) - much better quality than system voices
-- Installation: `pip install --user --break-system-packages gtts`
-- CLI discovery: auto-detects binaries from `PATH` with optional env overrides (`STASH_GTTS_CLI`, `STASH_COQUI_TTS_CLI`, `STASH_FFMPEG_CLI`, etc.)
-- Voices: Language codes (en, es, fr, de, etc.) with optional `|slow` suffix
+- Provider: Coqui TTS (local, high quality)
+- Default voice: `tts_models/en/vctk/vits|p241`
+- Setup: Python 3.11 env + `pip install TTS` + `brew install espeak-ng`
+- CLI discovery: auto-detects binaries from `PATH` with optional env overrides (`STASH_COQUI_TTS_CLI`, `STASH_ESPEAK_CLI`, `STASH_FFMPEG_CLI`, etc.)
+- See `docs/COQUI_SETUP.md` for full setup instructions
 - See `docs/TTS_MACOS.md` for all TTS options
 - Provider in v1: Edge TTS
 - Default output directory: `~/.stash/audio`
