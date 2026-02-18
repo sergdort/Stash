@@ -1,6 +1,6 @@
+import type { JSX } from "react"
 import { useState } from "react"
-
-import { Button } from "../../../shared/ui/button"
+import { Box, Button, Checkbox, FormControlLabel, Stack, TextField } from "@mui/material"
 
 type SaveFormProps = {
   onSave: (payload: { url: string; title?: string; tags?: string[]; extract?: boolean }) => Promise<void>
@@ -14,7 +14,9 @@ export function SaveForm({ onSave, saving }: SaveFormProps): JSX.Element {
   const [extract, setExtract] = useState(true)
 
   return (
-    <form
+    <Stack
+      component="form"
+      spacing={1.5}
       onSubmit={(event) => {
         event.preventDefault()
         const normalizedTags = tags
@@ -33,30 +35,58 @@ export function SaveForm({ onSave, saving }: SaveFormProps): JSX.Element {
           setTags("")
         })
       }}
-      style={{ display: "grid", gap: 8 }}
     >
-      <input placeholder="URL" value={url} onChange={(event) => setUrl(event.target.value)} />
-      <input
-        placeholder="Title (optional)"
-        value={title}
-        onChange={(event) => setTitle(event.target.value)}
+      <TextField
+        label="URL"
+        value={url}
+        onChange={(event) => setUrl(event.target.value)}
+        placeholder="https://example.com"
+        required
+        fullWidth
+        size="small"
       />
-      <input
-        placeholder="Tags (comma separated)"
-        value={tags}
-        onChange={(event) => setTags(event.target.value)}
+
+      <Box
+        sx={{
+          display: "grid",
+          gap: 1.5,
+          gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+        }}
+      >
+        <Box>
+          <TextField
+            label="Title (optional)"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            fullWidth
+            size="small"
+          />
+        </Box>
+        <Box>
+          <TextField
+            label="Tags (comma separated)"
+            value={tags}
+            onChange={(event) => setTags(event.target.value)}
+            fullWidth
+            size="small"
+          />
+        </Box>
+      </Box>
+
+      <FormControlLabel
+        control={
+          <Checkbox
+            checked={extract}
+            onChange={(event) => setExtract(event.target.checked)}
+            size="small"
+          />
+        }
+        label="Extract content"
       />
-      <label style={{ display: "flex", gap: 8 }}>
-        <input
-          type="checkbox"
-          checked={extract}
-          onChange={(event) => setExtract(event.target.checked)}
-        />
-        Extract content
-      </label>
-      <Button type="submit" disabled={saving || url.trim().length === 0}>
+
+      <Button type="submit" variant="contained" disabled={saving || url.trim().length === 0}>
         {saving ? "Saving..." : "Save"}
       </Button>
-    </form>
+    </Stack>
   )
 }

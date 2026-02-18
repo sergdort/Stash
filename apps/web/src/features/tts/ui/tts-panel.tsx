@@ -1,4 +1,5 @@
-import { Button } from "../../../shared/ui/button"
+import type { JSX } from "react"
+import { Button, Link, Stack } from "@mui/material"
 
 type TtsPanelProps = {
   itemId: number
@@ -9,15 +10,15 @@ type TtsPanelProps = {
 
 export function TtsPanel({ itemId, loading, downloadUrl, onGenerate }: TtsPanelProps): JSX.Element {
   return (
-    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-      <Button type="button" disabled={loading} onClick={() => void onGenerate(itemId)}>
+    <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
+      <Button type="button" variant="contained" disabled={loading} onClick={() => void onGenerate(itemId)}>
         {loading ? "Generating audio..." : "Generate TTS"}
       </Button>
       {downloadUrl ? (
-        <a href={downloadUrl} target="_blank" rel="noreferrer">
+        <Link href={downloadUrl} target="_blank" rel="noreferrer" underline="hover">
           Download
-        </a>
+        </Link>
       ) : null}
-    </div>
+    </Stack>
   )
 }

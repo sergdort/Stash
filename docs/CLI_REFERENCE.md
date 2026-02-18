@@ -160,6 +160,10 @@ Equivalent CLI form:
 stash web [--host <host>] [--port <n>]
 ```
 
+Web UI stack:
+- React + Vite
+- Material UI (MUI)
+
 ## Save
 
 Save a URL:

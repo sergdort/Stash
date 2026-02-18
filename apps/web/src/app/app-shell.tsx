@@ -1,4 +1,12 @@
 import { useMemo, useState } from "react"
+import {
+  Box,
+  Container,
+  Divider,
+  Paper,
+  Stack,
+  Typography,
+} from "@mui/material"
 
 import { ExtractButton, useExtract } from "../features/extract"
 import { InboxList, useInbox } from "../features/inbox"
@@ -7,7 +15,6 @@ import { SaveForm, useSaveItem } from "../features/save"
 import { StatusToggle, useStatus } from "../features/status"
 import { TagEditor } from "../features/tags"
 import { TtsPanel, useTts } from "../features/tts"
-import { Panel } from "../shared/ui/panel"
 
 export function AppShell(): JSX.Element {
   const { items, loading, error, refresh } = useInbox()
@@ -26,83 +33,112 @@ export function AppShell(): JSX.Element {
   }
 
   return (
-    <main
-      style={{
+    <Box
+      sx={{
         minHeight: "100vh",
-        background: "linear-gradient(180deg, #f3f4f6 0%, #e5e7eb 100%)",
-        padding: 16,
+        background: "linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%)",
+        py: { xs: 2, md: 3 },
       }}
     >
-      <h1 style={{ marginTop: 0 }}>stash web</h1>
+      <Container maxWidth="xl">
+        <Stack spacing={2}>
+          <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 } }}>
+            <Stack spacing={1.5}>
+              <Typography variant="h4">stash web</Typography>
+              <SaveForm
+                saving={saveState.saving}
+                onSave={async (payload) => {
+                  await saveState.save(payload)
+                  await refresh()
+                }}
+              />
+              {saveState.error ? (
+                <Typography variant="body2" color="error.main">
+                  {saveState.error}
+                </Typography>
+              ) : null}
+            </Stack>
+          </Paper>
 
-      <section style={{ marginBottom: 16 }}>
-        <Panel>
-          <SaveForm
-            saving={saveState.saving}
-            onSave={async (payload) => {
-              await saveState.save(payload)
-              await refresh()
+          <Box
+            sx={{
+              display: "grid",
+              gap: 2,
+              gridTemplateColumns: {
+                xs: "1fr",
+                md: "minmax(280px, 420px) 1fr",
+              },
             }}
-          />
-          {saveState.error ? <p style={{ color: "#b91c1c" }}>{saveState.error}</p> : null}
-        </Panel>
-      </section>
+          >
+            <Box>
+              <Paper variant="outlined" sx={{ p: 2, height: "100%" }}>
+                <Stack spacing={1}>
+                  <Typography variant="h6">Inbox</Typography>
+                  {loading ? (
+                    <Typography variant="body2" color="text.secondary">
+                      Loading...
+                    </Typography>
+                  ) : null}
+                  {error ? (
+                    <Typography variant="body2" color="error.main">
+                      {error}
+                    </Typography>
+                  ) : null}
+                  <InboxList items={items} selectedItemId={selectedId} onSelect={setSelectedItemId} />
+                </Stack>
+              </Paper>
+            </Box>
 
-      <section
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(280px, 420px) 1fr",
-          gap: 16,
-        }}
-      >
-        <Panel>
-          <h2 style={{ marginTop: 0 }}>Inbox</h2>
-          {loading ? <p>Loading...</p> : null}
-          {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-          <InboxList items={items} selectedItemId={selectedId} onSelect={setSelectedItemId} />
-        </Panel>
+            <Box>
+              <Paper variant="outlined" sx={{ p: 2, height: "100%" }}>
+                <Stack spacing={1.5}>
+                  <ItemDetail item={item} />
+                  {item ? (
+                    <>
+                      <Divider />
+                      <Stack spacing={1.25}>
+                        <StatusToggle
+                          itemId={item.id}
+                          status={item.status}
+                          loading={statusState.loading}
+                          onToggle={async (itemId, status) => {
+                            await statusState.updateStatus(itemId, status)
+                            await refreshAll()
+                          }}
+                        />
 
-        <Panel>
-          <ItemDetail item={item} />
-          {item ? (
-            <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
-              <StatusToggle
-                itemId={item.id}
-                status={item.status}
-                loading={statusState.loading}
-                onToggle={async (itemId, status) => {
-                  await statusState.updateStatus(itemId, status)
-                  await refreshAll()
-                }}
-              />
+                        <TagEditor
+                          itemId={item.id}
+                          tags={item.tags}
+                          onChanged={async () => {
+                            await refreshAll()
+                          }}
+                        />
 
-              <TagEditor
-                itemId={item.id}
-                tags={item.tags}
-                onChanged={async () => {
-                  await refreshAll()
-                }}
-              />
+                        <ExtractButton
+                          itemId={item.id}
+                          loading={extractState.loading}
+                          onExtract={async (itemId, force) => {
+                            await extractState.runExtract(itemId, force)
+                            await refreshAll()
+                          }}
+                        />
 
-              <ExtractButton
-                itemId={item.id}
-                loading={extractState.loading}
-                onExtract={async (itemId, force) => {
-                  await extractState.runExtract(itemId, force)
-                  await refreshAll()
-                }}
-              />
-
-              <TtsPanel
-                itemId={item.id}
-                loading={ttsState.loading}
-                downloadUrl={ttsState.downloadUrl}
-                onGenerate={ttsState.runTts}
-              />
-            </div>
-          ) : null}
-        </Panel>
-      </section>
-    </main>
+                        <TtsPanel
+                          itemId={item.id}
+                          loading={ttsState.loading}
+                          downloadUrl={ttsState.downloadUrl}
+                          onGenerate={ttsState.runTts}
+                        />
+                      </Stack>
+                    </>
+                  ) : null}
+                </Stack>
+              </Paper>
+            </Box>
+          </Box>
+        </Stack>
+      </Container>
+    </Box>
   )
 }

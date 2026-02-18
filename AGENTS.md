@@ -32,6 +32,7 @@ Current implementation status:
 - Default Coqui voice: `tts_models/en/vctk/vits|p241`
 - CLI discovery standardized across providers: PATH first, optional env overrides (`STASH_GTTS_CLI`, `STASH_COQUI_TTS_CLI`, `STASH_FFMPEG_CLI`, `STASH_SAY_CLI`, `STASH_AFCONVERT_CLI`, `STASH_ESPEAK_CLI`)
 - Fallback providers available: Google TTS (gtts), macOS `say`
+- Web frontend stack: React + Vite + Material UI
 
 ## Repository Layout
 
@@ -229,8 +230,8 @@ pnpm run db:doctor -- --json
 ```
 4. Test CLI behavior from compiled output:
 ```bash
-node dist/cli.js --help
-node dist/cli.js list --help
+node dist/apps/cli/src/cli.js --help
+node dist/apps/cli/src/cli.js list --help
 ```
 
 ## Documentation Maintenance Rule

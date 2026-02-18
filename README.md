@@ -160,6 +160,8 @@ stash tts 1 --out ~/Downloads/article-1.mp3
 - dotenv (local dev script env loading)
 - Drizzle ORM + Drizzle Kit
 - Mozilla Readability + linkedom (content extraction)
+- React + Vite (web frontend)
+- Material UI (web UI component system)
 
 ## Roadmap
 

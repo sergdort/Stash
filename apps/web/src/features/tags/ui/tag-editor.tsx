@@ -1,6 +1,7 @@
+import type { JSX } from "react"
 import { useState } from "react"
+import { Box, Button, Chip, Stack, TextField } from "@mui/material"
 
-import { Button } from "../../../shared/ui/button"
 import { addTag, removeTag } from "../api/tags-api"
 
 type TagEditorProps = {
@@ -13,25 +14,31 @@ export function TagEditor({ itemId, tags, onChanged }: TagEditorProps): JSX.Elem
   const [nextTag, setNextTag] = useState("")
 
   return (
-    <div style={{ display: "grid", gap: 6 }}>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+    <Stack spacing={1}>
+      <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
         {tags.map((tag) => (
-          <Button
+          <Chip
             key={tag}
-            type="button"
-            onClick={() => {
+            label={tag}
+            variant="outlined"
+            onDelete={() => {
               void removeTag(itemId, tag).then(onChanged)
             }}
-            style={{ background: "#374151" }}
-          >
-            {tag} x
-          </Button>
+          />
         ))}
-      </div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <input value={nextTag} onChange={(event) => setNextTag(event.target.value)} placeholder="new tag" />
+      </Stack>
+
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+        <TextField
+          value={nextTag}
+          onChange={(event) => setNextTag(event.target.value)}
+          placeholder="new tag"
+          size="small"
+          sx={{ minWidth: 220 }}
+        />
         <Button
           type="button"
+          variant="outlined"
           onClick={() => {
             if (nextTag.trim().length === 0) {
               return
@@ -44,7 +51,7 @@ export function TagEditor({ itemId, tags, onChanged }: TagEditorProps): JSX.Elem
         >
           Add tag
         </Button>
-      </div>
-    </div>
+      </Box>
+    </Stack>
   )
 }
