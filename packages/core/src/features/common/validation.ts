@@ -37,3 +37,23 @@ export function parseStatus(value: string): "unread" | "read" | "archived" {
   }
   return normalized
 }
+
+export function parseListItemsStatusFilter(
+  value: string,
+): "unread" | "read" | "archived" | "active" {
+  const normalized = value.trim().toLowerCase()
+  if (
+    normalized !== "unread" &&
+    normalized !== "read" &&
+    normalized !== "archived" &&
+    normalized !== "active"
+  ) {
+    throw new StashError(
+      "Invalid status. Use unread, read, archived, or active.",
+      "VALIDATION_ERROR",
+      2,
+      400,
+    )
+  }
+  return normalized
+}

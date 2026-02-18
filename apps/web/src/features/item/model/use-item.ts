@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 
 import type { StashItem } from "../../../shared/types"
 import { getItem } from "../api/get-item"
@@ -13,7 +13,7 @@ export function useItem(itemId: number | null): {
   const [item, setItem] = useState<StashItem | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const refresh = async (): Promise<void> => {
+  const refresh = useCallback(async (): Promise<void> => {
     if (itemId === null) {
       setItem(null)
       return
@@ -30,11 +30,11 @@ export function useItem(itemId: number | null): {
     } finally {
       setLoading(false)
     }
-  }
+  }, [itemId])
 
   useEffect(() => {
     void refresh()
-  }, [itemId])
+  }, [refresh])
 
   return {
     loading,

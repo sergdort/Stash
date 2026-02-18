@@ -48,6 +48,6 @@ export function handleGetAudioFile(context: RouteContext): void {
 
   context.res.statusCode = 200
   context.res.setHeader("content-type", fileName.endsWith(".wav") ? "audio/wav" : "audio/mpeg")
-  context.res.setHeader("content-disposition", `attachment; filename=\"${fileName}\"`)
+  context.res.setHeader("content-disposition", `attachment; filename="${fileName}"`)
   fs.createReadStream(filePath).pipe(context.res)
 }

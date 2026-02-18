@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react"
 
 import type { StashItem } from "../../../shared/types"
+import type { ListInboxItemsInput } from "../api/list-items"
 import { listInboxItems } from "../api/list-items"
 
-export function useInbox(): {
+export function useInbox(filters: ListInboxItemsInput): {
   loading: boolean
   error: string | null
   items: StashItem[]
@@ -18,7 +19,7 @@ export function useInbox(): {
     setError(null)
 
     try {
-      const response = await listInboxItems()
+      const response = await listInboxItems(filters)
       setItems(response.items)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to load inbox"
@@ -26,7 +27,7 @@ export function useInbox(): {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [filters])
 
   useEffect(() => {
     void refresh()

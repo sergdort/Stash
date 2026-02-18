@@ -13,10 +13,7 @@ import * as schema from "./db/schema.js"
 import { extractContent } from "./lib/extract.js"
 import { DEFAULT_AUDIO_DIR, DEFAULT_DB_PATH, resolveAudioDir, resolveDbPath } from "./lib/paths.js"
 import { buildFriendlyFilename, ensureUniqueFilePath } from "./lib/tts/files.js"
-import { createEdgeTtsProvider } from "./lib/tts/providers/edge.js"
 import { coquiTtsProvider } from "./lib/tts/providers/coqui.js"
-import { macOSSayProvider } from "./lib/tts/providers/macos-say.js"
-import { gTtsProvider } from "./lib/tts/providers/gtts.js"
 import { TtsProviderError, type TtsFormat } from "./lib/tts/types.js"
 import { startWebServer } from "../packages/web-server/src/index.js"
 
@@ -36,7 +33,6 @@ const DEFAULT_WEB_PORT = process.env.STASH_WEB_PORT
   ? parsePositiveInt(process.env.STASH_WEB_PORT)
   : 4173
 const DEFAULT_TTS_VOICE = "tts_models/en/vctk/vits|p241" // Coqui male voice
-const edgeTtsProvider = createEdgeTtsProvider()
 
 type ItemStatus = "unread" | "read" | "archived"
 type TagMode = "any" | "all"

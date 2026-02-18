@@ -3,8 +3,11 @@ import os from "node:os"
 import path from "node:path"
 
 import Database from "better-sqlite3"
+import { eq } from "drizzle-orm"
+import { drizzle } from "drizzle-orm/better-sqlite3"
 import { afterEach, describe, expect, it } from "vitest"
 
+import * as schema from "../packages/core/src/db/schema.js"
 import { startWebServer, type StartedWebServer } from "../packages/web-server/src/app/server.js"
 
 function createTempPaths(): { tempDir: string; dbPath: string; audioDir: string } {
@@ -17,11 +20,66 @@ function createTempPaths(): { tempDir: string; dbPath: string; audioDir: string 
 }
 
 function seedNote(dbPath: string, itemId: number, content: string): void {
-  const db = new Database(dbPath)
-  db.prepare(
-    "insert into notes (item_id, content, updated_at) values (?, ?, ?) on conflict(item_id) do update set content=excluded.content, updated_at=excluded.updated_at",
-  ).run(itemId, content, Date.now())
-  db.close()
+  const sqlite = new Database(dbPath)
+  const db = drizzle(sqlite)
+  const timestamp = new Date()
+
+  db.insert(schema.notes)
+    .values({
+      itemId,
+      content,
+      updatedAt: timestamp,
+    })
+    .onConflictDoUpdate({
+      target: schema.notes.itemId,
+      set: {
+        content,
+        updatedAt: timestamp,
+      },
+    })
+    .run()
+
+  sqlite.close()
+}
+
+function setItemStatus(dbPath: string, itemId: number, status: "unread" | "read" | "archived"): void {
+  const sqlite = new Database(dbPath)
+  const db = drizzle(sqlite)
+  const timestamp = new Date()
+
+  if (status === "archived") {
+    db.update(schema.items)
+      .set({
+        status,
+        readAt: null,
+        archivedAt: timestamp,
+        updatedAt: timestamp,
+      })
+      .where(eq(schema.items.id, itemId))
+      .run()
+  } else if (status === "read") {
+    db.update(schema.items)
+      .set({
+        status,
+        readAt: timestamp,
+        archivedAt: null,
+        updatedAt: timestamp,
+      })
+      .where(eq(schema.items.id, itemId))
+      .run()
+  } else {
+    db.update(schema.items)
+      .set({
+        status,
+        readAt: null,
+        archivedAt: null,
+        updatedAt: timestamp,
+      })
+      .where(eq(schema.items.id, itemId))
+      .run()
+  }
+
+  sqlite.close()
 }
 
 type ApiError = {
@@ -205,5 +263,99 @@ describe("web server API", () => {
 
     expect(tts.ok).toBe(false)
     expect(tts.error.code).toBe("NO_CONTENT")
+  })
+
+  it("supports active status and tag any/all filters", async () => {
+    const { tempDir, dbPath, audioDir } = createTempPaths()
+    cleanupDirs.push(tempDir)
+
+    const server = await startWebServer({
+      host: "127.0.0.1",
+      port: 0,
+      dbPath,
+      migrationsDir: path.join(process.cwd(), "drizzle"),
+      webDistDir: path.join(process.cwd(), "apps", "web", "dist"),
+      audioDir,
+    })
+    servers.push(server)
+
+    const baseUrl = `http://${server.host}:${server.port}`
+
+    const unreadSave = await fetch(`${baseUrl}/api/items`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        url: "https://example.com/unread",
+        title: "Unread story",
+        tags: ["tech", "ai"],
+        extract: false,
+      }),
+    }).then((response) => readJson<{ item: { id: number } }>(response))
+
+    const readSave = await fetch(`${baseUrl}/api/items`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        url: "https://example.com/read",
+        title: "Read story",
+        tags: ["tech", "backend"],
+        extract: false,
+      }),
+    }).then((response) => readJson<{ item: { id: number } }>(response))
+
+    const archivedSave = await fetch(`${baseUrl}/api/items`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        url: "https://example.com/archived",
+        title: "Archived story",
+        tags: ["ops"],
+        extract: false,
+      }),
+    }).then((response) => readJson<{ item: { id: number } }>(response))
+
+    await fetch(`${baseUrl}/api/items/${readSave.item.id}/status`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "read" }),
+    })
+    setItemStatus(dbPath, archivedSave.item.id, "archived")
+
+    const activeList = await fetch(`${baseUrl}/api/items?status=active`).then((response) =>
+      readJson<{ ok: boolean; items: Array<{ id: number; status: string }> }>(response),
+    )
+    expect(activeList.ok).toBe(true)
+    expect(activeList.items.map((item) => item.id)).toContain(unreadSave.item.id)
+    expect(activeList.items.map((item) => item.id)).toContain(readSave.item.id)
+    expect(activeList.items.map((item) => item.id)).not.toContain(archivedSave.item.id)
+
+    const unreadOnly = await fetch(`${baseUrl}/api/items?status=unread`).then((response) =>
+      readJson<{ ok: boolean; items: Array<{ id: number }> }>(response),
+    )
+    expect(unreadOnly.ok).toBe(true)
+    expect(unreadOnly.items).toHaveLength(1)
+    expect(unreadOnly.items[0]?.id).toBe(unreadSave.item.id)
+
+    const readOnly = await fetch(`${baseUrl}/api/items?status=read`).then((response) =>
+      readJson<{ ok: boolean; items: Array<{ id: number }> }>(response),
+    )
+    expect(readOnly.ok).toBe(true)
+    expect(readOnly.items).toHaveLength(1)
+    expect(readOnly.items[0]?.id).toBe(readSave.item.id)
+
+    const tagAny = await fetch(`${baseUrl}/api/items?status=active&tag=ai&tag=backend&tagMode=any`).then(
+      (response) => readJson<{ ok: boolean; items: Array<{ id: number }> }>(response),
+    )
+    expect(tagAny.ok).toBe(true)
+    expect(tagAny.items).toHaveLength(2)
+    expect(tagAny.items.map((item) => item.id)).toContain(unreadSave.item.id)
+    expect(tagAny.items.map((item) => item.id)).toContain(readSave.item.id)
+
+    const tagAll = await fetch(`${baseUrl}/api/items?status=active&tag=tech&tag=backend&tagMode=all`).then(
+      (response) => readJson<{ ok: boolean; items: Array<{ id: number }> }>(response),
+    )
+    expect(tagAll.ok).toBe(true)
+    expect(tagAll.items).toHaveLength(1)
+    expect(tagAll.items[0]?.id).toBe(readSave.item.id)
   })
 })

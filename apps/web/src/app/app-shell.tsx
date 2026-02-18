@@ -1,4 +1,3 @@
-import { useMemo, useState } from "react"
 import {
   Alert,
   Box,
@@ -9,20 +8,43 @@ import {
   Stack,
   Typography,
 } from "@mui/material"
+import type { JSX } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import { ExtractButton, useExtract } from "../features/extract"
-import { InboxList, useInbox } from "../features/inbox"
+import { InboxFilters, InboxList, useInbox } from "../features/inbox"
+import type { InboxStatusFilter, InboxTagModeFilter, ListInboxItemsInput } from "../features/inbox/api/list-items"
 import { ItemDetail, useItem } from "../features/item"
 import { SaveForm, useSaveItem } from "../features/save"
 import { StatusToggle, useStatus } from "../features/status"
-import { TagEditor } from "../features/tags"
+import { TagEditor, useTags } from "../features/tags"
 import { TtsPanel, useTts } from "../features/tts"
-import { ArticleIcon, InboxIcon, StatusIcon } from "../shared/ui/icons"
+import { InboxIcon, StatusIcon } from "../shared/ui/icons"
 
 export function AppShell(): JSX.Element {
-  const { items, loading, error, refresh } = useInbox()
+  const [statusFilter, setStatusFilter] = useState<InboxStatusFilter>("unread")
+  const [tagModeFilter, setTagModeFilter] = useState<InboxTagModeFilter>("any")
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const inboxFilters = useMemo<ListInboxItemsInput>(
+    () => ({
+      status: statusFilter,
+      tags: selectedTags,
+      tagMode: tagModeFilter,
+      limit: 50,
+      offset: 0,
+    }),
+    [statusFilter, selectedTags, tagModeFilter],
+  )
+
+  const { items, loading, error, refresh } = useInbox(inboxFilters)
+  const { tags: availableTags, refresh: refreshTags } = useTags()
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null)
-  const selectedId = useMemo(() => selectedItemId ?? items[0]?.id ?? null, [items, selectedItemId])
+  const selectedId = selectedItemId
+  const unreadInView = useMemo(
+    () => items.filter((item) => item.status === "unread").length,
+    [items],
+  )
+  const loadingStatusLabel = statusFilter === "all" ? "active" : statusFilter
 
   const { item, loading: itemLoading, error: itemError, refresh: refreshItem } = useItem(selectedId)
   const saveState = useSaveItem()
@@ -30,9 +52,26 @@ export function AppShell(): JSX.Element {
   const extractState = useExtract()
   const ttsState = useTts()
 
+  useEffect(() => {
+    if (items.length === 0) {
+      setSelectedItemId(null)
+      return
+    }
+
+    if (selectedItemId === null) {
+      setSelectedItemId(items[0].id)
+      return
+    }
+
+    if (!items.some((item) => item.id === selectedItemId)) {
+      setSelectedItemId(items[0].id)
+    }
+  }, [items, selectedItemId])
+
   const refreshAll = async (): Promise<void> => {
     await refresh()
     await refreshItem()
+    await refreshTags()
   }
 
   return (
@@ -56,7 +95,7 @@ export function AppShell(): JSX.Element {
                   </Typography>
                 </Box>
                 <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="flex-start">
-                  <Chip size="small" icon={<InboxIcon fontSize="small" />} label={`${items.length} unread`} />
+                  <Chip size="small" icon={<InboxIcon fontSize="small" />} label={`${unreadInView} unread in view`} />
                   <Chip size="small" color="warning" icon={<StatusIcon fontSize="small" />} label="Light mode" />
                 </Stack>
               </Stack>
@@ -66,6 +105,7 @@ export function AppShell(): JSX.Element {
                 onSave={async (payload) => {
                   await saveState.save(payload)
                   await refresh()
+                  await refreshTags()
                 }}
               />
               {saveState.error ? (
@@ -93,9 +133,23 @@ export function AppShell(): JSX.Element {
                     <InboxIcon fontSize="small" color="primary" />
                     <Typography variant="h6">Inbox</Typography>
                   </Stack>
+                  <InboxFilters
+                    status={statusFilter}
+                    onStatusChange={setStatusFilter}
+                    tagMode={tagModeFilter}
+                    onTagModeChange={setTagModeFilter}
+                    availableTags={availableTags}
+                    selectedTags={selectedTags}
+                    onSelectedTagsChange={setSelectedTags}
+                    onClear={() => {
+                      setStatusFilter("unread")
+                      setSelectedTags([])
+                      setTagModeFilter("any")
+                    }}
+                  />
                   {loading ? (
                     <Typography variant="body2" color="text.secondary">
-                      Loading unread items...
+                      Loading {loadingStatusLabel} items...
                     </Typography>
                   ) : null}
                   {error ? (

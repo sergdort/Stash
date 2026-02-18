@@ -34,7 +34,7 @@ export function serveStatic(
   const hasDist = fs.existsSync(webDistDir)
   if (!hasDist) {
     if (pathname === "/" || pathname === "/index.html") {
-      const html = `<!doctype html><html><head><meta charset=\"utf-8\"><title>stash web</title></head><body><h1>stash web</h1><p>Frontend assets are not built yet. Run the web build before using UI.</p></body></html>`
+      const html = `<!doctype html><html><head><meta charset="utf-8"><title>stash web</title></head><body><h1>stash web</h1><p>Frontend assets are not built yet. Run the web build before using UI.</p></body></html>`
       res.statusCode = 200
       res.setHeader("content-type", "text/html; charset=utf-8")
       res.end(html)

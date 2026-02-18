@@ -47,6 +47,14 @@ pnpm run format
 pnpm run lint:fix
 ```
 
+### VS Code
+
+- Install the `Biome` extension (`biomejs.biome`).
+- This workspace is configured for auto-fix on save (format + fix-all + organize imports).
+- Use CLI checks to verify parity:
+  - `pnpm run lint`
+  - `pnpm run format:check`
+
 ## Global Install
 
 For local development (before publishing):

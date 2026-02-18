@@ -1,4 +1,5 @@
 export type ItemStatus = "unread" | "read" | "archived"
+export type ListItemsStatusFilter = ItemStatus | "active"
 export type TagMode = "any" | "all"
 
 export type StashItem = {
@@ -22,7 +23,7 @@ export type Paging = {
 }
 
 export type ListItemsInput = {
-  status?: ItemStatus
+  status?: ListItemsStatusFilter
   tags?: string[]
   tagMode?: TagMode
   limit?: number

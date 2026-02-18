@@ -1,4 +1,4 @@
-import type { ItemStatus, ListItemsInput, TagMode } from "../../../../core/src/types.js"
+import type { ListItemsInput, ListItemsStatusFilter, TagMode } from "../../../../core/src/types.js"
 import { asNonNegativeInt, asPositiveInt } from "../../shared/validation/parse.js"
 
 export function parseInboxQuery(query: URLSearchParams): ListItemsInput {
@@ -14,7 +14,7 @@ export function parseInboxQuery(query: URLSearchParams): ListItemsInput {
   }
 
   if (status) {
-    input.status = status as ItemStatus
+    input.status = status as ListItemsStatusFilter
   }
 
   if (tags.length > 0) {

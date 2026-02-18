@@ -16,7 +16,7 @@ import {
   withReadyDb,
   withReadyDbAsync,
 } from "../common/db.js"
-import { parseTagMode, parseUrl, parseStatus } from "../common/validation.js"
+import { parseListItemsStatusFilter, parseTagMode, parseUrl } from "../common/validation.js"
 
 export async function saveItem(context: OperationContext, input: SaveItemInput): Promise<SaveItemResult> {
   const parsedUrl = parseUrl(input.url)
@@ -136,13 +136,17 @@ export function listItems(context: OperationContext, input: ListItemsInput): Lis
   const offset = input.offset ?? 0
   const tagMode = parseTagMode(input.tagMode ?? "any")
   const tags = normalizeTags(input.tags ?? [])
-  const status = input.status ? parseStatus(input.status) : undefined
+  const status = input.status ? parseListItemsStatusFilter(input.status) : undefined
 
   return withReadyDb(context.dbPath, context.migrationsDir, (db) => {
     const conditions: SQL[] = []
 
     if (status) {
-      conditions.push(eq(schema.items.status, status))
+      if (status === "active") {
+        conditions.push(inArray(schema.items.status, ["unread", "read"]))
+      } else {
+        conditions.push(eq(schema.items.status, status))
+      }
     }
 
     if (tags.length > 0) {
