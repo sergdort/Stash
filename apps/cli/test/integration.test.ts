@@ -196,6 +196,46 @@ function upsertNoteContent(dbPath: string, itemId: number, content: string): voi
   }
 }
 
+function buildDataHtmlUrl(html: string): string {
+  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`
+}
+
+function getItemThumbnailUrl(dbPath: string, itemId: number): string | null {
+  const result = spawnSync(
+    process.execPath,
+    [
+      "-e",
+      `import("better-sqlite3").then((mod) => {
+  const Database = mod.default
+  const db = new Database(process.env.DB_PATH)
+  const row = db
+    .prepare("select thumbnail_url from items where id = ?")
+    .get(Number(process.env.ITEM_ID))
+  db.close()
+  process.stdout.write(JSON.stringify(row?.thumbnail_url ?? null))
+}).catch((error) => {
+  console.error(error?.message ?? String(error))
+  process.exit(1)
+})`,
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        DB_PATH: dbPath,
+        ITEM_ID: String(itemId),
+      },
+    },
+  )
+
+  if (result.status !== 0) {
+    throw new Error(`Failed to read item thumbnail:\n${result.stdout}\n${result.stderr}`)
+  }
+
+  return JSON.parse(result.stdout.trim()) as string | null
+}
+
 const sqliteProbe = probeSqliteBinding()
 const sqliteProbeOutput = `${sqliteProbe.stdout}\n${sqliteProbe.stderr}`
 const sqliteBindingsMissing =
@@ -230,7 +270,7 @@ integrationSuite(integrationTitle, () => {
 
         const migrationStatus = runJson<DoctorResponse>(["db", "doctor"], { dbPath })
         expect(migrationStatus.ok).toBe(true)
-        expect(migrationStatus.applied_count).toBe(1)
+        expect(migrationStatus.applied_count).toBe(2)
         expect(migrationStatus.pending_count).toBe(0)
       } finally {
         cleanup()
@@ -250,6 +290,37 @@ integrationSuite(integrationTitle, () => {
         const secondMigrate = runJson<MigrateResponse>(["db", "migrate"], { dbPath })
         expect(secondMigrate.ok).toBe(true)
         expect(secondMigrate.applied_count).toBe(0)
+      } finally {
+        cleanup()
+      }
+    })
+  })
+
+  describe("extraction thumbnail persistence", () => {
+    it("persists thumbnail_url for save extraction and extract command flows", () => {
+      const { dbPath, cleanup } = createTempDb()
+      try {
+        const saveExtractHtml = `<!doctype html><html><head><meta property="og:image" content="https://cdn.example.com/save-cover.png"></head><body><article><h1>Save flow</h1><p>${"Save flow content. ".repeat(24)}</p></article></body></html>`
+        const saveExtractUrl = buildDataHtmlUrl(saveExtractHtml)
+        const saved = runJson<SaveResponse>(["save", saveExtractUrl, "--title", "Save flow item"], {
+          dbPath,
+        })
+
+        expect(getItemThumbnailUrl(dbPath, saved.item.id)).toBe("https://cdn.example.com/save-cover.png")
+
+        const extractHtml = `<!doctype html><html><head><meta property="og:image" content="https://cdn.example.com/extract-cover.png"></head><body><article><h1>Extract flow</h1><p>${"Extract flow content. ".repeat(24)}</p></article></body></html>`
+        const extractUrl = buildDataHtmlUrl(extractHtml)
+        const savedWithoutExtract = runJson<SaveResponse>(
+          ["save", extractUrl, "--title", "Extract flow item", "--no-extract"],
+          { dbPath },
+        )
+        expect(getItemThumbnailUrl(dbPath, savedWithoutExtract.item.id)).toBeNull()
+
+        runJson(["extract", String(savedWithoutExtract.item.id)], { dbPath })
+
+        expect(getItemThumbnailUrl(dbPath, savedWithoutExtract.item.id)).toBe(
+          "https://cdn.example.com/extract-cover.png",
+        )
       } finally {
         cleanup()
       }

@@ -134,6 +134,7 @@ export function serializeItem(row: ItemRow, tags: string[]): StashItem {
     id: row.id,
     url: row.url,
     title: row.title,
+    thumbnail_url: row.thumbnailUrl,
     domain: row.domain,
     status: row.status,
     is_starred: row.isStarred,

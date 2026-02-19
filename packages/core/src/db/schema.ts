@@ -15,6 +15,7 @@ export const items = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     url: text("url").notNull(),
     title: text("title"),
+    thumbnailUrl: text("thumbnail_url"),
     domain: text("domain"),
     status: text("status").notNull().default("unread"),
     isStarred: integer("is_starred", { mode: "boolean" }).notNull().default(false),

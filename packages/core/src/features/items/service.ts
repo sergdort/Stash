@@ -108,6 +108,15 @@ export async function saveItem(context: OperationContext, input: SaveItemInput):
             db.update(schema.items)
               .set({
                 title: extracted.title,
+                thumbnailUrl: extracted.thumbnailUrl ?? null,
+                updatedAt: timestamp,
+              })
+              .where(eq(schema.items.id, itemId))
+              .run()
+          } else {
+            db.update(schema.items)
+              .set({
+                thumbnailUrl: extracted.thumbnailUrl ?? null,
                 updatedAt: timestamp,
               })
               .where(eq(schema.items.id, itemId))

@@ -15,6 +15,7 @@ Current implementation status:
 - Implemented: migration tooling (`db migrate`, `db doctor`) and baseline schema.
 - Implemented: automatic migration application for normal data commands.
 - Implemented: content extraction on save using Mozilla Readability (stores in `notes` table).
+- Implemented: thumbnail extraction (metadata-first with content-image fallback) persisted on `items.thumbnail_url`.
 - Implemented: `extract` command to extract or re-extract content for existing items.
 - Not implemented yet: `archive`, `delete`, `open`, search command.
 
@@ -111,6 +112,7 @@ When saving URLs, stash automatically:
 - Fetches the web page
 - Extracts readable content using Mozilla Readability
 - Stores the text in the `notes` table
+- Extracts a thumbnail URL (`og:image`/`twitter:image` first, article image fallback) into `items.thumbnail_url`
 - Updates the item title if extraction finds a better one
 
 To skip extraction (for faster saves or non-article URLs):
@@ -230,7 +232,7 @@ Typical error shape:
 ## Schema Summary (Current)
 
 - `items`
-  - Core bookmark record and state: `status`, timestamps, URL metadata.
+  - Core bookmark record and state: `status`, timestamps, URL metadata, extracted thumbnail URL (`thumbnail_url`).
 - `tags`
   - Unique tag names.
 - `item_tags`

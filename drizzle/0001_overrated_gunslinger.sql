@@ -1,0 +1,1 @@
+ALTER TABLE `items` ADD `thumbnail_url` text;

@@ -6,7 +6,7 @@ This document is the user-facing reference for the current `stash` feature set.
 
 ## Current Feature Set
 
-- Save links with automatic content extraction
+- Save links with automatic content + thumbnail extraction
 - List links with status and tag filters
 - List available tags with counts
 - Add/remove tags on an item
@@ -164,6 +164,9 @@ Web UI stack:
 - React + Vite
 - Material UI (MUI)
 
+Web API item payloads (`GET /api/items`, `GET /api/items/:id`, `POST /api/items`) include:
+- `thumbnail_url: string | null`
+
 ## Save
 
 Save a URL:
@@ -177,6 +180,7 @@ Behavior:
 - Re-saving same URL is idempotent (`created: false`)
 - Tags are normalized (`trim + lowercase`)
 - Content is automatically extracted using Mozilla Readability (unless `--no-extract`)
+- Thumbnail metadata is extracted and persisted to `items.thumbnail_url` (`og:image`/`twitter:image` first, article-image fallback)
 - Extracted title updates the item if no `--title` provided
 - Extracted text is stored in the `notes` table for future search/TTS features
 
@@ -250,10 +254,11 @@ stash extract <id> [--force] [--json]
 Behavior:
 - Fetches the URL and extracts readable content using Mozilla Readability
 - Stores extracted text in the `notes` table
+- Persists extracted thumbnail metadata to `items.thumbnail_url`
 - Updates item title if extraction finds one and item has no title
 - Use `--force` to re-extract even if content already exists
 - Useful for:
-  - Backfilling items saved before extraction was implemented
+  - Backfilling items missing extracted text/thumbnail metadata (`stash extract <id> --force`)
   - Retrying failed extractions
   - Updating content when articles change
   - Testing extraction improvements

@@ -87,6 +87,22 @@ function setItemStatus(
   sqlite.close()
 }
 
+function setItemThumbnail(dbPath: string, itemId: number, thumbnailUrl: string | null): void {
+  const sqlite = new Database(dbPath)
+  const db = drizzle(sqlite)
+  const timestamp = new Date()
+
+  db.update(schema.items)
+    .set({
+      thumbnailUrl,
+      updatedAt: timestamp,
+    })
+    .where(eq(schema.items.id, itemId))
+    .run()
+
+  sqlite.close()
+}
+
 type ApiError = {
   ok: false
   error: {
@@ -246,6 +262,60 @@ webServerSuite(webServerSuiteTitle, () => {
 
     expect(tts.ok).toBe(true)
     expect(tts.download_url).toMatch(/^\/api\/audio\//)
+  })
+
+  it("returns thumbnail_url in list and item payloads", async () => {
+    const { tempDir, dbPath, audioDir } = createTempPaths()
+    cleanupDirs.push(tempDir)
+
+    const server = await startWebServer({
+      host: "127.0.0.1",
+      port: 0,
+      dbPath,
+      migrationsDir: path.join(process.cwd(), "drizzle"),
+      webDistDir: path.join(process.cwd(), "apps", "web", "dist"),
+      audioDir,
+    })
+    servers.push(server)
+
+    const baseUrl = `http://${server.host}:${server.port}`
+
+    const save = await fetch(`${baseUrl}/api/items`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        url: "https://example.com/thumbnail",
+        title: "Thumbnail story",
+        extract: false,
+      }),
+    }).then((response) => readJson<{ item: { id: number } }>(response))
+
+    const itemId = save.item.id as number
+
+    const itemBeforeThumbnail = await fetch(`${baseUrl}/api/items/${itemId}`).then((response) =>
+      readJson<{ ok: boolean; item: { id: number; thumbnail_url: string | null } }>(response),
+    )
+    expect(itemBeforeThumbnail.ok).toBe(true)
+    expect(itemBeforeThumbnail.item.id).toBe(itemId)
+    expect(itemBeforeThumbnail.item.thumbnail_url).toBeNull()
+
+    const thumbnailUrl = "https://cdn.example.com/thumbnail.png"
+    setItemThumbnail(dbPath, itemId, thumbnailUrl)
+
+    const list = await fetch(`${baseUrl}/api/items?status=unread`).then((response) =>
+      readJson<{ ok: boolean; items: Array<{ id: number; thumbnail_url: string | null }> }>(response),
+    )
+    expect(list.ok).toBe(true)
+    expect(list.items.some((item) => item.id === itemId && item.thumbnail_url === thumbnailUrl)).toBe(
+      true,
+    )
+
+    const itemAfterThumbnail = await fetch(`${baseUrl}/api/items/${itemId}`).then((response) =>
+      readJson<{ ok: boolean; item: { id: number; thumbnail_url: string | null } }>(response),
+    )
+    expect(itemAfterThumbnail.ok).toBe(true)
+    expect(itemAfterThumbnail.item.id).toBe(itemId)
+    expect(itemAfterThumbnail.item.thumbnail_url).toBe(thumbnailUrl)
   })
 
   it("returns NO_CONTENT for tts when notes are missing", async () => {

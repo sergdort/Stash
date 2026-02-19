@@ -4,6 +4,7 @@ export type StashItem = {
   id: number
   url: string
   title: string | null
+  thumbnail_url: string | null
   domain: string | null
   status: ItemStatus
   is_starred: boolean

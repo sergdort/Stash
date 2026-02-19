@@ -108,7 +108,7 @@ stash db doctor --json
 
 ## Features
 
-- Save URLs with automatic content extraction
+- Save URLs with automatic content + thumbnail extraction
 - Extract or re-extract content for existing items
 - Organize with tags
 - Mark items as read/unread
@@ -128,7 +128,7 @@ stash tag add 1 productivity
 stash tag rm 1 productivity
 stash mark read 1
 stash mark unread 1
-stash extract 1  # extract content for items saved before extraction was added
+stash extract 1  # extract content + thumbnail metadata for an existing item
 stash extract 1 --force  # re-extract even if content exists
 stash tts 1 --json
 stash tts 1 --audio-dir ~/Downloads/audio
@@ -159,6 +159,7 @@ stash tts 1 --out ~/Downloads/article-1.mp3
 - Deterministic list order: `created_at DESC, id DESC`
 - Pagination via `--limit` and `--offset`
 - Tag filtering via repeated `--tag` and `--tag-mode any|all`
+- Web/API item payloads include `thumbnail_url` (`string | null`)
 
 ## Stack
 

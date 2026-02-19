@@ -8,9 +8,94 @@ export interface ExtractedContent {
   excerpt?: string
   byline?: string
   length?: number
+  thumbnailUrl?: string
 }
 
 type ReadabilityDocument = ConstructorParameters<typeof Readability>[0]
+type ParsedDocument = ReturnType<typeof parseHTML>["document"]
+const METADATA_IMAGE_SELECTORS = [
+  'meta[property="og:image:secure_url"]',
+  'meta[property="og:image:url"]',
+  'meta[property="og:image"]',
+  'meta[name="twitter:image"]',
+  'meta[name="twitter:image:src"]',
+  'meta[property="twitter:image"]',
+]
+
+function normalizeThumbnailUrl(candidate: string | null, pageUrl: string): string | undefined {
+  if (!candidate) {
+    return undefined
+  }
+
+  const trimmed = candidate.trim()
+  if (trimmed.length === 0) {
+    return undefined
+  }
+
+  try {
+    const resolved = new URL(trimmed, pageUrl)
+    if (resolved.protocol !== "http:" && resolved.protocol !== "https:") {
+      return undefined
+    }
+    return resolved.toString()
+  } catch {
+    return undefined
+  }
+}
+
+function getFirstSrcsetCandidate(srcset: string | null): string | undefined {
+  if (!srcset) {
+    return undefined
+  }
+
+  for (const item of srcset.split(",")) {
+    const candidate = item.trim().split(/\s+/)[0]
+    if (candidate) {
+      return candidate
+    }
+  }
+
+  return undefined
+}
+
+function extractThumbnailFromMetadata(document: ParsedDocument, pageUrl: string): string | undefined {
+  for (const selector of METADATA_IMAGE_SELECTORS) {
+    const content = document.querySelector(selector)?.getAttribute("content") ?? null
+    const resolved = normalizeThumbnailUrl(content, pageUrl)
+    if (resolved) {
+      return resolved
+    }
+  }
+
+  return undefined
+}
+
+function extractThumbnailFromArticleContent(
+  articleHtml: string | null | undefined,
+  pageUrl: string,
+): string | undefined {
+  if (!articleHtml) {
+    return undefined
+  }
+
+  const { document } = parseHTML(articleHtml, { url: pageUrl })
+  const images = document.querySelectorAll("img")
+
+  for (const image of images) {
+    const src = normalizeThumbnailUrl(image.getAttribute("src"), pageUrl)
+    if (src) {
+      return src
+    }
+
+    const srcset = getFirstSrcsetCandidate(image.getAttribute("srcset"))
+    const srcsetUrl = normalizeThumbnailUrl(srcset ?? null, pageUrl)
+    if (srcsetUrl) {
+      return srcsetUrl
+    }
+  }
+
+  return undefined
+}
 
 export async function extractContent(url: string): Promise<ExtractedContent | null> {
   try {
@@ -48,6 +133,10 @@ export async function extractContent(url: string): Promise<ExtractedContent | nu
     if (article.excerpt) result.excerpt = article.excerpt
     if (article.byline) result.byline = article.byline
     if (article.length) result.length = article.length
+    const thumbnailUrl =
+      extractThumbnailFromMetadata(document, url) ??
+      extractThumbnailFromArticleContent(article.content, url)
+    if (thumbnailUrl) result.thumbnailUrl = thumbnailUrl
 
     return result
   } catch (error) {

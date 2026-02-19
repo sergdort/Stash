@@ -1,6 +1,6 @@
-import type { JSX } from "react"
 import { Box, Chip, Stack, Typography, useMediaQuery } from "@mui/material"
 import { useTheme } from "@mui/material/styles"
+import { type JSX, useState } from "react"
 
 import { formatDateTime } from "../../../shared/lib/date"
 import type { StashItem } from "../../../shared/types"
@@ -11,6 +11,46 @@ type InboxListProps = {
   selectedItemId: number | null
   onSelect: (itemId: number) => void
   showCreatedAt?: boolean
+}
+
+type ThumbnailPreviewProps = {
+  imageUrl: string | null
+  width: number
+  height: number
+}
+
+function ThumbnailPreview({ imageUrl, width, height }: ThumbnailPreviewProps): JSX.Element {
+  return (
+    <Box
+      sx={{
+        width,
+        height,
+        borderRadius: 1,
+        border: "1px solid",
+        borderColor: "divider",
+        bgcolor: "rgba(15,23,42,0.04)",
+        overflow: "hidden",
+        flexShrink: 0,
+      }}
+    >
+      {imageUrl ? (
+        <Box
+          component="img"
+          src={imageUrl}
+          alt=""
+          loading="lazy"
+          width={width}
+          height={height}
+          sx={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
+        />
+      ) : null}
+    </Box>
+  )
 }
 
 export function InboxList({
@@ -58,7 +98,8 @@ export function InboxList({
               px: isMobile ? 1.75 : 1.5,
               py: isMobile ? 1.6 : 1.4,
               cursor: "pointer",
-              transition: "background-color 180ms ease, border-color 180ms ease, transform 180ms ease",
+              transition:
+                "background-color 180ms ease, border-color 180ms ease, transform 180ms ease",
               minHeight: isMobile ? 124 : 96,
               "&:hover": {
                 bgcolor: selected ? "rgba(20, 184, 166, 0.17)" : "rgba(15, 23, 42, 0.03)",
@@ -90,7 +131,13 @@ export function InboxList({
                   {item.domain ?? item.url}
                 </Typography>
 
-                <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" alignItems="center">
+                <Stack
+                  direction="row"
+                  spacing={0.75}
+                  useFlexGap
+                  flexWrap="wrap"
+                  alignItems="center"
+                >
                   <Chip size="small" variant="outlined" label={`#${item.id}`} />
                   <Chip
                     size="small"
@@ -109,19 +156,12 @@ export function InboxList({
                 </Stack>
               </Stack>
 
-              {isMobile ? (
-                <Box
-                  sx={{
-                    width: 104,
-                    height: 84,
-                    borderRadius: 1.5,
-                    border: "1px solid",
-                    borderColor: "divider",
-                    bgcolor: "rgba(15,23,42,0.04)",
-                    flexShrink: 0,
-                  }}
-                />
-              ) : null}
+              <ThumbnailPreview
+                key={`${item.id}-${item.thumbnail_url ?? "none"}`}
+                imageUrl={item.thumbnail_url}
+                width={isMobile ? 104 : 88}
+                height={isMobile ? 84 : 72}
+              />
             </Stack>
           </Box>
         )
