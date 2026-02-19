@@ -48,6 +48,7 @@ export function AppShell(): JSX.Element {
   const { tags: availableTags, refresh: refreshTags } = useTags()
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null)
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
+  const [mobileSaveOpen, setMobileSaveOpen] = useState(false)
   const selectedId = selectedItemId
   const unreadInView = useMemo(
     () => items.filter((item) => item.status === "unread").length,
@@ -107,8 +108,20 @@ export function AppShell(): JSX.Element {
                   <Typography variant="h4" component="h1">
                     stash.
                   </Typography>
-                  <IconButton size="small" aria-label="add link">
-                    <AddIcon />
+                  <IconButton
+                    aria-label="add link"
+                    onClick={() => setMobileSaveOpen(true)}
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 2,
+                      border: "1px solid",
+                      borderColor: "primary.main",
+                      color: "primary.main",
+                      bgcolor: "rgba(20, 184, 166, 0.08)",
+                    }}
+                  >
+                    <AddIcon sx={{ fontSize: 28 }} />
                   </IconButton>
                 </Stack>
                 <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" alignItems="center">
@@ -135,14 +148,6 @@ export function AppShell(): JSX.Element {
                   />
                   <Chip size="small" icon={<InboxIcon fontSize="small" />} label={`${unreadInView} unread`} />
                 </Stack>
-                <SaveForm
-                  saving={saveState.saving}
-                  onSave={async (payload) => {
-                    await saveState.save(payload)
-                    await refresh()
-                    await refreshTags()
-                  }}
-                />
                 {saveState.error ? (
                   <Alert severity="error" variant="outlined">
                     {saveState.error}
@@ -177,6 +182,45 @@ export function AppShell(): JSX.Element {
               ) : null}
               <InboxList items={items} selectedItemId={selectedId} onSelect={handleSelectItem} />
             </Paper>
+
+            <Drawer
+              anchor="bottom"
+              open={mobileSaveOpen}
+              onClose={() => setMobileSaveOpen(false)}
+              PaperProps={{
+                sx: {
+                  borderTopLeftRadius: 14,
+                  borderTopRightRadius: 14,
+                  p: 2,
+                  maxHeight: "82vh",
+                  overflowY: "auto",
+                },
+              }}
+            >
+              <Stack spacing={1.5}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="subtitle1">Save a new link</Typography>
+                  <Button size="small" onClick={() => setMobileSaveOpen(false)}>
+                    Close
+                  </Button>
+                </Stack>
+
+                <SaveForm
+                  saving={saveState.saving}
+                  onSave={async (payload) => {
+                    await saveState.save(payload)
+                    await refresh()
+                    await refreshTags()
+                    setMobileSaveOpen(false)
+                  }}
+                />
+                {saveState.error ? (
+                  <Alert severity="error" variant="outlined">
+                    {saveState.error}
+                  </Alert>
+                ) : null}
+              </Stack>
+            </Drawer>
 
             <Drawer
               anchor="bottom"
