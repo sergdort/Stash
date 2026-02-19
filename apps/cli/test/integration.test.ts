@@ -85,6 +85,7 @@ type ErrorResponse = {
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+const fixturesDir = path.join(__dirname, "fixtures")
 const repoRoot = path.resolve(__dirname, "../../..")
 const cliPath = path.join(repoRoot, "dist", "apps", "cli", "src", "cli.js")
 const articleUrl = "https://example.com/article"
@@ -200,6 +201,10 @@ function buildDataHtmlUrl(html: string): string {
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`
 }
 
+function readFixture(name: string): string {
+  return fs.readFileSync(path.join(fixturesDir, name), "utf8")
+}
+
 function getItemThumbnailUrl(dbPath: string, itemId: number): string | null {
   const result = spawnSync(
     process.execPath,
@@ -300,15 +305,17 @@ integrationSuite(integrationTitle, () => {
     it("persists thumbnail_url for save extraction and extract command flows", () => {
       const { dbPath, cleanup } = createTempDb()
       try {
-        const saveExtractHtml = `<!doctype html><html><head><meta property="og:image" content="https://cdn.example.com/save-cover.png"></head><body><article><h1>Save flow</h1><p>${"Save flow content. ".repeat(24)}</p></article></body></html>`
+        const saveExtractHtml = readFixture("article_with_image_save.html")
         const saveExtractUrl = buildDataHtmlUrl(saveExtractHtml)
         const saved = runJson<SaveResponse>(["save", saveExtractUrl, "--title", "Save flow item"], {
           dbPath,
         })
 
-        expect(getItemThumbnailUrl(dbPath, saved.item.id)).toBe("https://cdn.example.com/save-cover.png")
+        expect(getItemThumbnailUrl(dbPath, saved.item.id)).toBe(
+          "https://cdn.example.com/save-cover.png",
+        )
 
-        const extractHtml = `<!doctype html><html><head><meta property="og:image" content="https://cdn.example.com/extract-cover.png"></head><body><article><h1>Extract flow</h1><p>${"Extract flow content. ".repeat(24)}</p></article></body></html>`
+        const extractHtml = readFixture("article_with_image_extract.html")
         const extractUrl = buildDataHtmlUrl(extractHtml)
         const savedWithoutExtract = runJson<SaveResponse>(
           ["save", extractUrl, "--title", "Extract flow item", "--no-extract"],
