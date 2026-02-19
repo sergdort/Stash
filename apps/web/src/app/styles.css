@@ -21,8 +21,14 @@ body,
   min-height: 100vh;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
+  overflow-x: hidden;
   font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
   color: var(--stash-text-primary);
   background-color: var(--stash-bg-0);

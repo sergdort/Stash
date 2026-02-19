@@ -1,13 +1,18 @@
 import {
   Alert,
   Box,
+  Button,
   Chip,
   Container,
   Divider,
+  Drawer,
+  IconButton,
   Paper,
   Stack,
   Typography,
+  useMediaQuery,
 } from "@mui/material"
+import { useTheme } from "@mui/material/styles"
 import type { JSX } from "react"
 import { useEffect, useMemo, useState } from "react"
 
@@ -19,9 +24,12 @@ import { SaveForm, useSaveItem } from "../features/save"
 import { StatusToggle, useStatus } from "../features/status"
 import { TagEditor, useTags } from "../features/tags"
 import { TtsPanel, useTts } from "../features/tts"
-import { InboxIcon, StatusIcon } from "../shared/ui/icons"
+import { AddIcon, InboxIcon, StatusIcon } from "../shared/ui/icons"
 
 export function AppShell(): JSX.Element {
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"))
+
   const [statusFilter, setStatusFilter] = useState<InboxStatusFilter>("unread")
   const [tagModeFilter, setTagModeFilter] = useState<InboxTagModeFilter>("any")
   const [selectedTags, setSelectedTags] = useState<string[]>([])
@@ -39,6 +47,7 @@ export function AppShell(): JSX.Element {
   const { items, loading, error, refresh } = useInbox(inboxFilters)
   const { tags: availableTags, refresh: refreshTags } = useTags()
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null)
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
   const selectedId = selectedItemId
   const unreadInView = useMemo(
     () => items.filter((item) => item.status === "unread").length,
@@ -72,6 +81,170 @@ export function AppShell(): JSX.Element {
     await refresh()
     await refreshItem()
     await refreshTags()
+  }
+
+  const clearFilters = (): void => {
+    setStatusFilter("unread")
+    setSelectedTags([])
+    setTagModeFilter("any")
+  }
+
+  const handleSelectItem = (itemId: number): void => {
+    setSelectedItemId(itemId)
+    if (isMobile) {
+      setMobileDetailOpen(true)
+    }
+  }
+
+  if (isMobile) {
+    return (
+      <Box sx={{ minHeight: "100vh", py: 1.25 }}>
+        <Container maxWidth="sm" sx={{ px: 1.25 }}>
+          <Stack spacing={1.25}>
+            <Paper sx={{ p: 1.5 }}>
+              <Stack spacing={1.25}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                  <Typography variant="h4" component="h1">
+                    stash.
+                  </Typography>
+                  <IconButton size="small" aria-label="add link">
+                    <AddIcon />
+                  </IconButton>
+                </Stack>
+                <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" alignItems="center">
+                  <Chip
+                    size="small"
+                    variant={statusFilter === "all" ? "filled" : "outlined"}
+                    color={statusFilter === "all" ? "primary" : "default"}
+                    label="All"
+                    onClick={() => setStatusFilter("all")}
+                  />
+                  <Chip
+                    size="small"
+                    variant={statusFilter === "unread" ? "filled" : "outlined"}
+                    color={statusFilter === "unread" ? "primary" : "default"}
+                    label="Unread"
+                    onClick={() => setStatusFilter("unread")}
+                  />
+                  <Chip
+                    size="small"
+                    variant={statusFilter === "read" ? "filled" : "outlined"}
+                    color={statusFilter === "read" ? "primary" : "default"}
+                    label="Read"
+                    onClick={() => setStatusFilter("read")}
+                  />
+                  <Chip size="small" icon={<InboxIcon fontSize="small" />} label={`${unreadInView} unread`} />
+                </Stack>
+                <SaveForm
+                  saving={saveState.saving}
+                  onSave={async (payload) => {
+                    await saveState.save(payload)
+                    await refresh()
+                    await refreshTags()
+                  }}
+                />
+                {saveState.error ? (
+                  <Alert severity="error" variant="outlined">
+                    {saveState.error}
+                  </Alert>
+                ) : null}
+              </Stack>
+            </Paper>
+
+            <Paper sx={{ p: 0, overflow: "hidden" }}>
+              <Box sx={{ px: 1.25, pt: 1.25 }}>
+                <InboxFilters
+                  status={statusFilter}
+                  onStatusChange={setStatusFilter}
+                  tagMode={tagModeFilter}
+                  onTagModeChange={setTagModeFilter}
+                  availableTags={availableTags}
+                  selectedTags={selectedTags}
+                  onSelectedTagsChange={setSelectedTags}
+                  onClear={clearFilters}
+                />
+              </Box>
+              <Divider sx={{ mt: 1.25 }} />
+              {loading ? (
+                <Typography variant="body2" color="text.secondary" sx={{ px: 1.5, py: 1.25 }}>
+                  Loading {loadingStatusLabel} items...
+                </Typography>
+              ) : null}
+              {error ? (
+                <Typography variant="body2" color="error.main" role="status" sx={{ px: 1.5, py: 1.25 }}>
+                  {error}
+                </Typography>
+              ) : null}
+              <InboxList items={items} selectedItemId={selectedId} onSelect={handleSelectItem} />
+            </Paper>
+
+            <Drawer
+              anchor="bottom"
+              open={mobileDetailOpen && Boolean(item)}
+              onClose={() => setMobileDetailOpen(false)}
+              PaperProps={{
+                sx: {
+                  borderTopLeftRadius: 14,
+                  borderTopRightRadius: 14,
+                  p: 2,
+                  maxHeight: "82vh",
+                  overflowY: "auto",
+                },
+              }}
+            >
+              <Stack spacing={1.5}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="subtitle1">Item details</Typography>
+                  <Button size="small" onClick={() => setMobileDetailOpen(false)}>
+                    Close
+                  </Button>
+                </Stack>
+
+                <ItemDetail item={item} loading={itemLoading} error={itemError} />
+                {item ? (
+                  <>
+                    <Divider />
+                    <StatusToggle
+                      itemId={item.id}
+                      status={item.status}
+                      loading={statusState.loading}
+                      onToggle={async (itemId, status) => {
+                        await statusState.updateStatus(itemId, status)
+                        await refreshAll()
+                      }}
+                    />
+
+                    <TagEditor
+                      itemId={item.id}
+                      tags={item.tags}
+                      onChanged={async () => {
+                        await refreshAll()
+                      }}
+                    />
+
+                    <ExtractButton
+                      itemId={item.id}
+                      loading={extractState.loading}
+                      onExtract={async (itemId, force) => {
+                        await extractState.runExtract(itemId, force)
+                        await refreshAll()
+                      }}
+                    />
+
+                    <TtsPanel
+                      itemId={item.id}
+                      loading={ttsState.loading}
+                      downloadUrl={ttsState.downloadUrl}
+                      onGenerate={ttsState.runTts}
+                    />
+                  </>
+                ) : null}
+              </Stack>
+            </Drawer>
+          </Stack>
+        </Container>
+      </Box>
+    )
   }
 
   return (
@@ -141,11 +314,7 @@ export function AppShell(): JSX.Element {
                     availableTags={availableTags}
                     selectedTags={selectedTags}
                     onSelectedTagsChange={setSelectedTags}
-                    onClear={() => {
-                      setStatusFilter("unread")
-                      setSelectedTags([])
-                      setTagModeFilter("any")
-                    }}
+                    onClear={clearFilters}
                   />
                   {loading ? (
                     <Typography variant="body2" color="text.secondary">
@@ -157,7 +326,7 @@ export function AppShell(): JSX.Element {
                       {error}
                     </Typography>
                   ) : null}
-                  <InboxList items={items} selectedItemId={selectedId} onSelect={setSelectedItemId} />
+                  <InboxList items={items} selectedItemId={selectedId} onSelect={handleSelectItem} />
                 </Stack>
               </Paper>
             </Box>
