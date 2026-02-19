@@ -27,3 +27,5 @@
 [0] If `pnpm install` fails after `Recreating .../node_modules`, local commands like `tsc`/`vite` may disappear until dependencies are successfully restored.
 
 [0] For deterministic CLI/web TTS tests, set `STASH_TTS_MOCK_BASE64` in Vitest setup (not per-test) so child `spawnSync` CLI calls inherit the same mock audio payload.
+
+[0] If `pyenv virtualenv` errors with `no such command 'virtualenv'`, install the `pyenv-virtualenv` plugin and add `eval "$(pyenv virtualenv-init -)"` to shell init before creating Coqui environments.
