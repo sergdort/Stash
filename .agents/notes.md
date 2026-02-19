@@ -31,3 +31,5 @@
 [0] If `pyenv virtualenv` errors with `no such command 'virtualenv'`, install the `pyenv-virtualenv` plugin and add `eval "$(pyenv virtualenv-init -)"` to shell init before creating Coqui environments.
 
 [0] `biome lint` does not enforce Assist actions like `assist/source/organizeImports`; use `biome check` (or dedicated scripts like `lint:strict`) to match VS Code organize-import diagnostics.
+[0] On macOS, Coqui model tests like `tts_models/en/ljspeech/vits` can fail with "No espeak backend found" until `espeak-ng` is installed and `PHONEMIZER_ESPEAK_LIBRARY` points to `$(brew --prefix espeak-ng)/lib/libespeak-ng.dylib`.
+[0] In Coqui CLI examples, avoid `--text -`: many setups treat it as literal `"-"` instead of stdin, which can trigger Tacotron2 kernel-size runtime errors on too-short input. Use `--text "..."` or pipe via `xargs`.
