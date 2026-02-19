@@ -14,7 +14,7 @@ import {
 } from "@mui/material"
 import { useTheme } from "@mui/material/styles"
 import type { JSX } from "react"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 import { ExtractButton, useExtract } from "../features/extract"
 import { InboxFilters, InboxList, useInbox } from "../features/inbox"
@@ -61,6 +61,7 @@ export function AppShell(): JSX.Element {
   const statusState = useStatus()
   const extractState = useExtract()
   const ttsState = useTts()
+  const lastCompletedTtsJobIdRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (items.length === 0) {
@@ -77,6 +78,29 @@ export function AppShell(): JSX.Element {
       setSelectedItemId(items[0].id)
     }
   }, [items, selectedItemId])
+
+  useEffect(() => {
+    if (!selectedId) {
+      return
+    }
+    void ttsState.refreshLatestJob(selectedId).catch(() => {
+      // Hook manages API errors.
+    })
+  }, [selectedId, ttsState.refreshLatestJob])
+
+  useEffect(() => {
+    if (ttsState.job?.status !== "succeeded") {
+      return
+    }
+    if (lastCompletedTtsJobIdRef.current === ttsState.job.id) {
+      return
+    }
+    lastCompletedTtsJobIdRef.current = ttsState.job.id
+    void (async () => {
+      await refreshItem()
+      await refresh()
+    })()
+  }, [ttsState.job, refreshItem, refresh])
 
   const refreshAll = async (): Promise<void> => {
     await refresh()
@@ -278,8 +302,19 @@ export function AppShell(): JSX.Element {
                     <TtsPanel
                       itemId={item.id}
                       loading={ttsState.loading}
-                      downloadUrl={ttsState.downloadUrl}
-                      onGenerate={ttsState.runTts}
+                      error={ttsState.error}
+                      job={ttsState.job}
+                      hasExtractedContent={item.has_extracted_content}
+                      ttsAudio={item.tts_audio}
+                      onGenerate={async (itemId) => {
+                        try {
+                          await ttsState.runTts(itemId)
+                        } catch {
+                          // Error is stored in useTts state.
+                        }
+                        await refreshItem()
+                        await refresh()
+                      }}
                     />
                   </>
                 ) : null}
@@ -415,8 +450,19 @@ export function AppShell(): JSX.Element {
                         <TtsPanel
                           itemId={item.id}
                           loading={ttsState.loading}
-                          downloadUrl={ttsState.downloadUrl}
-                          onGenerate={ttsState.runTts}
+                          error={ttsState.error}
+                          job={ttsState.job}
+                          hasExtractedContent={item.has_extracted_content}
+                          ttsAudio={item.tts_audio}
+                          onGenerate={async (itemId) => {
+                            try {
+                              await ttsState.runTts(itemId)
+                            } catch {
+                              // Error is stored in useTts state.
+                            }
+                            await refreshItem()
+                            await refresh()
+                          }}
                         />
                       </Stack>
                     </>

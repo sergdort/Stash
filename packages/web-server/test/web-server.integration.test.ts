@@ -115,6 +115,44 @@ async function readJson<T>(response: Response): Promise<T> {
   return (await response.json()) as T
 }
 
+async function waitForJob(
+  baseUrl: string,
+  jobId: number,
+  timeoutMs = 5000,
+): Promise<{
+  id: number
+  status: "queued" | "running" | "succeeded" | "failed"
+  output_file_name: string | null
+  error_code: string | null
+  error_message: string | null
+}> {
+  const deadline = Date.now() + timeoutMs
+
+  while (Date.now() < deadline) {
+    const response = await fetch(`${baseUrl}/api/tts-jobs/${jobId}`)
+    const payload = await readJson<{
+      ok: true
+      job: {
+        id: number
+        status: "queued" | "running" | "succeeded" | "failed"
+        output_file_name: string | null
+        error_code: string | null
+        error_message: string | null
+      }
+    }>(response)
+
+    if (payload.job.status === "succeeded" || payload.job.status === "failed") {
+      return payload.job
+    }
+
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 100)
+    })
+  }
+
+  throw new Error(`Timed out waiting for tts job ${jobId}`)
+}
+
 function probeLocalhostListenCapability(): boolean {
   const result = spawnSync(
     process.execPath,
@@ -203,17 +241,28 @@ webServerSuite(webServerSuiteTitle, () => {
     const itemId = save.item.id as number
 
     const list = await fetch(`${baseUrl}/api/items?status=unread`).then((response) =>
-      readJson<{ ok: boolean; items: Array<{ id: number }> }>(response),
+      readJson<
+        {
+          ok: boolean
+          items: Array<{ id: number; has_extracted_content: boolean; tts_audio: object | null }>
+        }
+      >(response),
     )
     expect(list.ok).toBe(true)
     expect(Array.isArray(list.items)).toBe(true)
     expect(list.items).toHaveLength(1)
+    expect(list.items[0]?.has_extracted_content).toBe(false)
+    expect(list.items[0]?.tts_audio).toBeNull()
 
     const item = await fetch(`${baseUrl}/api/items/${itemId}`).then((response) =>
-      readJson<{ ok: boolean; item: { id: number } }>(response),
+      readJson<
+        { ok: boolean; item: { id: number; has_extracted_content: boolean; tts_audio: object | null } }
+      >(response),
     )
     expect(item.ok).toBe(true)
     expect(item.item.id).toBe(itemId)
+    expect(item.item.has_extracted_content).toBe(false)
+    expect(item.item.tts_audio).toBeNull()
 
     const tags = await fetch(`${baseUrl}/api/tags`).then((response) =>
       readJson<{ ok: boolean; tags: Array<{ name: string }> }>(response),
@@ -258,10 +307,76 @@ webServerSuite(webServerSuiteTitle, () => {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ format: "mp3" }),
-    }).then((response) => readJson<{ ok: true; download_url: string }>(response))
+    }).then((response) =>
+      readJson<{
+        ok: true
+        created: boolean
+        job: {
+          id: number
+          status: "queued" | "running"
+        }
+        poll_url: string
+        poll_interval_ms: number
+      }>(response),
+    )
 
     expect(tts.ok).toBe(true)
-    expect(tts.download_url).toMatch(/^\/api\/audio\//)
+    expect(tts.created).toBe(true)
+    expect(tts.job.status === "queued" || tts.job.status === "running").toBe(true)
+    expect(tts.poll_url).toBe(`/api/tts-jobs/${tts.job.id}`)
+    expect(tts.poll_interval_ms).toBeGreaterThan(0)
+
+    const completedJob = await waitForJob(baseUrl, tts.job.id)
+    expect(completedJob.status).toBe("succeeded")
+    expect(completedJob.output_file_name).toBeTruthy()
+
+    const itemAfterTts = await fetch(`${baseUrl}/api/items/${itemId}`).then((response) =>
+      readJson<
+        {
+          ok: boolean
+          item: {
+            id: number
+            has_extracted_content: boolean
+            tts_audio: {
+              file_name: string
+              format: "mp3" | "wav"
+              provider: string
+              voice: string
+              bytes: number
+              generated_at: string
+            } | null
+          }
+        }
+      >(response),
+    )
+    expect(itemAfterTts.ok).toBe(true)
+    expect(itemAfterTts.item.id).toBe(itemId)
+    expect(itemAfterTts.item.has_extracted_content).toBe(true)
+    expect(itemAfterTts.item.tts_audio).not.toBeNull()
+    expect(itemAfterTts.item.tts_audio?.format).toBe("mp3")
+    expect(itemAfterTts.item.tts_audio?.bytes).toBeGreaterThan(0)
+    expect(itemAfterTts.item.tts_audio?.file_name).toBe(completedJob.output_file_name)
+
+    const itemJobs = await fetch(`${baseUrl}/api/items/${itemId}/tts-jobs?limit=10`).then((response) =>
+      readJson<{
+        ok: true
+        jobs: Array<{ id: number }>
+        paging: { limit: number; offset: number; returned: number }
+      }>(response),
+    )
+    expect(itemJobs.ok).toBe(true)
+    expect(itemJobs.paging.returned).toBeGreaterThan(0)
+    expect(itemJobs.jobs[0]?.id).toBe(tts.job.id)
+
+    const playbackPath = `/api/audio/${encodeURIComponent(completedJob.output_file_name as string)}`
+    const downloadPath = `${playbackPath}?download=1`
+    const playbackResponse = await fetch(`${baseUrl}${playbackPath}`)
+    expect(playbackResponse.status).toBe(200)
+    expect(playbackResponse.headers.get("content-disposition")).toMatch(/^inline;/)
+
+    const downloadResponse = await fetch(`${baseUrl}${downloadPath}`)
+    expect(downloadResponse.status).toBe(200)
+    expect(downloadResponse.headers.get("content-disposition")).toMatch(/^attachment;/)
   })
 
   it("returns thumbnail_url in list and item payloads", async () => {

@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import fs from "node:fs"
-import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -10,6 +9,7 @@ import { and, asc, desc, eq, exists, inArray, sql, type SQL } from "drizzle-orm"
 import { openDb, type StashDb } from "../../../packages/core/src/db/client.js"
 import { getMigrationStatus, runMigrations } from "../../../packages/core/src/db/migrate.js"
 import * as schema from "../../../packages/core/src/db/schema.js"
+import { StashError } from "../../../packages/core/src/errors.js"
 import { extractContent } from "../../../packages/core/src/lib/extract.js"
 import {
   DEFAULT_AUDIO_DIR,
@@ -18,11 +18,12 @@ import {
   resolveDbPath,
 } from "../../../packages/core/src/lib/paths.js"
 import {
-  buildFriendlyFilename,
-  ensureUniqueFilePath,
-} from "../../../packages/core/src/lib/tts/files.js"
-import { coquiTtsProvider } from "../../../packages/core/src/lib/tts/providers/coqui.js"
-import { TtsProviderError, type TtsFormat } from "../../../packages/core/src/lib/tts/types.js"
+  enqueueTtsJob,
+  getTtsJob,
+  runTtsWorkerOnce,
+  startTtsWorker,
+  waitForTtsJob,
+} from "../../../packages/core/src/features/tts/jobs.js"
 import { startWebServer } from "../../../packages/web-server/src/index.js"
 
 const CLI_DIR = path.dirname(fileURLToPath(import.meta.url))
@@ -159,27 +160,12 @@ function parseItemId(value: string): number {
   return parsed
 }
 
-function parseTtsFormat(value: string): TtsFormat {
-  const normalized = value.trim().toLowerCase()
-  if (normalized !== "mp3" && normalized !== "wav") {
-    throw new CliError("Invalid format. Use mp3 or wav.", "VALIDATION_ERROR", 2)
-  }
-  return normalized
-}
-
 function parsePort(value: string): number {
   const port = parsePositiveInt(value)
   if (port > 65535) {
     throw new InvalidArgumentError("Expected a valid port in range 1..65535.")
   }
   return port
-}
-
-function resolveCliPath(input: string): string {
-  if (input.startsWith("~/")) {
-    return path.join(os.homedir(), input.slice(2))
-  }
-  return path.resolve(input)
 }
 
 function parseUrl(value: string): URL {
@@ -207,6 +193,10 @@ function serializeItem(row: ItemRow, tags: string[]): StashItem {
 }
 
 function handleActionError(error: unknown, jsonMode: boolean): never {
+  if (error instanceof StashError) {
+    printError(error.message, jsonMode, error.code, error.exitCode)
+  }
+
   if (error instanceof CliError) {
     printError(error.message, jsonMode, error.code, error.exitCode)
   }
@@ -362,89 +352,6 @@ function ensureItemExists(db: Db, itemId: number): void {
   }
 }
 
-function getItemTextForTts(db: Db, itemId: number): { title: string | null; text: string } {
-  const row = db
-    .select({
-      id: schema.items.id,
-      title: schema.items.title,
-      content: schema.notes.content,
-    })
-    .from(schema.items)
-    .leftJoin(schema.notes, eq(schema.notes.itemId, schema.items.id))
-    .where(eq(schema.items.id, itemId))
-    .get()
-
-  if (!row) {
-    throw new CliError(`Item ${itemId} not found.`, "NOT_FOUND", 3)
-  }
-
-  const text = row.content?.trim() ?? ""
-  if (text.length === 0) {
-    throw new CliError(
-      `No extracted content found for item ${itemId}. Save without --no-extract or re-save the URL.`,
-      "NO_CONTENT",
-      2,
-    )
-  }
-
-  return {
-    title: row.title,
-    text,
-  }
-}
-
-function resolveTtsOutputPath(
-  itemId: number,
-  title: string | null,
-  voice: string,
-  format: TtsFormat,
-  outputFilePath?: string,
-  audioDirInput?: string,
-): string {
-  if (outputFilePath && outputFilePath.trim().length > 0) {
-    const resolved = resolveCliPath(outputFilePath)
-    const ext = path.extname(resolved).toLowerCase()
-    if (ext.length > 0 && ext !== ".mp3" && ext !== ".wav") {
-      throw new CliError("Output file extension must be .mp3 or .wav.", "VALIDATION_ERROR", 2)
-    }
-
-    if (resolved.endsWith(path.sep)) {
-      throw new CliError(
-        "Output path must include a file name. Use --audio-dir for folder output.",
-        "VALIDATION_ERROR",
-        2,
-      )
-    }
-
-    if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
-      throw new CliError(
-        "Output path points to a directory. Use --audio-dir for folder output.",
-        "VALIDATION_ERROR",
-        2,
-      )
-    }
-
-    const withExtension = ext.length > 0 ? resolved : `${resolved}.${format}`
-    const parentDir = path.dirname(withExtension)
-    fs.mkdirSync(parentDir, { recursive: true })
-    return withExtension
-  }
-
-  const resolvedAudioDir = resolveAudioDir(
-    audioDirInput ?? process.env.STASH_AUDIO_DIR ?? DEFAULT_AUDIO_DIR,
-  )
-  fs.mkdirSync(resolvedAudioDir, { recursive: true })
-
-  const fileName = buildFriendlyFilename({
-    itemId,
-    title,
-    voice,
-    format,
-  })
-
-  return ensureUniqueFilePath(path.join(resolvedAudioDir, fileName))
-}
-
 function runDbAction<T>(jsonMode: boolean, action: () => T | Promise<T>): T | Promise<T> {
   try {
     const result = action()
@@ -483,7 +390,9 @@ Quick Reference:
   stash read <id> [--json]
   stash unread <id> [--json]
   stash extract <id> [--force] [--json]
-  stash tts <id> [--voice <name>] [--format mp3|wav] [--out <file>] [--audio-dir <dir>] [--json]
+  stash tts <id> [--voice <name>] [--format mp3|wav] [--wait] [--json]
+  stash tts status <jobId> [--json]
+  stash jobs worker [--poll-ms <n>] [--once] [--json]
   stash web [--host <host>] [--port <n>]
   stash db migrate [--json] [--migrations-dir <path>]
   stash db doctor [--json] [--migrations-dir <path>] [--limit <n>]
@@ -738,93 +647,125 @@ program
   )
 
 program
-  .command("tts <id>")
-  .description("Generate TTS audio for an item's extracted content")
+  .command("tts <id> [jobId]")
+  .description("Queue TTS generation or check TTS job status (`stash tts status <jobId>`)")
   .option("--voice <name>", "Voice name for synthesis", DEFAULT_TTS_VOICE)
   .option("--format <format>", "Audio format: mp3|wav", "mp3")
-  .option("--out <file>", "Write audio to an explicit output file path")
-  .option(
-    "--audio-dir <dir>",
-    "Output directory for auto-generated friendly filenames",
-    process.env.STASH_AUDIO_DIR ?? DEFAULT_AUDIO_DIR,
-  )
+  .option("--wait", "Wait for completion after enqueueing")
+  .option("--poll-ms <n>", "Polling interval for wait/status output", parsePositiveInt, 1500)
   .option("--json", "Print machine-readable JSON output")
   .action(
     async (
       id: string,
+      jobId: string | undefined,
       options: {
         voice: string
         format: string
-        out?: string
-        audioDir?: string
+        wait?: boolean
+        pollMs: number
         json?: boolean
       },
     ) => {
       const jsonMode = Boolean(options.json)
+      const dbPath = resolveDbPath(program.opts().dbPath as string)
+      const context = {
+        dbPath,
+        migrationsDir: resolveMigrationsDir(),
+      }
 
       return runDbAction(jsonMode, async () => {
-        const itemId = parseItemId(id)
-        const format = parseTtsFormat(options.format)
-        const voice = options.voice?.trim() ?? DEFAULT_TTS_VOICE
-        if (voice.length === 0) {
-          throw new CliError("Voice cannot be empty.", "VALIDATION_ERROR", 2)
-        }
-
-        const dbPath = resolveDbPath(program.opts().dbPath as string)
-        const { title, text } = withReadyDb(dbPath, (db) => getItemTextForTts(db, itemId))
-
-        let audioBuffer: Buffer
-        let provider = "coqui"
-        try {
-          const result = await coquiTtsProvider.synthesize({
-            text,
-            voice,
-            format,
-          })
-          audioBuffer = result.audio
-          provider = result.provider
-        } catch (error) {
-          if (error instanceof TtsProviderError) {
-            if (error.code === "TTS_PROVIDER_UNAVAILABLE") {
-              throw new CliError(
-                `TTS is unavailable. ${error.message}`,
-                "TTS_PROVIDER_UNAVAILABLE",
-                2,
-              )
-            }
-            throw new CliError(`TTS provider error: ${error.message}`, "INTERNAL_ERROR", 1)
+        if (id === "status") {
+          if (!jobId) {
+            throw new CliError("Job id is required: stash tts status <jobId>", "VALIDATION_ERROR", 2)
           }
-          throw error
-        }
+          const parsedJobId = parseItemId(jobId)
+          const job = getTtsJob(context, parsedJobId)
 
-        const outputPath = resolveTtsOutputPath(
-          itemId,
-          title,
-          voice,
-          format,
-          options.out,
-          options.out ? undefined : options.audioDir,
-        )
+          if (jsonMode) {
+            printJson({
+              ok: true,
+              job,
+            })
+            return
+          }
 
-        fs.writeFileSync(outputPath, audioBuffer)
-        const fileName = path.basename(outputPath)
-        const bytes = audioBuffer.length
-
-        if (jsonMode) {
-          printJson({
-            ok: true,
-            item_id: itemId,
-            provider,
-            voice,
-            format,
-            output_path: outputPath,
-            file_name: fileName,
-            bytes,
-          })
+          const suffix = job.error_message ? ` (${job.error_message})` : ""
+          process.stdout.write(`tts job #${job.id} ${job.status}${suffix}\n`)
           return
         }
 
-        process.stdout.write(`generated #${itemId} ${outputPath}\n`)
+        if (jobId !== undefined) {
+          throw new CliError("Unexpected extra argument for `stash tts <id>`.", "VALIDATION_ERROR", 2)
+        }
+
+        const itemId = parseItemId(id)
+        const enqueue = enqueueTtsJob(context, {
+          itemId,
+          voice: options.voice,
+          format: options.format,
+        })
+
+        if (!options.wait) {
+          if (jsonMode) {
+            printJson({
+              ok: true,
+              created: enqueue.created,
+              job_id: enqueue.job.id,
+              status: enqueue.job.status,
+              poll_interval_ms: enqueue.poll_interval_ms,
+            })
+            return
+          }
+
+          process.stdout.write(
+            `${enqueue.created ? "queued" : "existing"} tts job #${enqueue.job.id} for item #${itemId}\n`,
+          )
+          return
+        }
+
+        const audioDir = resolveAudioDir(process.env.STASH_AUDIO_DIR ?? DEFAULT_AUDIO_DIR)
+        const worker = startTtsWorker(context, {
+          pollMs: options.pollMs,
+          audioDir,
+        })
+
+        try {
+          const completed = await waitForTtsJob(context, enqueue.job.id, {
+            pollMs: options.pollMs,
+          })
+
+          if (completed.status === "failed") {
+            const code = completed.error_code ?? "INTERNAL_ERROR"
+            const exitCode = code === "NO_CONTENT" ? 2 : code === "NOT_FOUND" ? 3 : 1
+            throw new CliError(completed.error_message ?? "TTS job failed.", code, exitCode)
+          }
+
+          const fileName = completed.output_file_name
+          if (!fileName) {
+            throw new CliError(
+              `TTS job ${completed.id} completed without output file.`,
+              "INTERNAL_ERROR",
+              1,
+            )
+          }
+          const outputPath = path.join(audioDir, fileName)
+
+          if (jsonMode) {
+            printJson({
+              ok: true,
+              job_id: completed.id,
+              item_id: completed.item_id,
+              status: completed.status,
+              output_file_name: fileName,
+              output_path: outputPath,
+            })
+            return
+          }
+
+          process.stdout.write(`generated #${completed.item_id} ${outputPath}\n`)
+        } finally {
+          await worker.stop()
+        }
       })
     },
   )
@@ -1314,6 +1255,73 @@ markCommand
         return
       }
       process.stdout.write(`marked #${result.itemId} as unread\n`)
+    })
+  })
+
+const jobsCommand = program.command("jobs").description("Background job workers")
+
+jobsCommand
+  .command("worker")
+  .description("Run TTS background worker loop")
+  .option("--poll-ms <n>", "Polling interval in milliseconds", parsePositiveInt, 1500)
+  .option("--once", "Process at most one queued job and exit")
+  .option("--json", "Print machine-readable JSON output")
+  .action(async (options: { pollMs: number; once?: boolean; json?: boolean }) => {
+    const jsonMode = Boolean(options.json)
+
+    return runDbAction(jsonMode, async () => {
+      const context = {
+        dbPath: resolveDbPath(program.opts().dbPath as string),
+        migrationsDir: resolveMigrationsDir(),
+      }
+      const audioDir = resolveAudioDir(process.env.STASH_AUDIO_DIR ?? DEFAULT_AUDIO_DIR)
+
+      if (options.once) {
+        const processed = await runTtsWorkerOnce(context, { audioDir })
+        if (jsonMode) {
+          printJson({
+            ok: true,
+            processed: Boolean(processed),
+            job: processed,
+          })
+          return
+        }
+
+        if (!processed) {
+          process.stdout.write("No queued TTS jobs.\n")
+          return
+        }
+
+        process.stdout.write(`Processed tts job #${processed.id} (${processed.status}).\n`)
+        return
+      }
+
+      const worker = startTtsWorker(context, {
+        pollMs: options.pollMs,
+        audioDir,
+      })
+
+      if (jsonMode) {
+        printJson({
+          ok: true,
+          status: "running",
+          poll_ms: options.pollMs,
+        })
+      } else {
+        process.stdout.write(`tts worker running (poll ${options.pollMs}ms)\n`)
+      }
+
+      await new Promise<void>((resolve) => {
+        const stop = (): void => {
+          void worker.stop().finally(() => {
+            process.off("SIGINT", stop)
+            process.off("SIGTERM", stop)
+            resolve()
+          })
+        }
+        process.on("SIGINT", stop)
+        process.on("SIGTERM", stop)
+      })
     })
   })
 

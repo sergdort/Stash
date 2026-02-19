@@ -64,15 +64,47 @@ type MarkResponse = {
   status: "read" | "unread"
 }
 
-type TtsResponse = {
-  ok: boolean
+type TtsJob = {
+  id: number
   item_id: number
-  provider: string
+  status: "queued" | "running" | "succeeded" | "failed"
   voice: string
   format: "mp3" | "wav"
+  error_code: string | null
+  error_message: string | null
+  output_file_name: string | null
+  created_at: string
+  started_at: string | null
+  finished_at: string | null
+  updated_at: string
+}
+
+type TtsEnqueueResponse = {
+  ok: boolean
+  created: boolean
+  job_id: number
+  status: "queued" | "running"
+  poll_interval_ms: number
+}
+
+type TtsStatusResponse = {
+  ok: boolean
+  job: TtsJob
+}
+
+type TtsWaitResponse = {
+  ok: boolean
+  job_id: number
+  item_id: number
+  status: "succeeded"
+  output_file_name: string
   output_path: string
-  file_name: string
-  bytes: number
+}
+
+type WorkerOnceResponse = {
+  ok: boolean
+  processed: boolean
+  job: TtsJob | null
 }
 
 type ErrorResponse = {
@@ -275,7 +307,7 @@ integrationSuite(integrationTitle, () => {
 
         const migrationStatus = runJson<DoctorResponse>(["db", "doctor"], { dbPath })
         expect(migrationStatus.ok).toBe(true)
-        expect(migrationStatus.applied_count).toBe(2)
+        expect(migrationStatus.applied_count).toBe(4)
         expect(migrationStatus.pending_count).toBe(0)
       } finally {
         cleanup()
@@ -486,120 +518,75 @@ integrationSuite(integrationTitle, () => {
     })
   })
 
-  describe("tts export", () => {
-    it("writes to default ~/.stash/audio when no output overrides are provided", () => {
+  describe("tts jobs", () => {
+    it("queues a job immediately and exposes status endpoint", () => {
       const { dbPath, cleanup } = createTempDb()
       try {
         const saved = seedSavedItem(dbPath)
         upsertNoteContent(dbPath, saved.item.id, "A short article body for synthesized speech.")
 
-        const homeDir = path.dirname(dbPath)
-        const tts = runJson<TtsResponse>(["tts", String(saved.item.id)], {
+        const queued = runJson<TtsEnqueueResponse>(["tts", String(saved.item.id)], {
+          dbPath,
+        })
+        expect(queued.ok).toBe(true)
+        expect(queued.created).toBe(true)
+        expect(queued.status === "queued" || queued.status === "running").toBe(true)
+        expect(queued.poll_interval_ms).toBeGreaterThan(0)
+
+        const status = runJson<TtsStatusResponse>(["tts", "status", String(queued.job_id)], {
+          dbPath,
+        })
+        expect(status.ok).toBe(true)
+        expect(status.job.id).toBe(queued.job_id)
+      } finally {
+        cleanup()
+      }
+    })
+
+    it("processes one queued job with jobs worker --once", () => {
+      const { dbPath, cleanup } = createTempDb()
+      try {
+        const saved = seedSavedItem(dbPath)
+        upsertNoteContent(dbPath, saved.item.id, "Worker processing content.")
+        const audioDir = path.join(path.dirname(dbPath), "audio")
+        const queued = runJson<TtsEnqueueResponse>(["tts", String(saved.item.id)], { dbPath })
+
+        const processed = runJson<WorkerOnceResponse>(["jobs", "worker", "--once"], {
           dbPath,
           env: {
-            HOME: homeDir,
+            STASH_AUDIO_DIR: audioDir,
           },
         })
-
-        const expectedDir = path.join(homeDir, ".stash", "audio")
-        expect(tts.ok).toBe(true)
-        expect(tts.item_id).toBe(saved.item.id)
-        expect(tts.provider).toBe("coqui")
-        expect(tts.output_path.startsWith(expectedDir)).toBe(true)
-        expect(tts.file_name.includes(`id-${saved.item.id}`)).toBe(true)
-        expect(tts.bytes).toBeGreaterThan(0)
-        expect(fs.existsSync(tts.output_path)).toBe(true)
+        expect(processed.ok).toBe(true)
+        expect(processed.processed).toBe(true)
+        expect(processed.job?.id).toBe(queued.job_id)
+        expect(processed.job?.status).toBe("succeeded")
+        expect(processed.job?.output_file_name).toBeTruthy()
       } finally {
         cleanup()
       }
     })
 
-    it("supports --audio-dir and STASH_AUDIO_DIR overrides", () => {
+    it("supports --wait to return terminal output metadata", () => {
       const { dbPath, cleanup } = createTempDb()
       try {
         const saved = seedSavedItem(dbPath)
-        upsertNoteContent(dbPath, saved.item.id, "Audio override test content.")
-        const tempRoot = path.dirname(dbPath)
-        const envDir = path.join(tempRoot, "env-audio")
-        const flagDir = path.join(tempRoot, "flag-audio")
-
-        const envResult = runJson<TtsResponse>(["tts", String(saved.item.id)], {
-          dbPath,
-          env: {
-            STASH_AUDIO_DIR: envDir,
-          },
-        })
-        expect(envResult.output_path.startsWith(envDir)).toBe(true)
-        expect(fs.existsSync(envResult.output_path)).toBe(true)
-
-        const flagResult = runJson<TtsResponse>(
-          ["tts", String(saved.item.id), "--audio-dir", flagDir],
-          {
-            dbPath,
-            env: {
-              STASH_AUDIO_DIR: envDir,
-            },
-          },
-        )
-        expect(flagResult.output_path.startsWith(flagDir)).toBe(true)
-        expect(fs.existsSync(flagResult.output_path)).toBe(true)
-      } finally {
-        cleanup()
-      }
-    })
-
-    it("uses --out as highest-priority output target", () => {
-      const { dbPath, cleanup } = createTempDb()
-      try {
-        const saved = seedSavedItem(dbPath)
-        upsertNoteContent(dbPath, saved.item.id, "Explicit output path test content.")
-        const tempRoot = path.dirname(dbPath)
-        const explicitOutput = path.join(tempRoot, "exports", "article-audio")
-
-        const tts = runJson<TtsResponse>(
-          [
-            "tts",
-            String(saved.item.id),
-            "--out",
-            explicitOutput,
-            "--audio-dir",
-            path.join(tempRoot, "unused-audio-dir"),
-          ],
-          {
-            dbPath,
-            env: {
-              STASH_AUDIO_DIR: path.join(tempRoot, "unused-env-dir"),
-            },
-          },
-        )
-
-        expect(tts.output_path).toBe(`${explicitOutput}.mp3`)
-        expect(fs.existsSync(tts.output_path)).toBe(true)
-      } finally {
-        cleanup()
-      }
-    })
-
-    it("generates unique auto filenames across repeated runs", () => {
-      const { dbPath, cleanup } = createTempDb()
-      try {
-        const saved = seedSavedItem(dbPath)
-        upsertNoteContent(dbPath, saved.item.id, "Unique file naming test content.")
+        upsertNoteContent(dbPath, saved.item.id, "Wait mode content.")
         const audioDir = path.join(path.dirname(dbPath), "audio")
 
-        const first = runJson<TtsResponse>(
-          ["tts", String(saved.item.id), "--audio-dir", audioDir],
-          { dbPath },
-        )
+        const waited = runJson<TtsWaitResponse>(["tts", String(saved.item.id), "--wait"], {
+          dbPath,
+          env: {
+            STASH_AUDIO_DIR: audioDir,
+          },
+        })
 
-        const second = runJson<TtsResponse>(
-          ["tts", String(saved.item.id), "--audio-dir", audioDir],
-          { dbPath },
-        )
-
-        expect(first.output_path).not.toBe(second.output_path)
-        expect(fs.existsSync(first.output_path)).toBe(true)
-        expect(fs.existsSync(second.output_path)).toBe(true)
+        expect(waited.ok).toBe(true)
+        expect(waited.item_id).toBe(saved.item.id)
+        expect(waited.status).toBe("succeeded")
+        expect(waited.output_file_name.length).toBeGreaterThan(0)
+        expect(waited.output_path.startsWith(audioDir)).toBe(true)
+        expect(fs.existsSync(waited.output_path)).toBe(true)
       } finally {
         cleanup()
       }

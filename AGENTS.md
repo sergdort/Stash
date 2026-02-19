@@ -11,7 +11,8 @@ Primary goal:
 
 Current implementation status:
 - Implemented: `save`, `list`, `tags list`, `tag add`, `tag rm`, `mark read`, `mark unread`, plus `read`/`unread` aliases.
-- Implemented: `tts` export command (Coqui-first provider, filesystem output).
+- Implemented: async `tts` job system (`stash tts`, `stash tts status`, `stash jobs worker`) with durable SQLite state.
+- Implemented: web/API TTS playback metadata (`item_audio`, latest-per-item) and extracted-content availability flags.
 - Implemented: migration tooling (`db migrate`, `db doctor`) and baseline schema.
 - Implemented: automatic migration application for normal data commands.
 - Implemented: content extraction on save using Mozilla Readability (stores in `notes` table).
@@ -163,8 +164,9 @@ stash unread 1 --json
 Generate TTS audio:
 ```bash
 stash tts 1 --json
-stash tts 1 --audio-dir ~/Downloads/stash-audio --json
-stash tts 1 --out ~/Downloads/article-1.mp3 --json
+stash tts 1 --wait --json
+stash tts status 12 --json
+stash jobs worker --once --json
 ```
 
 Extract or re-extract content:
@@ -239,6 +241,10 @@ Typical error shape:
   - Many-to-many link between items and tags.
 - `notes`
   - Optional per-item note content.
+- `item_audio`
+  - Latest generated TTS artifact metadata per item (`file_name`, provider/voice/format, bytes, timestamp).
+- `tts_jobs`
+  - Durable async TTS queue records (`queued|running|succeeded|failed`) with per-job error/output metadata.
 
 Initial SQL migration:
 - `drizzle/0000_init.sql`
@@ -283,7 +289,15 @@ Updates should include:
 - `.db/` is git-ignored local runtime data for repository-local development.
 - Local npm scripts load `.env` using `dotenv` via `scripts/with-env.mjs`.
 - CLI DB path precedence remains: `--db-path` > `STASH_DB_PATH` > `~/.stash/stash.db`.
-- `tts` output path precedence is: `--out` > `--audio-dir` > `STASH_AUDIO_DIR` > `~/.stash/audio`.
+- Async TTS defaults:
+  - `stash tts <id>` enqueues and returns immediately.
+  - `stash tts <id> --wait` waits for terminal status.
+  - `stash jobs worker` runs queue processing loop (`--once` for one job).
+- Web/API item payloads now include:
+  - `has_extracted_content: boolean`
+  - `tts_audio: null | { file_name, format, provider, voice, bytes, generated_at }`
+- `POST /api/items/:id/tts` is enqueue-first and returns job metadata (`job`, `poll_url`, `poll_interval_ms`).
+- `GET /api/tts-jobs/:id` and `GET /api/items/:id/tts-jobs` expose job status/history for polling/recovery.
 - `tts` auto-generated filenames use friendly slugs + timestamp + short random suffix and collision fallback (`_2`, `_3`, ...).
 - Vitest sets `STASH_TTS_MOCK_BASE64` in `test/vitest.setup.ts` for deterministic TTS tests; default `pnpm test` does not require local Coqui/espeak binaries.
 

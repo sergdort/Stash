@@ -7,11 +7,12 @@ import { openDb, type StashDb } from "../../db/client.js"
 import { runMigrations } from "../../db/migrate.js"
 import * as schema from "../../db/schema.js"
 import { StashError } from "../../errors.js"
-import type { ItemStatus, StashItem } from "../../types.js"
+import type { ItemStatus, ItemTtsAudio, StashItem } from "../../types.js"
 
 export type Db = StashDb
 export type DbExecutor = Pick<Db, "insert" | "select">
 export type ItemRow = typeof schema.items.$inferSelect & { status: ItemStatus }
+export type ItemAudioRow = typeof schema.itemAudio.$inferSelect
 
 export function nowMs(): number {
   return Date.now()
@@ -129,7 +130,76 @@ export function getTagsMap(db: Db, itemIds: number[]): Map<number, string[]> {
   return map
 }
 
-export function serializeItem(row: ItemRow, tags: string[]): StashItem {
+export function getExtractedContentMap(db: Db, itemIds: number[]): Map<number, boolean> {
+  const map = new Map<number, boolean>()
+  if (itemIds.length === 0) {
+    return map
+  }
+
+  const rows = db
+    .select({ itemId: schema.notes.itemId, content: schema.notes.content })
+    .from(schema.notes)
+    .where(inArray(schema.notes.itemId, itemIds))
+    .all()
+
+  for (const row of rows) {
+    map.set(row.itemId, row.content.trim().length > 0)
+  }
+
+  return map
+}
+
+export function getExtractedContentForItem(db: Db, itemId: number): boolean {
+  const row = db
+    .select({ content: schema.notes.content })
+    .from(schema.notes)
+    .where(eq(schema.notes.itemId, itemId))
+    .get()
+
+  return row ? row.content.trim().length > 0 : false
+}
+
+function serializeItemAudio(row: ItemAudioRow): ItemTtsAudio {
+  return {
+    file_name: row.fileName,
+    format: row.format as "mp3" | "wav",
+    provider: row.provider,
+    voice: row.voice,
+    bytes: row.bytes,
+    generated_at: toIso(row.generatedAt) as string,
+  }
+}
+
+export function getItemAudioMap(db: Db, itemIds: number[]): Map<number, ItemTtsAudio> {
+  const map = new Map<number, ItemTtsAudio>()
+  if (itemIds.length === 0) {
+    return map
+  }
+
+  const rows = db
+    .select()
+    .from(schema.itemAudio)
+    .where(inArray(schema.itemAudio.itemId, itemIds))
+    .all()
+
+  for (const row of rows) {
+    map.set(row.itemId, serializeItemAudio(row))
+  }
+
+  return map
+}
+
+export function getItemAudioForItem(db: Db, itemId: number): ItemTtsAudio | null {
+  const row = db.select().from(schema.itemAudio).where(eq(schema.itemAudio.itemId, itemId)).get()
+  return row ? serializeItemAudio(row) : null
+}
+
+export function serializeItem(
+  row: ItemRow,
+  tags: string[],
+  hasExtractedContent: boolean,
+  ttsAudio: ItemTtsAudio | null,
+): StashItem {
   return {
     id: row.id,
     url: row.url,
@@ -138,6 +208,8 @@ export function serializeItem(row: ItemRow, tags: string[]): StashItem {
     domain: row.domain,
     status: row.status,
     is_starred: row.isStarred,
+    has_extracted_content: hasExtractedContent,
+    tts_audio: ttsAudio,
     tags,
     created_at: toIso(row.createdAt) as string,
     updated_at: toIso(row.updatedAt) as string,

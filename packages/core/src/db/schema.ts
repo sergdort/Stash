@@ -67,3 +67,51 @@ export const notes = sqliteTable("notes", {
   content: text("content").notNull().default(""),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 })
+
+export const itemAudio = sqliteTable(
+  "item_audio",
+  {
+    itemId: integer("item_id")
+      .primaryKey()
+      .references(() => items.id, { onDelete: "cascade" }),
+    fileName: text("file_name").notNull(),
+    provider: text("provider").notNull(),
+    voice: text("voice").notNull(),
+    format: text("format").notNull(),
+    bytes: integer("bytes").notNull(),
+    generatedAt: integer("generated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [check("item_audio_format_check", sql`${table.format} in ('mp3','wav')`)],
+)
+
+export const ttsJobs = sqliteTable(
+  "tts_jobs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    itemId: integer("item_id")
+      .notNull()
+      .references(() => items.id, { onDelete: "cascade" }),
+    status: text("status").notNull(),
+    voice: text("voice").notNull(),
+    format: text("format").notNull(),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    outputFileName: text("output_file_name"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+    startedAt: integer("started_at", { mode: "timestamp_ms" }),
+    finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
+  },
+  (table) => [
+    check(
+      "tts_jobs_status_check",
+      sql`${table.status} in ('queued','running','succeeded','failed')`,
+    ),
+    check("tts_jobs_format_check", sql`${table.format} in ('mp3','wav')`),
+    index("idx_tts_jobs_status_created").on(table.status, table.createdAt, table.id),
+    index("idx_tts_jobs_item_created").on(table.itemId, table.createdAt, table.id),
+    uniqueIndex("idx_tts_jobs_item_active")
+      .on(table.itemId)
+      .where(sql`${table.status} in ('queued','running')`),
+  ],
+)

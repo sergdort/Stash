@@ -5,6 +5,10 @@ import { extractContent } from "../../lib/extract.js"
 import type { ListItemsInput, ListItemsResult, OperationContext, SaveItemInput, SaveItemResult } from "../../types.js"
 import {
   ensureTagId,
+  getExtractedContentForItem,
+  getExtractedContentMap,
+  getItemAudioForItem,
+  getItemAudioMap,
   getItemRowById,
   type ItemRow,
   getItemTags,
@@ -135,7 +139,12 @@ export async function saveItem(context: OperationContext, input: SaveItemInput):
 
     return {
       created,
-      item: serializeItem(row, getItemTags(db, row.id)),
+      item: serializeItem(
+        row,
+        getItemTags(db, row.id),
+        getExtractedContentForItem(db, row.id),
+        getItemAudioForItem(db, row.id),
+      ),
     }
   })
 }
@@ -191,8 +200,23 @@ export function listItems(context: OperationContext, input: ListItemsInput): Lis
       db,
       rows.map((row) => row.id),
     )
+    const extractedContentMap = getExtractedContentMap(
+      db,
+      rows.map((row) => row.id),
+    )
+    const itemAudioMap = getItemAudioMap(
+      db,
+      rows.map((row) => row.id),
+    )
 
-    const items = rows.map((row) => serializeItem(row, tagsMap.get(row.id) ?? []))
+    const items = rows.map((row) =>
+      serializeItem(
+        row,
+        tagsMap.get(row.id) ?? [],
+        extractedContentMap.get(row.id) ?? false,
+        itemAudioMap.get(row.id) ?? null,
+      ),
+    )
 
     return {
       items,
@@ -211,6 +235,11 @@ export function getItem(context: OperationContext, itemId: number): SaveItemResu
     if (!row) {
       return undefined
     }
-    return serializeItem(row, getItemTags(db, row.id))
+    return serializeItem(
+      row,
+      getItemTags(db, row.id),
+      getExtractedContentForItem(db, row.id),
+      getItemAudioForItem(db, row.id),
+    )
   })
 }

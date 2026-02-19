@@ -145,6 +145,12 @@ export function InboxList({
                     label={item.status}
                     variant={item.status === "read" ? "filled" : "outlined"}
                   />
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    color={item.has_extracted_content ? "success" : "default"}
+                    label={item.has_extracted_content ? "content" : "no content"}
+                  />
                   {showCreatedAt ? (
                     <Chip
                       size="small"

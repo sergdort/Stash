@@ -11,7 +11,7 @@ This document is the user-facing reference for the current `stash` feature set.
 - List available tags with counts
 - Add/remove tags on an item
 - Mark items read/unread
-- Generate TTS audio files from extracted note content
+- Queue and process async TTS jobs from extracted note content
 - Run/inspect DB migrations
 - Machine-friendly JSON output for agent workflows
 
@@ -166,6 +166,8 @@ Web UI stack:
 
 Web API item payloads (`GET /api/items`, `GET /api/items/:id`, `POST /api/items`) include:
 - `thumbnail_url: string | null`
+- `has_extracted_content: boolean`
+- `tts_audio: null | { file_name, format, provider, voice, bytes, generated_at }`
 
 ## Save
 
@@ -270,10 +272,12 @@ Error codes:
 
 ## TTS Export
 
-Generate audio from extracted content stored in `notes`:
+Queue audio generation jobs from extracted content stored in `notes`:
 
 ```bash
-stash tts <id> [--voice <name>] [--format mp3|wav] [--out <file>] [--audio-dir <dir>] [--json]
+stash tts <id> [--voice <name>] [--format mp3|wav] [--wait] [--json]
+stash tts status <jobId> [--json]
+stash jobs worker [--poll-ms <n>] [--once] [--json]
 ```
 
 Defaults:
@@ -288,32 +292,43 @@ Environment:
 - `STASH_AFCONVERT_CLI` (optional): absolute path to macOS `afconvert`
 - `STASH_ESPEAK_CLI` (optional): absolute path to `espeak-ng`/`espeak` for Coqui phonemizer
 - `--format mp3`
-- Default output directory: `~/.stash/audio`
-
-Output path precedence:
-1. `--out <file>` (exact file path)
-2. `--audio-dir <dir>`
-3. `STASH_AUDIO_DIR`
-4. `~/.stash/audio`
+- Worker poll interval: `1500ms` default
+- Worker output directory:
+  1. `STASH_AUDIO_DIR`
+  2. `~/.stash/audio`
 
 Behavior:
-- `tts` requires extracted note content for the item; if not present, returns `NO_CONTENT`.
-- Auto-generated filenames are friendly and collision-safe.
-- JSON success payload includes:
-  - `item_id`, `provider`, `voice`, `format`, `output_path`, `file_name`, `bytes`
+- `stash tts <id>` enqueues and returns immediately with `job_id` and polling hints.
+- `stash tts <id> --wait` enqueues then waits for terminal job status.
+- `stash tts status <jobId>` returns current job details.
+- `stash jobs worker` processes queued jobs (`--once` processes at most one).
+- One active (`queued|running`) TTS job per item is allowed; enqueue deduplicates active jobs.
+- `tts` requires extracted note content; enqueue returns `NO_CONTENT` when missing.
+- Job statuses: `queued`, `running`, `succeeded`, `failed`.
+- Terminal job records are pruned after 30 days by worker maintenance.
+- Web API (`POST /api/items/:id/tts`) returns:
+  - `job` payload
+  - `poll_url: /api/tts-jobs/<job_id>`
+  - `poll_interval_ms`
+- Web job status/history APIs:
+  - `GET /api/tts-jobs/:id`
+  - `GET /api/items/:id/tts-jobs?limit=<n>&offset=<n>`
+- Web audio serving behavior:
+  - `GET /api/audio/:fileName` returns inline-playable audio by default.
+  - `GET /api/audio/:fileName?download=1` forces attachment download.
+- Latest-audio persistence model:
+  - Web/API stores only the latest generated TTS metadata per item (`item_audio` table).
+  - No automatic backfill for previously generated audio files.
 
 Typical JSON response:
 
 ```json
 {
   "ok": true,
-  "item_id": 1,
-  "provider": "edge",
-  "voice": "en-US-AriaNeural",
-  "format": "mp3",
-  "output_path": "/Users/alex/.stash/audio/2026-02-17_example-article_id-1_en-us-arianeural_153045_k9x3vd.mp3",
-  "file_name": "2026-02-17_example-article_id-1_en-us-arianeural_153045_k9x3vd.mp3",
-  "bytes": 48291
+  "created": true,
+  "job_id": 14,
+  "status": "queued",
+  "poll_interval_ms": 1500
 }
 ```
 
@@ -354,6 +369,8 @@ Typical list response:
       "domain": "example.com",
       "status": "unread",
       "is_starred": false,
+      "has_extracted_content": true,
+      "tts_audio": null,
       "tags": ["ai", "cli"],
       "created_at": "2026-02-14T20:00:00.000Z",
       "updated_at": "2026-02-14T20:00:00.000Z",
@@ -428,22 +445,28 @@ Re-extract content even if it already exists:
 stash extract 1 --force --json
 ```
 
-Generate TTS in default audio directory:
+Queue TTS job:
 
 ```bash
 stash tts 1 --json
 ```
 
-Generate TTS in custom directory:
+Queue and wait for terminal result:
 
 ```bash
-stash tts 1 --audio-dir ~/Downloads/stash-audio --json
+stash tts 1 --wait --json
 ```
 
-Generate TTS to exact file path:
+Check job status:
 
 ```bash
-stash tts 1 --out ~/Downloads/article-1.mp3 --json
+stash tts status 14 --json
+```
+
+Run one worker pass:
+
+```bash
+stash jobs worker --once --json
 ```
 
 ## Roadmap (Not Implemented Yet)

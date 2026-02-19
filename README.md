@@ -113,6 +113,7 @@ stash db doctor --json
 - Organize with tags
 - Mark items as read/unread
 - Generate TTS audio from extracted article content
+- Play previously generated TTS audio in the web UI
 - Machine-friendly JSON output
 - Local SQLite storage
 
@@ -131,27 +132,39 @@ stash mark unread 1
 stash extract 1  # extract content + thumbnail metadata for an existing item
 stash extract 1 --force  # re-extract even if content exists
 stash tts 1 --json
-stash tts 1 --audio-dir ~/Downloads/audio
-stash tts 1 --out ~/Downloads/article-1.mp3
+stash tts 1 --wait --json
+stash tts status 12 --json
+stash jobs worker --once --json
 ```
 
 ## TTS Export
 
-- Command: `stash tts <id> [--voice <name>] [--format mp3|wav] [--out <file>] [--audio-dir <dir>] [--json]`
+- Command: `stash tts <id> [--voice <name>] [--format mp3|wav] [--wait] [--json]`
+- Status command: `stash tts status <jobId> [--json]`
+- Worker command: `stash jobs worker [--poll-ms <n>] [--once] [--json]`
 - Provider: Coqui TTS (local, high quality)
 - Default voice: `tts_models/en/vctk/vits|p241`
 - Setup: Python 3.11 env + `pip install TTS` + `brew install espeak-ng`
 - CLI discovery: auto-detects binaries from `PATH` with optional env overrides (`STASH_COQUI_TTS_CLI`, `STASH_ESPEAK_CLI`, `STASH_FFMPEG_CLI`, etc.)
 - See `docs/COQUI_SETUP.md` for full setup instructions
 - See `docs/TTS_MACOS.md` for all TTS options
-- Provider in v1: Edge TTS
-- Default output directory: `~/.stash/audio`
-- Directory override precedence:
-  1. `--out <file>` (exact output file path)
-  2. `--audio-dir <dir>`
-  3. `STASH_AUDIO_DIR`
-  4. `~/.stash/audio`
-- Auto-generated filenames are human-readable and unique to avoid overwriting.
+- Default queue polling interval: `1500ms`
+- Async queue model:
+  - `stash tts <id>` enqueues job and returns `job_id` immediately.
+  - `stash tts <id> --wait` waits for terminal status and prints generated output metadata.
+  - `stash jobs worker` processes queued jobs (`--once` is test/dev friendly).
+- Worker audio output directory precedence:
+  1. `STASH_AUDIO_DIR`
+  2. `~/.stash/audio`
+- Web/API persistence model for playback is latest-only per item (`item_audio` table, no backfill for old files).
+- Web/API `POST /api/items/:id/tts` response includes:
+  - `job` payload (`queued|running|succeeded|failed`)
+  - `poll_url: /api/tts-jobs/<job_id>`
+  - `poll_interval_ms`
+- Web/API job endpoints:
+  - `GET /api/tts-jobs/:id`
+  - `GET /api/items/:id/tts-jobs?limit=<n>&offset=<n>`
+- `GET /api/audio/:fileName` is inline-playable by default and attachment when `?download=1` is set.
 
 ## Agent-friendly behavior
 
@@ -159,7 +172,10 @@ stash tts 1 --out ~/Downloads/article-1.mp3
 - Deterministic list order: `created_at DESC, id DESC`
 - Pagination via `--limit` and `--offset`
 - Tag filtering via repeated `--tag` and `--tag-mode any|all`
-- Web/API item payloads include `thumbnail_url` (`string | null`)
+- Web/API item payloads include:
+  - `thumbnail_url` (`string | null`)
+  - `has_extracted_content` (`boolean`)
+  - `tts_audio` (`null | { file_name, format, provider, voice, bytes, generated_at }`)
 
 ## Stack
 
@@ -181,7 +197,8 @@ stash tts 1 --out ~/Downloads/article-1.mp3
 - ✅ Mark items as read/unread
 - ✅ JSON output mode for automation
 - ✅ Basic content extraction
-- ✅ TTS export (Edge-first) with friendly unique filenames
+- ✅ Async TTS job queue (Coqui-first) with worker command
+- ✅ Web playback for latest generated item audio
 
 ### Coming Soon
 - 🔍 **Full-text search** - Search across article content
@@ -195,4 +212,4 @@ stash tts 1 --out ~/Downloads/article-1.mp3
 
 - Migrations are SQL files in `drizzle/`.
 - Schema source is `packages/core/src/db/schema.ts`.
-- The initial migration creates `items`, `tags`, `item_tags`, and `notes`.
+- Current schema includes `items`, `tags`, `item_tags`, `notes`, `item_audio`, and `tts_jobs`.

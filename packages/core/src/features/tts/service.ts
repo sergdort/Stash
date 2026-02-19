@@ -11,7 +11,7 @@ import { coquiTtsProvider } from "../../lib/tts/providers/coqui.js"
 import { TtsProviderError, type TtsFormat } from "../../lib/tts/types.js"
 import type { OperationContext, TtsResult } from "../../types.js"
 import { parseTtsFormat } from "../common/validation.js"
-import { withReadyDb } from "../common/db.js"
+import { nowMs, withReadyDb } from "../common/db.js"
 
 export type GenerateTtsInput = {
   itemId: number
@@ -116,7 +116,10 @@ function resolveTtsOutputPath(
   return ensureUniqueFilePath(path.join(resolvedAudioDir, fileName))
 }
 
-export async function generateTts(context: OperationContext, input: GenerateTtsInput): Promise<TtsResult> {
+export async function executeTtsForItem(
+  context: OperationContext,
+  input: GenerateTtsInput,
+): Promise<TtsResult> {
   const format = parseTtsFormat(input.format ?? "mp3")
   const voice = input.voice?.trim() ?? "tts_models/en/vctk/vits|p241"
   if (voice.length === 0) {
@@ -158,6 +161,33 @@ export async function generateTts(context: OperationContext, input: GenerateTtsI
   )
 
   fs.writeFileSync(outputPath, audioBuffer)
+  const fileName = path.basename(outputPath)
+  const generatedAt = new Date(nowMs())
+
+  withReadyDb(context.dbPath, context.migrationsDir, (db) => {
+    db.insert(schema.itemAudio)
+      .values({
+        itemId: input.itemId,
+        fileName,
+        provider,
+        voice,
+        format,
+        bytes: audioBuffer.length,
+        generatedAt,
+      })
+      .onConflictDoUpdate({
+        target: schema.itemAudio.itemId,
+        set: {
+          fileName,
+          provider,
+          voice,
+          format,
+          bytes: audioBuffer.length,
+          generatedAt,
+        },
+      })
+      .run()
+  })
 
   return {
     item_id: input.itemId,
@@ -165,7 +195,14 @@ export async function generateTts(context: OperationContext, input: GenerateTtsI
     voice,
     format,
     output_path: outputPath,
-    file_name: path.basename(outputPath),
+    file_name: fileName,
     bytes: audioBuffer.length,
   }
+}
+
+export async function generateTts(
+  context: OperationContext,
+  input: GenerateTtsInput,
+): Promise<TtsResult> {
+  return await executeTtsForItem(context, input)
 }

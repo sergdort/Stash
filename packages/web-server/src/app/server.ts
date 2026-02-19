@@ -1,5 +1,6 @@
 import http from "node:http"
 
+import { startTtsWorker } from "../../../core/src/features/tts/jobs.js"
 import { resolveAudioDir } from "../../../core/src/lib/paths.js"
 import { extractRoutes } from "../features/extract/routes.js"
 import { inboxRoutes } from "../features/inbox/routes.js"
@@ -21,6 +22,7 @@ export type StartWebServerOptions = {
   migrationsDir: string
   webDistDir: string
   audioDir?: string
+  ttsWorkerPollMs?: number
 }
 
 export type StartedWebServer = {
@@ -55,6 +57,18 @@ const allRoutes = [
 export async function startWebServer(options: StartWebServerOptions): Promise<StartedWebServer> {
   const compiledRoutes = compileRoutes(allRoutes)
   const audioDir = resolveAudioDir(options.audioDir)
+  const workerOptions = { audioDir } as { audioDir: string; pollMs?: number }
+  if (options.ttsWorkerPollMs !== undefined) {
+    workerOptions.pollMs = options.ttsWorkerPollMs
+  }
+
+  const ttsWorker = startTtsWorker(
+    {
+      dbPath: options.dbPath,
+      migrationsDir: options.migrationsDir,
+    },
+    workerOptions,
+  )
 
   const server = http.createServer(async (req, res) => {
     try {
@@ -113,6 +127,7 @@ export async function startWebServer(options: StartWebServerOptions): Promise<St
     port: resolvedPort,
     audioDir,
     close: async () => {
+      await ttsWorker.stop()
       await new Promise<void>((resolve, reject) => {
         server.close((error) => {
           if (error) {

@@ -58,6 +58,12 @@ export function ItemDetail({ item, loading, error }: ItemDetailProps): JSX.Eleme
           color={item.status === "read" ? "success" : "default"}
           label={item.status}
         />
+        <Chip
+          size="small"
+          variant="outlined"
+          color={item.has_extracted_content ? "success" : "default"}
+          label={item.has_extracted_content ? "extracted" : "not extracted"}
+        />
         {item.tags.map((tag) => (
           <Chip key={tag} size="small" variant="outlined" label={tag} />
         ))}

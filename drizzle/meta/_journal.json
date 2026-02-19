@@ -15,6 +15,20 @@
       "when": 1771531170566,
       "tag": "0001_overrated_gunslinger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1771537268855,
+      "tag": "0002_absurd_mindworm",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1771539382892,
+      "tag": "0003_colossal_robin_chapel",
+      "breakpoints": true
     }
   ]
 }
