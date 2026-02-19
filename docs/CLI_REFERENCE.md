@@ -277,6 +277,7 @@ Queue audio generation jobs from extracted content stored in `notes`:
 ```bash
 stash tts <id> [--voice <name>] [--format mp3|wav] [--wait] [--json]
 stash tts status <jobId> [--json]
+stash tts doctor [--json]
 stash jobs worker [--poll-ms <n>] [--once] [--json]
 ```
 
@@ -301,6 +302,7 @@ Behavior:
 - `stash tts <id>` enqueues and returns immediately with `job_id` and polling hints.
 - `stash tts <id> --wait` enqueues then waits for terminal job status.
 - `stash tts status <jobId>` returns current job details.
+- `stash tts doctor` reports dependency health for Coqui/espeak/ffmpeg and exits with code `2` when required checks fail.
 - `stash jobs worker` processes queued jobs (`--once` processes at most one).
 - One active (`queued|running`) TTS job per item is allowed; enqueue deduplicates active jobs.
 - `tts` requires extracted note content; enqueue returns `NO_CONTENT` when missing.
@@ -329,6 +331,44 @@ Typical JSON response:
   "job_id": 14,
   "status": "queued",
   "poll_interval_ms": 1500
+}
+```
+
+Typical `tts doctor` JSON response:
+
+```json
+{
+  "ok": true,
+  "provider": "coqui",
+  "healthy": true,
+  "checks": [
+    {
+      "id": "coqui_cli",
+      "required": true,
+      "ok": true,
+      "path": "/usr/local/bin/tts",
+      "message": null
+    },
+    {
+      "id": "espeak",
+      "required": true,
+      "ok": true,
+      "path": "/opt/homebrew/bin/espeak-ng",
+      "message": null
+    },
+    {
+      "id": "ffmpeg",
+      "required": false,
+      "ok": true,
+      "path": "/opt/homebrew/bin/ffmpeg",
+      "message": null
+    }
+  ],
+  "coqui_cli_features": {
+    "supports_text_file": true,
+    "supports_progress_bar": true
+  },
+  "invocation_strategy": "text_file_then_fallback_text"
 }
 ```
 

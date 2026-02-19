@@ -107,6 +107,24 @@ type WorkerOnceResponse = {
   job: TtsJob | null
 }
 
+type TtsDoctorResponse = {
+  ok: boolean
+  provider: "coqui"
+  healthy: boolean
+  checks: Array<{
+    id: "coqui_cli" | "espeak" | "ffmpeg"
+    required: boolean
+    ok: boolean
+    path: string | null
+    message: string | null
+  }>
+  coqui_cli_features: {
+    supports_text_file: boolean
+    supports_progress_bar: boolean
+  }
+  invocation_strategy: "text_file_then_fallback_text"
+}
+
 type ErrorResponse = {
   ok: false
   error: {
@@ -186,6 +204,11 @@ function createTempDb(): { dbPath: string; cleanup: () => void } {
     fs.rmSync(tempDir, { recursive: true, force: true })
   }
   return { dbPath, cleanup }
+}
+
+function writeExecutable(filePath: string, content: string): void {
+  fs.writeFileSync(filePath, content, "utf8")
+  fs.chmodSync(filePath, 0o755)
 }
 
 function seedSavedItem(dbPath: string): SaveResponse {
@@ -589,6 +612,86 @@ integrationSuite(integrationTitle, () => {
         expect(fs.existsSync(waited.output_path)).toBe(true)
       } finally {
         cleanup()
+      }
+    })
+  })
+
+  describe("tts doctor", () => {
+    it("returns health details in JSON", () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "stash-tts-doctor-cli-"))
+      const dbPath = path.join(tempDir, "stash.db")
+      try {
+        const coquiPath = path.join(tempDir, "fake-tts.sh")
+        const espeakPath = path.join(tempDir, "fake-espeak.sh")
+        writeExecutable(
+          coquiPath,
+          `#!/bin/sh
+if [ "$1" = "--help" ]; then
+  echo "usage: tts [--text_file TEXT_FILE] [--progress_bar PROGRESS_BAR]"
+  exit 0
+fi
+exit 0
+`,
+        )
+        writeExecutable(
+          espeakPath,
+          `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "espeak-ng 1.0"
+  exit 0
+fi
+exit 0
+`,
+        )
+
+        const report = runJson<TtsDoctorResponse>(["tts", "doctor"], {
+          dbPath,
+          env: {
+            STASH_COQUI_TTS_CLI: coquiPath,
+            STASH_ESPEAK_CLI: espeakPath,
+          },
+        })
+        expect(report.ok).toBe(true)
+        expect(report.healthy).toBe(true)
+        expect(report.provider).toBe("coqui")
+        expect(report.coqui_cli_features.supports_text_file).toBe(true)
+        expect(report.coqui_cli_features.supports_progress_bar).toBe(true)
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true })
+      }
+    })
+
+    it("exits with code 2 when required dependencies are missing", () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "stash-tts-doctor-cli-"))
+      const dbPath = path.join(tempDir, "stash.db")
+      try {
+        const coquiPath = path.join(tempDir, "fake-tts.sh")
+        writeExecutable(
+          coquiPath,
+          `#!/bin/sh
+if [ "$1" = "--help" ]; then
+  echo "usage: tts [--text TEXT]"
+  exit 0
+fi
+exit 0
+`,
+        )
+
+        const report = runJson<TtsDoctorResponse>(["tts", "doctor"], {
+          dbPath,
+          expectedCode: 2,
+          env: {
+            STASH_COQUI_TTS_CLI: coquiPath,
+            STASH_ESPEAK_CLI: path.join(tempDir, "missing-espeak"),
+          },
+        })
+
+        expect(report.ok).toBe(true)
+        expect(report.healthy).toBe(false)
+        expect(report.checks.find((check) => check.id === "coqui_cli")?.ok).toBe(true)
+        expect(report.checks.find((check) => check.id === "espeak")?.ok).toBe(false)
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true })
       }
     })
   })

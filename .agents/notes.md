@@ -35,3 +35,5 @@
 [0] In Coqui CLI examples, avoid `--text -`: many setups treat it as literal `"-"` instead of stdin, which can trigger Tacotron2 kernel-size runtime errors on too-short input. Use `--text "..."` or pipe via `xargs`.
 [0] When adding a new DB migration, update CLI integration assertions that hard-code `db doctor` migration counts (e.g., expected `applied_count`) to prevent false negatives.
 [0] In sandboxed tests, default `~/.stash/audio` can be unwritable; set `STASH_AUDIO_DIR` to a temp path for worker-based TTS tests/commands.
+[0] Coqui CLI variants differ: some support `--text_file`, others only `--text`. Keep provider invocation backward compatible by retrying with inline `--text` when `--text_file`/`--progress_bar` is rejected.
+[0] CLI integration tests execute `dist/apps/cli/src/cli.js`; always run `pnpm run build` after source edits and before targeted integration runs, otherwise tests can fail against stale command behavior.

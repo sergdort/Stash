@@ -4,19 +4,13 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { Command, InvalidArgumentError } from "commander"
-import { and, asc, desc, eq, exists, inArray, sql, type SQL } from "drizzle-orm"
+import { and, asc, desc, eq, exists, inArray, type SQL, sql } from "drizzle-orm"
 
 import { openDb, type StashDb } from "../../../packages/core/src/db/client.js"
 import { getMigrationStatus, runMigrations } from "../../../packages/core/src/db/migrate.js"
 import * as schema from "../../../packages/core/src/db/schema.js"
 import { StashError } from "../../../packages/core/src/errors.js"
-import { extractContent } from "../../../packages/core/src/lib/extract.js"
-import {
-  DEFAULT_AUDIO_DIR,
-  DEFAULT_DB_PATH,
-  resolveAudioDir,
-  resolveDbPath,
-} from "../../../packages/core/src/lib/paths.js"
+import { inspectCoquiTtsHealth } from "../../../packages/core/src/features/tts/doctor.js"
 import {
   enqueueTtsJob,
   getTtsJob,
@@ -24,6 +18,13 @@ import {
   startTtsWorker,
   waitForTtsJob,
 } from "../../../packages/core/src/features/tts/jobs.js"
+import { extractContent } from "../../../packages/core/src/lib/extract.js"
+import {
+  DEFAULT_AUDIO_DIR,
+  DEFAULT_DB_PATH,
+  resolveAudioDir,
+  resolveDbPath,
+} from "../../../packages/core/src/lib/paths.js"
 import { startWebServer } from "../../../packages/web-server/src/index.js"
 
 const CLI_DIR = path.dirname(fileURLToPath(import.meta.url))
@@ -392,6 +393,7 @@ Quick Reference:
   stash extract <id> [--force] [--json]
   stash tts <id> [--voice <name>] [--format mp3|wav] [--wait] [--json]
   stash tts status <jobId> [--json]
+  stash tts doctor [--json]
   stash jobs worker [--poll-ms <n>] [--once] [--json]
   stash web [--host <host>] [--port <n>]
   stash db migrate [--json] [--migrations-dir <path>]
@@ -648,7 +650,9 @@ program
 
 program
   .command("tts <id> [jobId]")
-  .description("Queue TTS generation or check TTS job status (`stash tts status <jobId>`)")
+  .description(
+    "Queue TTS generation, check TTS job status (`stash tts status <jobId>`), or run `stash tts doctor`.",
+  )
   .option("--voice <name>", "Voice name for synthesis", DEFAULT_TTS_VOICE)
   .option("--format <format>", "Audio format: mp3|wav", "mp3")
   .option("--wait", "Wait for completion after enqueueing")
@@ -674,9 +678,53 @@ program
       }
 
       return runDbAction(jsonMode, async () => {
+        if (id === "doctor") {
+          if (jobId !== undefined) {
+            throw new CliError(
+              "Unexpected extra argument for `stash tts doctor`.",
+              "VALIDATION_ERROR",
+              2,
+            )
+          }
+
+          const report = inspectCoquiTtsHealth()
+          if (jsonMode) {
+            printJson({
+              ok: true,
+              ...report,
+            })
+          } else {
+            process.stdout.write(`tts doctor: ${report.healthy ? "healthy" : "unhealthy"}\n`)
+            for (const check of report.checks) {
+              const requirement = check.required ? "required" : "optional"
+              const status = check.ok ? "ok" : "failed"
+              const resolvedPath = check.path ?? "-"
+              process.stdout.write(`${check.id} (${requirement}): ${status} [${resolvedPath}]\n`)
+              if (check.message) {
+                process.stdout.write(`  ${check.message}\n`)
+              }
+            }
+            process.stdout.write(
+              `coqui flags: --text_file=${report.coqui_cli_features.supports_text_file ? "yes" : "no"} --progress_bar=${report.coqui_cli_features.supports_progress_bar ? "yes" : "no"}\n`,
+            )
+            process.stdout.write(
+              `invocation strategy: ${report.invocation_strategy.replaceAll("_", " ")}\n`,
+            )
+          }
+
+          if (!report.healthy) {
+            process.exitCode = 2
+          }
+          return
+        }
+
         if (id === "status") {
           if (!jobId) {
-            throw new CliError("Job id is required: stash tts status <jobId>", "VALIDATION_ERROR", 2)
+            throw new CliError(
+              "Job id is required: stash tts status <jobId>",
+              "VALIDATION_ERROR",
+              2,
+            )
           }
           const parsedJobId = parseItemId(jobId)
           const job = getTtsJob(context, parsedJobId)
@@ -695,7 +743,11 @@ program
         }
 
         if (jobId !== undefined) {
-          throw new CliError("Unexpected extra argument for `stash tts <id>`.", "VALIDATION_ERROR", 2)
+          throw new CliError(
+            "Unexpected extra argument for `stash tts <id>`.",
+            "VALIDATION_ERROR",
+            2,
+          )
         }
 
         const itemId = parseItemId(id)

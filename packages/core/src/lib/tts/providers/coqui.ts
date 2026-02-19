@@ -1,10 +1,24 @@
+import { randomBytes } from "node:crypto"
 import { promises as fs } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { randomBytes } from "node:crypto"
-import type { TtsProvider, TtsRequest, TtsResult, TtsFormat } from "../types.js"
-import { TtsProviderError } from "../types.js"
 import { resolveBinary, runCommand } from "../command.js"
+import type { TtsFormat, TtsProvider, TtsRequest, TtsResult } from "../types.js"
+import { TtsProviderError } from "../types.js"
+
+function shouldRetryWithInlineText(stderr: string): boolean {
+  const normalized = stderr.toLowerCase()
+  const reportsUnknownArg =
+    normalized.includes("unrecognized arguments") ||
+    normalized.includes("no such option") ||
+    normalized.includes("unknown option")
+
+  if (!reportsUnknownArg) {
+    return false
+  }
+
+  return normalized.includes("--text_file") || normalized.includes("--progress_bar")
+}
 
 function decodeMockAudioBuffer(): Buffer | null {
   const mockBase64 = process.env.STASH_TTS_MOCK_BASE64?.trim()
@@ -95,7 +109,7 @@ export const coquiTtsProvider: TtsProvider = {
       const modelName = voiceParts[0] || voice
       const speakerIdx = voiceParts[1]
 
-      const args: string[] = [
+      const primaryArgs: string[] = [
         "--model_name",
         modelName,
         "--text_file",
@@ -106,11 +120,24 @@ export const coquiTtsProvider: TtsProvider = {
         "false",
       ]
 
-      if (speakerIdx) args.push("--speaker_idx", speakerIdx)
+      if (speakerIdx) primaryArgs.push("--speaker_idx", speakerIdx)
 
       ensureEspeakAvailable()
       const ttsCli = resolveCoquiCli()
-      const ttsResult = await runCommand(ttsCli, args)
+      let ttsResult = await runCommand(ttsCli, primaryArgs)
+      if (ttsResult.code !== 0 && shouldRetryWithInlineText(ttsResult.stderr)) {
+        const fallbackArgs: string[] = [
+          "--model_name",
+          modelName,
+          "--text",
+          text,
+          "--out_path",
+          tempAudioFile,
+        ]
+
+        if (speakerIdx) fallbackArgs.push("--speaker_idx", speakerIdx)
+        ttsResult = await runCommand(ttsCli, fallbackArgs)
+      }
 
       if (ttsResult.code !== 0) {
         if (ttsResult.stderr.includes("No espeak backend")) {

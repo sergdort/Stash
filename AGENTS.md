@@ -11,7 +11,7 @@ Primary goal:
 
 Current implementation status:
 - Implemented: `save`, `list`, `tags list`, `tag add`, `tag rm`, `mark read`, `mark unread`, plus `read`/`unread` aliases.
-- Implemented: async `tts` job system (`stash tts`, `stash tts status`, `stash jobs worker`) with durable SQLite state.
+- Implemented: async `tts` job system (`stash tts`, `stash tts status`, `stash tts doctor`, `stash jobs worker`) with durable SQLite state.
 - Implemented: web/API TTS playback metadata (`item_audio`, latest-per-item) and extracted-content availability flags.
 - Implemented: migration tooling (`db migrate`, `db doctor`) and baseline schema.
 - Implemented: automatic migration application for normal data commands.
@@ -166,6 +166,7 @@ Generate TTS audio:
 stash tts 1 --json
 stash tts 1 --wait --json
 stash tts status 12 --json
+stash tts doctor --json
 stash jobs worker --once --json
 ```
 
@@ -292,6 +293,7 @@ Updates should include:
 - Async TTS defaults:
   - `stash tts <id>` enqueues and returns immediately.
   - `stash tts <id> --wait` waits for terminal status.
+  - `stash tts doctor` validates local Coqui/espeak/ffmpeg dependencies and reports CLI flag compatibility.
   - `stash jobs worker` runs queue processing loop (`--once` for one job).
 - Web/API item payloads now include:
   - `has_extracted_content: boolean`

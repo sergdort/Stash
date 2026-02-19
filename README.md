@@ -134,6 +134,7 @@ stash extract 1 --force  # re-extract even if content exists
 stash tts 1 --json
 stash tts 1 --wait --json
 stash tts status 12 --json
+stash tts doctor --json
 stash jobs worker --once --json
 ```
 
@@ -141,6 +142,7 @@ stash jobs worker --once --json
 
 - Command: `stash tts <id> [--voice <name>] [--format mp3|wav] [--wait] [--json]`
 - Status command: `stash tts status <jobId> [--json]`
+- Health check command: `stash tts doctor [--json]`
 - Worker command: `stash jobs worker [--poll-ms <n>] [--once] [--json]`
 - Provider: Coqui TTS (local, high quality)
 - Default voice: `tts_models/en/vctk/vits|p241`
@@ -152,6 +154,7 @@ stash jobs worker --once --json
 - Async queue model:
   - `stash tts <id>` enqueues job and returns `job_id` immediately.
   - `stash tts <id> --wait` waits for terminal status and prints generated output metadata.
+  - `stash tts doctor` checks required local binaries and Coqui CLI flag compatibility (`--text_file`, `--progress_bar`).
   - `stash jobs worker` processes queued jobs (`--once` is test/dev friendly).
 - Worker audio output directory precedence:
   1. `STASH_AUDIO_DIR`
