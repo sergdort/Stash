@@ -33,6 +33,9 @@ Current implementation status:
 - CLI discovery standardized across providers: PATH first, optional env overrides (`STASH_GTTS_CLI`, `STASH_COQUI_TTS_CLI`, `STASH_FFMPEG_CLI`, `STASH_SAY_CLI`, `STASH_AFCONVERT_CLI`, `STASH_ESPEAK_CLI`)
 - Fallback providers available: Google TTS (gtts), macOS `say`
 - Web frontend stack: React + Vite + Material UI
+- Installed design-review skills:
+  - `web-design-guidelines` for baseline UI/accessibility audits
+  - `ui-ux-pro-max` for design pattern exploration and ideation
 
 ## Repository Layout
 
@@ -167,6 +170,24 @@ Extract or re-extract content:
 stash extract 1 --json
 stash extract 1 --force --json
 ```
+
+## UI/UX Workflow for Agents
+
+When making web UI changes, use this sequence:
+
+1. Implement feature/layout change in `apps/web`.
+2. Run build checks:
+```bash
+pnpm run build
+pnpm --dir apps/web build
+```
+3. Run a quick review with `web-design-guidelines` (primary quality gate).
+4. Use `ui-ux-pro-max` only when extra pattern/style exploration is needed.
+
+Guidance:
+- Treat `web-design-guidelines` as the baseline checklist.
+- Treat `ui-ux-pro-max` as inspiration/reference, not strict rules.
+- Preserve stash visual identity while improving mobile usability.
 
 ## Agent-Friendly Interface Contract
 
