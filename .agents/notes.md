@@ -29,3 +29,5 @@
 [0] For deterministic CLI/web TTS tests, set `STASH_TTS_MOCK_BASE64` in Vitest setup (not per-test) so child `spawnSync` CLI calls inherit the same mock audio payload.
 
 [0] If `pyenv virtualenv` errors with `no such command 'virtualenv'`, install the `pyenv-virtualenv` plugin and add `eval "$(pyenv virtualenv-init -)"` to shell init before creating Coqui environments.
+
+[0] `biome lint` does not enforce Assist actions like `assist/source/organizeImports`; use `biome check` (or dedicated scripts like `lint:strict`) to match VS Code organize-import diagnostics.

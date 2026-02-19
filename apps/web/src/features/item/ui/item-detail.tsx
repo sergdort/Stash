@@ -1,5 +1,5 @@
-import type { JSX } from "react"
 import { Alert, Chip, Link, Skeleton, Stack, Typography } from "@mui/material"
+import type { JSX } from "react"
 
 import { formatDateTime } from "../../../shared/lib/date"
 import type { StashItem } from "../../../shared/types"
@@ -53,15 +53,32 @@ export function ItemDetail({ item, loading, error }: ItemDetailProps): JSX.Eleme
         {item.url}
       </Link>
       <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-        <Chip size="small" color={item.status === "read" ? "success" : "default"} label={item.status} />
+        <Chip
+          size="small"
+          color={item.status === "read" ? "success" : "default"}
+          label={item.status}
+        />
         {item.tags.map((tag) => (
           <Chip key={tag} size="small" variant="outlined" label={tag} />
         ))}
       </Stack>
       <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-        <Chip size="small" icon={<TimeIcon sx={{ fontSize: 16 }} />} variant="outlined" label={`#${item.id}`} />
-        <Chip size="small" variant="outlined" label={`Created: ${formatDateTime(item.created_at)}`} />
-        <Chip size="small" variant="outlined" label={`Updated: ${formatDateTime(item.updated_at)}`} />
+        <Chip
+          size="small"
+          icon={<TimeIcon sx={{ fontSize: 16 }} />}
+          variant="outlined"
+          label={`#${item.id}`}
+        />
+        <Chip
+          size="small"
+          variant="outlined"
+          label={`Created: ${formatDateTime(item.created_at)}`}
+        />
+        <Chip
+          size="small"
+          variant="outlined"
+          label={`Updated: ${formatDateTime(item.updated_at)}`}
+        />
       </Stack>
     </Stack>
   )

@@ -15,6 +15,8 @@
     "dev:web": "pnpm --dir apps/web dev",
     "lint": "biome lint . --error-on-warnings",
     "lint:fix": "biome lint . --write --error-on-warnings",
+    "lint:strict": "biome check . --error-on-warnings",
+    "lint:strict:fix": "biome check . --write --error-on-warnings",
     "format": "biome format . --write",
     "format:check": "biome format .",
     "test": "pnpm run build && vitest run",

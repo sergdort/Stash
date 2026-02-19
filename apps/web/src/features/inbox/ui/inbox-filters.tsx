@@ -1,5 +1,3 @@
-import type { JSX } from "react"
-import { useMemo, useState } from "react"
 import {
   Box,
   Button,
@@ -13,9 +11,10 @@ import {
   useMediaQuery,
 } from "@mui/material"
 import { useTheme } from "@mui/material/styles"
-
-import type { InboxStatusFilter, InboxTagModeFilter } from "../api/list-items"
+import type { JSX } from "react"
+import { useMemo, useState } from "react"
 import { StatusIcon, TagIcon } from "../../../shared/ui/icons"
+import type { InboxStatusFilter, InboxTagModeFilter } from "../api/list-items"
 
 type TagOption = {
   name: string
@@ -80,8 +79,17 @@ export function InboxFilters({
 
   return (
     <Stack spacing={1.25}>
-      <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" flexWrap="wrap">
-        <Typography variant="subtitle2" sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="center"
+        justifyContent="space-between"
+        flexWrap="wrap"
+      >
+        <Typography
+          variant="subtitle2"
+          sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}
+        >
           <StatusIcon sx={{ fontSize: 18 }} />
           Status
         </Typography>
@@ -122,7 +130,10 @@ export function InboxFilters({
         </ToggleButtonGroup>
       ) : null}
 
-      <Typography variant="subtitle2" sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
+      <Typography
+        variant="subtitle2"
+        sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}
+      >
         <TagIcon sx={{ fontSize: 18 }} />
         Tags
       </Typography>
@@ -150,7 +161,12 @@ export function InboxFilters({
         </ToggleButtonGroup>
 
         {isMobile ? (
-          <Button variant="outlined" size="small" onClick={() => setTagsDrawerOpen(true)} sx={{ minHeight: 36 }}>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => setTagsDrawerOpen(true)}
+            sx={{ minHeight: 36 }}
+          >
             Show all tags ({availableTags.length})
           </Button>
         ) : null}

@@ -1,6 +1,6 @@
 import { Box, Chip, Stack, Typography, useMediaQuery } from "@mui/material"
 import { useTheme } from "@mui/material/styles"
-import { type JSX, useState } from "react"
+import type { JSX } from "react"
 
 import { formatDateTime } from "../../../shared/lib/date"
 import type { StashItem } from "../../../shared/types"
