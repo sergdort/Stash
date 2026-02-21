@@ -148,7 +148,7 @@ stash db doctor [--json] [--migrations-dir <path>] [--limit <n>]
 
 ## Web App
 
-Run the local web frontend + REST API with one command:
+Run the local PWA frontend + REST API with one command:
 
 ```bash
 pnpm run web
@@ -157,8 +157,18 @@ pnpm run web
 Equivalent CLI form:
 
 ```bash
-stash web [--host <host>] [--port <n>]
+stash web [--host <host>] [--api-port <n>] [--pwa-port <n>]
 ```
+
+Defaults:
+- `--host`: `127.0.0.1` (`STASH_WEB_HOST`)
+- `--api-port`: `4173` (`STASH_API_PORT`)
+- `--pwa-port`: `5173` (`STASH_PWA_PORT`)
+
+Notes:
+- API and PWA ports must be different.
+- Port conflicts fail fast (no automatic next-port fallback).
+- The PWA server proxies `/api/*` to the configured API server.
 
 Web UI stack:
 - React + Vite

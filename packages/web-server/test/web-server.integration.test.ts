@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process"
 import fs from "node:fs"
+import http from "node:http"
 import os from "node:os"
 import path from "node:path"
 
@@ -9,7 +10,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3"
 import { afterEach, describe, expect, it } from "vitest"
 
 import * as schema from "../../core/src/db/schema.js"
-import { startWebServer, type StartedWebServer } from "../src/app/server.js"
+import { startWebServer, startWebStack } from "../src/app/server.js"
 
 function createTempPaths(): { tempDir: string; dbPath: string; audioDir: string } {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "stash-web-"))
@@ -168,14 +169,54 @@ function probeLocalhostListenCapability(): boolean {
   return result.status === 0
 }
 
+async function occupyPort(
+  host: string,
+): Promise<{
+  port: number
+  close: () => Promise<void>
+}> {
+  const server = await new Promise<http.Server>((resolve, reject) => {
+    const instance = http.createServer()
+    instance.once("error", reject)
+    instance.listen(0, host, () => {
+      instance.off("error", reject)
+      resolve(instance)
+    })
+  })
+
+  const address = server.address()
+  if (!address || typeof address !== "object" || !("port" in address)) {
+    throw new Error("Could not resolve occupied port.")
+  }
+
+  return {
+    port: address.port,
+    close: async () => {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error)
+            return
+          }
+          resolve()
+        })
+      })
+    },
+  }
+}
+
 const canListenOnLocalhost = probeLocalhostListenCapability()
 const webServerSuite = canListenOnLocalhost ? describe : describe.skip
 const webServerSuiteTitle = canListenOnLocalhost
   ? "web server API"
   : "web server API (skipped: cannot bind localhost in this environment)"
 
+type ClosableServer = {
+  close: () => Promise<void>
+}
+
 webServerSuite(webServerSuiteTitle, () => {
-  const servers: StartedWebServer[] = []
+  const servers: ClosableServer[] = []
   const cleanupDirs: string[] = []
 
   afterEach(async () => {
@@ -377,6 +418,100 @@ webServerSuite(webServerSuiteTitle, () => {
     const downloadResponse = await fetch(`${baseUrl}${downloadPath}`)
     expect(downloadResponse.status).toBe(200)
     expect(downloadResponse.headers.get("content-disposition")).toMatch(/^attachment;/)
+  })
+
+  it("starts split API/PWA stack and proxies API requests through PWA port", async () => {
+    const { tempDir, dbPath, audioDir } = createTempPaths()
+    cleanupDirs.push(tempDir)
+
+    const stack = await startWebStack({
+      host: "127.0.0.1",
+      apiPort: 0,
+      pwaPort: 0,
+      dbPath,
+      migrationsDir: path.join(process.cwd(), "drizzle"),
+      webDistDir: path.join(process.cwd(), "apps", "web", "dist"),
+      audioDir,
+    })
+    servers.push(stack)
+
+    const apiBaseUrl = `http://${stack.api.host}:${stack.api.port}`
+    const pwaBaseUrl = `http://${stack.pwa.host}:${stack.pwa.port}`
+
+    const apiHealth = await fetch(`${apiBaseUrl}/api/health`).then((response) =>
+      readJson<{ ok: true }>(response),
+    )
+    expect(apiHealth).toEqual({ ok: true })
+
+    const pwaHealth = await fetch(`${pwaBaseUrl}/api/health`).then((response) =>
+      readJson<{ ok: true }>(response),
+    )
+    expect(pwaHealth).toEqual({ ok: true })
+
+    const root = await fetch(`${pwaBaseUrl}/`)
+    expect(root.status).toBe(200)
+    expect((root.headers.get("content-type") ?? "").includes("text/html")).toBe(true)
+  })
+
+  it("fails when API and PWA ports are equal", async () => {
+    const { tempDir, dbPath, audioDir } = createTempPaths()
+    cleanupDirs.push(tempDir)
+
+    await expect(
+      startWebStack({
+        host: "127.0.0.1",
+        apiPort: 4173,
+        pwaPort: 4173,
+        dbPath,
+        migrationsDir: path.join(process.cwd(), "drizzle"),
+        webDistDir: path.join(process.cwd(), "apps", "web", "dist"),
+        audioDir,
+      }),
+    ).rejects.toThrow("API and PWA ports must be different.")
+  })
+
+  it("fails with clear message when API port is already in use", async () => {
+    const { tempDir, dbPath, audioDir } = createTempPaths()
+    cleanupDirs.push(tempDir)
+
+    const blocker = await occupyPort("127.0.0.1")
+    try {
+      await expect(
+        startWebStack({
+          host: "127.0.0.1",
+          apiPort: blocker.port,
+          pwaPort: 0,
+          dbPath,
+          migrationsDir: path.join(process.cwd(), "drizzle"),
+          webDistDir: path.join(process.cwd(), "apps", "web", "dist"),
+          audioDir,
+        }),
+      ).rejects.toThrow(`API port ${blocker.port} on 127.0.0.1 is already in use.`)
+    } finally {
+      await blocker.close()
+    }
+  })
+
+  it("fails with clear message when PWA port is already in use", async () => {
+    const { tempDir, dbPath, audioDir } = createTempPaths()
+    cleanupDirs.push(tempDir)
+
+    const blocker = await occupyPort("127.0.0.1")
+    try {
+      await expect(
+        startWebStack({
+          host: "127.0.0.1",
+          apiPort: 0,
+          pwaPort: blocker.port,
+          dbPath,
+          migrationsDir: path.join(process.cwd(), "drizzle"),
+          webDistDir: path.join(process.cwd(), "apps", "web", "dist"),
+          audioDir,
+        }),
+      ).rejects.toThrow(`PWA port ${blocker.port} on 127.0.0.1 is already in use.`)
+    } finally {
+      await blocker.close()
+    }
   })
 
   it("returns thumbnail_url in list and item payloads", async () => {

@@ -1,6 +1,6 @@
 [1] In this sandbox, dependency installs can fail for two environment reasons: `pnpm install` may require `CI=true` in non-TTY mode, and external registry resolution (`registry.npmjs.org`) may be unavailable, which blocks lockfile/dependency updates.
 
-[1] In this sandbox, integration tests that bind a local HTTP listener (e.g., `startWebServer` on `127.0.0.1`) can fail with `listen EPERM`; validate those tests in a less restricted environment.
+[2] In this sandbox, integration tests that bind a local HTTP listener (e.g., `startWebServer` on `127.0.0.1`) can fail with `listen EPERM`; validate those tests in a less restricted environment.
 
 [0] If `pnpm add` fails with `ERR_PNPM_UNEXPECTED_STORE`, rerun with `--store-dir` pointing to the store path used by current `node_modules` (for this repo: `/Users/sergiishulga/Library/pnpm/store/v10`).
 

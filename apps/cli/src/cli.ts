@@ -25,7 +25,7 @@ import {
   resolveAudioDir,
   resolveDbPath,
 } from "../../../packages/core/src/lib/paths.js"
-import { startWebServer } from "../../../packages/web-server/src/index.js"
+import { startWebStack } from "../../../packages/web-server/src/index.js"
 
 const CLI_DIR = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_MIGRATIONS_DIR = resolveExistingPath([
@@ -39,9 +39,12 @@ const DEFAULT_WEB_DIST_DIR = resolveExistingPath([
   path.resolve(process.cwd(), "apps/web/dist"),
 ])
 const DEFAULT_WEB_HOST = process.env.STASH_WEB_HOST ?? "127.0.0.1"
-const DEFAULT_WEB_PORT = process.env.STASH_WEB_PORT
-  ? parsePositiveInt(process.env.STASH_WEB_PORT)
+const DEFAULT_API_PORT = process.env.STASH_API_PORT
+  ? parsePort(process.env.STASH_API_PORT)
   : 4173
+const DEFAULT_PWA_PORT = process.env.STASH_PWA_PORT
+  ? parsePort(process.env.STASH_PWA_PORT)
+  : 5173
 const DEFAULT_TTS_VOICE = "tts_models/en/vctk/vits|p241" // Coqui male voice
 
 type ItemStatus = "unread" | "read" | "archived"
@@ -200,6 +203,16 @@ function handleActionError(error: unknown, jsonMode: boolean): never {
 
   if (error instanceof CliError) {
     printError(error.message, jsonMode, error.code, error.exitCode)
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "EADDRINUSE"
+  ) {
+    const message = error instanceof Error ? error.message : "Address already in use."
+    printError(message, jsonMode, "VALIDATION_ERROR", 2)
   }
 
   const message = error instanceof Error ? error.message : "Unknown error"
@@ -395,7 +408,7 @@ Quick Reference:
   stash tts status <jobId> [--json]
   stash tts doctor [--json]
   stash jobs worker [--poll-ms <n>] [--once] [--json]
-  stash web [--host <host>] [--port <n>]
+  stash web [--host <host>] [--api-port <n>] [--pwa-port <n>]
   stash db migrate [--json] [--migrations-dir <path>]
   stash db doctor [--json] [--migrations-dir <path>] [--limit <n>]
 
@@ -1379,23 +1392,31 @@ jobsCommand
 
 program
   .command("web")
-  .description("Run local web frontend + REST API server")
-  .option("--host <host>", "Host to bind web server", DEFAULT_WEB_HOST)
-  .option("--port <n>", "Port to bind web server", parsePort, DEFAULT_WEB_PORT)
-  .action(async (options: { host: string; port: number }) => {
+  .description("Run local web frontend (PWA) + REST API servers")
+  .option("--host <host>", "Host to bind API and PWA servers", DEFAULT_WEB_HOST)
+  .option("--api-port <n>", "Port to bind API server", parsePort, DEFAULT_API_PORT)
+  .option("--pwa-port <n>", "Port to bind PWA server", parsePort, DEFAULT_PWA_PORT)
+  .action(async (options: { host: string; apiPort: number; pwaPort: number }) => {
     return runDbAction(false, async () => {
+      if (options.apiPort === options.pwaPort) {
+        throw new CliError("API and PWA ports must be different.", "VALIDATION_ERROR", 2)
+      }
+
       const dbPath = resolveDbPath(program.opts().dbPath as string)
       const migrationsDir = resolveMigrationsDir()
-      const web = await startWebServer({
+      const web = await startWebStack({
         host: options.host,
-        port: options.port,
+        apiPort: options.apiPort,
+        pwaPort: options.pwaPort,
         dbPath,
         migrationsDir,
         webDistDir: DEFAULT_WEB_DIST_DIR,
         audioDir: resolveAudioDir(process.env.STASH_AUDIO_DIR ?? DEFAULT_AUDIO_DIR),
       })
 
-      process.stdout.write(`stash web running on http://${web.host}:${web.port}\n`)
+      process.stdout.write(`stash web running\n`)
+      process.stdout.write(`API: http://${web.api.host}:${web.api.port}\n`)
+      process.stdout.write(`PWA: http://${web.pwa.host}:${web.pwa.port}\n`)
 
       await new Promise<void>((resolve) => {
         const stop = (): void => {

@@ -43,7 +43,7 @@ Current implementation status:
 
 - `apps/cli/src/cli.ts`: Main CLI command handlers (including `stash web`).
 - `apps/web/`: React web frontend (feature-centered structure).
-- `packages/web-server/`: Local REST API + static web serving.
+- `packages/web-server/`: Local REST API server + PWA static server with `/api/*` proxying to API.
 - `packages/core/`: Shared DB/domain logic used by CLI + web server.
 - `scripts/with-env.mjs`: Script wrapper to auto-load `.env` for local npm scripts.
 - `drizzle/`: SQL migration files.
@@ -78,6 +78,11 @@ pnpm install
 ```bash
 pnpm run web
 ```
+
+Web server defaults (overridable in `.env` or CLI flags):
+- `STASH_WEB_HOST=127.0.0.1`
+- `STASH_API_PORT=4173`
+- `STASH_PWA_PORT=5173`
 
 ## Database and Migrations
 
@@ -290,6 +295,9 @@ Updates should include:
 - `.db/` is git-ignored local runtime data for repository-local development.
 - Local npm scripts load `.env` using `dotenv` via `scripts/with-env.mjs`.
 - CLI DB path precedence remains: `--db-path` > `STASH_DB_PATH` > `~/.stash/stash.db`.
+- `stash web` now accepts `--host`, `--api-port`, `--pwa-port` (`--port` removed).
+- `stash web` runs split listeners (API + PWA) and fails fast on port conflicts or identical API/PWA ports.
+- Web dev (`apps/web` Vite) reads the same root `.env` port variables and uses strict port binding.
 - Async TTS defaults:
   - `stash tts <id>` enqueues and returns immediately.
   - `stash tts <id> --wait` waits for terminal status.

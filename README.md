@@ -16,13 +16,29 @@ pnpm run setup
 
 ## Web App (One Command)
 
-Run the local web frontend + API with a single command:
+Run the local PWA frontend + API with a single command:
 
 ```bash
 pnpm run web
 ```
 
-This script builds the TypeScript backend and React frontend, then starts `stash web` on `http://127.0.0.1:4173`.
+This script builds the TypeScript backend and React frontend, then starts:
+- API: `http://127.0.0.1:4173`
+- PWA: `http://127.0.0.1:5173`
+
+You can configure these via `.env`:
+
+```bash
+STASH_WEB_HOST=127.0.0.1
+STASH_API_PORT=4173
+STASH_PWA_PORT=5173
+```
+
+Or override at runtime:
+
+```bash
+stash web --host 127.0.0.1 --api-port 4173 --pwa-port 5173
+```
 
 If you see a `better-sqlite3` binding error on first run:
 
