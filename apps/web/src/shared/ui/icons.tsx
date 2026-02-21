@@ -82,3 +82,19 @@ export function TimeIcon(props: SvgIconProps): JSX.Element {
     </SvgIcon>
   )
 }
+
+export function PlayIcon(props: SvgIconProps): JSX.Element {
+  return (
+    <SvgIcon {...props}>
+      <path d="M8 5v14l11-7z" />
+    </SvgIcon>
+  )
+}
+
+export function PauseIcon(props: SvgIconProps): JSX.Element {
+  return (
+    <SvgIcon {...props}>
+      <path d="M6 5h5v14H6zm7 0h5v14h-5z" />
+    </SvgIcon>
+  )
+}

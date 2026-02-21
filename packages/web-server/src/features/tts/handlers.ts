@@ -140,11 +140,47 @@ export function handleGetAudioFile(context: RouteContext): void {
     throw new StashError("Audio file not found.", "NOT_FOUND", 3, 404)
   }
 
-  context.res.statusCode = 200
-  context.res.setHeader("content-type", fileName.endsWith(".wav") ? "audio/wav" : "audio/mpeg")
+  const stat = fs.statSync(filePath)
+  const totalSize = stat.size
+  const contentType = fileName.endsWith(".wav") ? "audio/wav" : "audio/mpeg"
+
+  context.res.setHeader("content-type", contentType)
+  context.res.setHeader("accept-ranges", "bytes")
   context.res.setHeader(
     "content-disposition",
     `${forceDownload ? "attachment" : "inline"}; filename="${fileName}"`,
   )
+
+  const range = context.req.headers.range
+  if (range) {
+    const match = /bytes=(\d*)-(\d*)/.exec(range)
+    if (!match) {
+      context.res.statusCode = 416
+      context.res.end()
+      return
+    }
+
+    const start = match[1] ? Number.parseInt(match[1], 10) : 0
+    const end = match[2] ? Number.parseInt(match[2], 10) : totalSize - 1
+
+    if (Number.isNaN(start) || Number.isNaN(end) || start > end || start >= totalSize) {
+      context.res.statusCode = 416
+      context.res.setHeader("content-range", `bytes */${totalSize}`)
+      context.res.end()
+      return
+    }
+
+    const clampedEnd = Math.min(end, totalSize - 1)
+    const chunkSize = clampedEnd - start + 1
+
+    context.res.statusCode = 206
+    context.res.setHeader("content-range", `bytes ${start}-${clampedEnd}/${totalSize}`)
+    context.res.setHeader("content-length", String(chunkSize))
+    fs.createReadStream(filePath, { start, end: clampedEnd }).pipe(context.res)
+    return
+  }
+
+  context.res.statusCode = 200
+  context.res.setHeader("content-length", String(totalSize))
   fs.createReadStream(filePath).pipe(context.res)
 }

@@ -13,18 +13,27 @@ import {
   useMediaQuery,
 } from "@mui/material"
 import { useTheme } from "@mui/material/styles"
-import type { JSX } from "react"
+import { Suspense, lazy, type JSX } from "react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
-import { ExtractButton, useExtract } from "../features/extract"
-import { InboxFilters, InboxList, useInbox } from "../features/inbox"
+import { useExtract } from "../features/extract"
+import { useInbox } from "../features/inbox"
 import type { InboxStatusFilter, InboxTagModeFilter, ListInboxItemsInput } from "../features/inbox/api/list-items"
-import { ItemDetail, useItem } from "../features/item"
-import { SaveForm, useSaveItem } from "../features/save"
-import { StatusToggle, useStatus } from "../features/status"
-import { TagEditor, useTags } from "../features/tags"
-import { TtsPanel, useTts } from "../features/tts"
+import { useItem } from "../features/item"
+import { useSaveItem } from "../features/save"
+import { useStatus } from "../features/status"
+import { useTags } from "../features/tags"
+import { useTts } from "../features/tts"
 import { AddIcon, InboxIcon, StatusIcon } from "../shared/ui/icons"
+
+const SaveForm = lazy(() => import("../features/save/ui/save-form").then((m) => ({ default: m.SaveForm })))
+const InboxFilters = lazy(() => import("../features/inbox/ui/inbox-filters").then((m) => ({ default: m.InboxFilters })))
+const InboxList = lazy(() => import("../features/inbox/ui/inbox-list").then((m) => ({ default: m.InboxList })))
+const ItemDetail = lazy(() => import("../features/item/ui/item-detail").then((m) => ({ default: m.ItemDetail })))
+const StatusToggle = lazy(() => import("../features/status/ui/status-toggle").then((m) => ({ default: m.StatusToggle })))
+const TagEditor = lazy(() => import("../features/tags/ui/tag-editor").then((m) => ({ default: m.TagEditor })))
+const ExtractButton = lazy(() => import("../features/extract/ui/extract-button").then((m) => ({ default: m.ExtractButton })))
+const TtsPanel = lazy(() => import("../features/tts/ui/tts-panel").then((m) => ({ default: m.TtsPanel })))
 
 export function AppShell(): JSX.Element {
   const theme = useTheme()
@@ -114,6 +123,16 @@ export function AppShell(): JSX.Element {
     setTagModeFilter("any")
   }
 
+  const lazyFallback = (
+    <Typography variant="body2" color="text.secondary">
+      Loading UI…
+    </Typography>
+  )
+
+  const inboxErrorMessage = error?.toLowerCase().includes("failed to fetch")
+    ? "Can’t reach the API right now. Make sure `stash web` is running and try again."
+    : error
+
   const handleSelectItem = (itemId: number): void => {
     setSelectedItemId(itemId)
     if (isMobile) {
@@ -125,7 +144,8 @@ export function AppShell(): JSX.Element {
     return (
       <Box sx={{ minHeight: "100vh", py: 1.25 }}>
         <Container maxWidth="sm" sx={{ px: 1.25 }}>
-          <Stack spacing={1.25}>
+          <Suspense fallback={lazyFallback}>
+            <Stack spacing={1.25}>
             <Paper sx={{ p: 1.5 }}>
               <Stack spacing={1.25}>
                 <Stack direction="row" alignItems="center" justifyContent="space-between">
@@ -199,10 +219,10 @@ export function AppShell(): JSX.Element {
                   Loading {loadingStatusLabel} items...
                 </Typography>
               ) : null}
-              {error ? (
-                <Typography variant="body2" color="error.main" role="status" sx={{ px: 1.5, py: 1.25 }}>
-                  {error}
-                </Typography>
+              {inboxErrorMessage ? (
+                <Alert severity="warning" variant="outlined" sx={{ mx: 1.5, my: 1.25 }}>
+                  {inboxErrorMessage}
+                </Alert>
               ) : null}
               <InboxList items={items} selectedItemId={selectedId} onSelect={handleSelectItem} />
             </Paper>
@@ -301,6 +321,7 @@ export function AppShell(): JSX.Element {
 
                     <TtsPanel
                       itemId={item.id}
+                      title={item.title ?? item.url}
                       loading={ttsState.loading}
                       error={ttsState.error}
                       job={ttsState.job}
@@ -321,6 +342,7 @@ export function AppShell(): JSX.Element {
               </Stack>
             </Drawer>
           </Stack>
+          </Suspense>
         </Container>
       </Box>
     )
@@ -334,7 +356,8 @@ export function AppShell(): JSX.Element {
       }}
     >
       <Container maxWidth="xl">
-        <Stack spacing={2.5}>
+        <Suspense fallback={lazyFallback}>
+          <Stack spacing={2.5}>
           <Paper sx={{ p: { xs: 2, md: 3 } }}>
             <Stack spacing={2}>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} justifyContent="space-between">
@@ -400,10 +423,10 @@ export function AppShell(): JSX.Element {
                       Loading {loadingStatusLabel} items...
                     </Typography>
                   ) : null}
-                  {error ? (
-                    <Typography variant="body2" color="error.main" role="status">
-                      {error}
-                    </Typography>
+                  {inboxErrorMessage ? (
+                    <Alert severity="warning" variant="outlined">
+                      {inboxErrorMessage}
+                    </Alert>
                   ) : null}
                   <InboxList items={items} selectedItemId={selectedId} onSelect={handleSelectItem} />
                 </Stack>
@@ -449,6 +472,7 @@ export function AppShell(): JSX.Element {
 
                         <TtsPanel
                           itemId={item.id}
+                          title={item.title ?? item.url}
                           loading={ttsState.loading}
                           error={ttsState.error}
                           job={ttsState.job}
@@ -471,7 +495,8 @@ export function AppShell(): JSX.Element {
               </Paper>
             </Box>
           </Box>
-        </Stack>
+          </Stack>
+        </Suspense>
       </Container>
     </Box>
   )
