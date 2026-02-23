@@ -39,3 +39,5 @@
 [0] In sandboxed tests, default `~/.stash/audio` can be unwritable; set `STASH_AUDIO_DIR` to a temp path for worker-based TTS tests/commands.
 [0] Coqui CLI variants differ: some support `--text_file`, others only `--text`. Keep provider invocation backward compatible by retrying with inline `--text` when `--text_file`/`--progress_bar` is rejected.
 [0] CLI integration tests execute `dist/apps/cli/src/cli.js`; always run `pnpm run build` after source edits and before targeted integration runs, otherwise tests can fail against stale command behavior.
+[0] With VS Code `node-terminal` launch running `pnpm run dev -- web`, the debugger UI can show wrapper-process disconnect messages (`Debugger attached` / `Waiting for the debugger to disconnect...`) even while the actual `stash web` child process is still running; verify via `/api/health` and use an attach config for breakpoints in the real process.
+[0] `scripts/with-env.mjs` should forward `SIGINT`/`SIGTERM`/`SIGHUP` to its spawned child; otherwise VS Code stop/terminate can kill the wrapper and orphan long-running child processes (e.g., `stash web`) on their ports.

@@ -19,22 +19,38 @@ This document is the user-facing reference for the current `stash` feature set.
 ## Install and Run
 
 Requirements:
-- Node.js >= 20
+- Node.js 22.x (see `.nvmrc`)
 - `pnpm`
 
 Install:
 
 ```bash
+nvm use
 pnpm install
 cp .env.example .env
 pnpm run setup
 ```
 
-If native SQLite bindings are missing:
+Optional (recommended once per machine) to honor the pinned `pnpm` version from `packageManager`:
 
 ```bash
+corepack enable
+```
+
+If native SQLite bindings are missing, or you switched Node versions and hit a `NODE_MODULE_VERSION` mismatch:
+
+```bash
+nvm use
 pnpm approve-builds
 pnpm rebuild better-sqlite3
+pnpm run setup
+```
+
+If rebuild still fails, reinstall dependencies under the active Node 22 runtime:
+
+```bash
+nvm use
+pnpm install
 pnpm run setup
 ```
 
@@ -109,8 +125,11 @@ Implementation note:
 Recommended setup:
 
 ```bash
+nvm use
 cp .env.example .env
 ```
+
+Use `nvm use` before running local scripts (especially after switching Node versions) so native modules match the active runtime. `.node-version` is included for compatibility with other version managers/tools.
 
 Default in `.env.example`:
 

@@ -30,7 +30,7 @@
     "db:doctor": "node scripts/with-env.mjs node dist/apps/cli/src/cli.js db doctor"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22 <23"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",

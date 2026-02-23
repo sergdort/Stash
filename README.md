@@ -8,10 +8,19 @@ Local-first Pocket-like CLI built with TypeScript and SQLite.
 
 ## Setup
 
+Node 22.x is required for local development (see `.nvmrc`).
+
 ```bash
+nvm use
 pnpm install
 cp .env.example .env
 pnpm run setup
+```
+
+Optional (recommended once per machine) to honor the pinned `pnpm` version from `packageManager`:
+
+```bash
+corepack enable
 ```
 
 ## Web App (One Command)
@@ -45,11 +54,20 @@ Or override at runtime:
 stash web --host 127.0.0.1 --api-port 4173 --pwa-port 5173
 ```
 
-If you see a `better-sqlite3` binding error on first run:
+If you see a `better-sqlite3` binding error on first run, or after switching Node versions:
 
 ```bash
+nvm use
 pnpm approve-builds
 pnpm rebuild better-sqlite3
+pnpm run setup
+```
+
+If `pnpm rebuild better-sqlite3` does not fix it, reinstall dependencies under the active Node 22 runtime:
+
+```bash
+nvm use
+pnpm install
 pnpm run setup
 ```
 
@@ -72,6 +90,7 @@ pnpm run lint:fix
 
 - Install the `Biome` extension (`biomejs.biome`).
 - This workspace is configured for auto-fix on save (format + fix-all + organize imports).
+- After switching Node versions, run `nvm use` in the integrated terminal before using debug/dev commands so native modules (for example `better-sqlite3`) match the active runtime.
 - Use CLI checks to verify parity:
   - `pnpm run lint`
   - `pnpm run format:check`

@@ -23,7 +23,7 @@ Current implementation status:
 
 ## Stack
 
-- Node.js (>= 20)
+- Node.js 22.x (see `.nvmrc`; `.node-version` is included for tool compatibility)
 - TypeScript
 - Commander (CLI framework)
 - SQLite via `better-sqlite3`
@@ -54,29 +54,35 @@ Current implementation status:
 
 ## Setup
 
-1. Install dependencies:
+1. Select the repo Node version (Node 22):
+```bash
+nvm use
+```
+
+2. Install dependencies:
 ```bash
 pnpm install
 ```
 
-2. Create local env file:
+3. Create local env file:
 ```bash
 cp .env.example .env
 ```
 
-3. Bootstrap:
+4. Bootstrap:
 ```bash
 pnpm run setup
 ```
 
-4. If SQLite native binding errors appear (`Could not locate the bindings file`), allow native builds and reinstall:
+5. If SQLite native binding errors appear (`Could not locate the bindings file`) or you recently switched Node versions (ABI mismatch), allow native builds and rebuild/reinstall after `nvm use`:
 ```bash
+nvm use
 pnpm approve-builds
 pnpm rebuild better-sqlite3
 pnpm install
 ```
 
-5. Run the local web app (single command):
+6. Run the local web app (single command):
 ```bash
 pnpm run web
 ```
