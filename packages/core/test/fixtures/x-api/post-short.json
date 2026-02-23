@@ -1,0 +1,18 @@
+{
+  "data": {
+    "id": "1111111111111111111",
+    "text": "Short X post with image attachment",
+    "attachments": {
+      "media_keys": ["3_short_photo"]
+    }
+  },
+  "includes": {
+    "media": [
+      {
+        "media_key": "3_short_photo",
+        "type": "photo",
+        "url": "https://pbs.twimg.com/media/short-photo.jpg"
+      }
+    ]
+  }
+}

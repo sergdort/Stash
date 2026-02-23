@@ -19,6 +19,7 @@ export function useSaveItem(): {
       await saveItem(payload)
     } catch (error) {
       setError(error instanceof Error ? error.message : "Failed to save item")
+      throw error
     } finally {
       setSaving(false)
     }

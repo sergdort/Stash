@@ -98,3 +98,11 @@ export function PauseIcon(props: SvgIconProps): JSX.Element {
     </SvgIcon>
   )
 }
+
+export function ChevronLeftIcon(props: SvgIconProps): JSX.Element {
+  return (
+    <SvgIcon {...props}>
+      <path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+    </SvgIcon>
+  )
+}

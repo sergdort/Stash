@@ -1,0 +1,21 @@
+{
+  "data": {
+    "id": "2222222222222222222",
+    "text": "Teaser post text that should not win over note_tweet",
+    "note_tweet": {
+      "text": "Long form X post line one.\r\n\r\nLong form X post line two."
+    },
+    "attachments": {
+      "media_keys": ["3_note_photo"]
+    }
+  },
+  "includes": {
+    "media": [
+      {
+        "media_key": "3_note_photo",
+        "type": "photo",
+        "url": "https://pbs.twimg.com/media/note-photo.jpg"
+      }
+    ]
+  }
+}

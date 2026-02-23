@@ -17,6 +17,7 @@ Current implementation status:
 - Implemented: automatic migration application for normal data commands.
 - Implemented: content extraction on save using Mozilla Readability (stores in `notes` table).
 - Implemented: thumbnail extraction (metadata-first with content-image fallback) persisted on `items.thumbnail_url`.
+- Implemented: API-assisted extraction for public X/Twitter status URLs via optional `STASH_X_BEARER_TOKEN` (normal posts + `note_tweet`, X Articles when API body text is present).
 - Implemented: `extract` command to extract or re-extract content for existing items.
 - Not implemented yet: `archive`, `delete`, `open`, search command.
 
@@ -30,6 +31,7 @@ Current implementation status:
 - Drizzle ORM + Drizzle Kit (schema/migrations)
 - Package manager: `pnpm`
 - Content extraction: Mozilla Readability + linkedom
+- X/Twitter extraction: optional X API post lookup for public `status/<id>` URLs (`STASH_X_BEARER_TOKEN`)
 - TTS provider (default): Coqui TTS (Python 3.11 + espeak-ng)
 - Default Coqui voice: `tts_models/en/vctk/vits|p241`
 - CLI discovery standardized across providers: PATH first, optional env overrides (`STASH_GTTS_CLI`, `STASH_COQUI_TTS_CLI`, `STASH_FFMPEG_CLI`, `STASH_SAY_CLI`, `STASH_AFCONVERT_CLI`, `STASH_ESPEAK_CLI`)
@@ -120,6 +122,8 @@ When saving URLs, stash automatically:
 - Stores the text in the `notes` table
 - Extracts a thumbnail URL (`og:image`/`twitter:image` first, article image fallback) into `items.thumbnail_url`
 - Updates the item title if extraction finds a better one
+- For public X/Twitter status URLs, uses X API extraction when `STASH_X_BEARER_TOKEN` is configured (no JS rendering/browser automation in phase 1)
+- X extraction is single-status only (no thread/conversation expansion) and may skip extraction if token/content is unavailable while still allowing `save` to succeed
 
 To skip extraction (for faster saves or non-article URLs):
 ```bash
@@ -298,6 +302,8 @@ Updates should include:
 - `stash web` now accepts `--host`, `--api-port`, `--pwa-port` (`--port` removed).
 - `stash web` runs split listeners (API + PWA) and fails fast on port conflicts or identical API/PWA ports.
 - Web dev (`apps/web` Vite) reads the same root `.env` port variables and uses strict port binding.
+- Web UI is PWA-first only (single-column layout across viewport sizes); desktop dashboard split-pane mode was removed.
+- PWA navigation is route-based screen flow: `/` (inbox), `/save`, `/item/:id`.
 - Async TTS defaults:
   - `stash tts <id>` enqueues and returns immediately.
   - `stash tts <id> --wait` waits for terminal status.
@@ -310,6 +316,7 @@ Updates should include:
 - `GET /api/tts-jobs/:id` and `GET /api/items/:id/tts-jobs` expose job status/history for polling/recovery.
 - `tts` auto-generated filenames use friendly slugs + timestamp + short random suffix and collision fallback (`_2`, `_3`, ...).
 - Vitest sets `STASH_TTS_MOCK_BASE64` in `test/vitest.setup.ts` for deterministic TTS tests; default `pnpm test` does not require local Coqui/espeak binaries.
+- `extractContent()` routes supported X/Twitter `status/<id>` URLs to an API-first extractor and does not fall back to Readability for those URLs when X extraction fails (strict no-partial-text behavior).
 
 ## Near-Term Roadmap
 

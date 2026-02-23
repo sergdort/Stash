@@ -7,6 +7,7 @@ This document is the user-facing reference for the current `stash` feature set.
 ## Current Feature Set
 
 - Save links with automatic content + thumbnail extraction
+- Optional API-assisted extraction for public X/Twitter status URLs (`STASH_X_BEARER_TOKEN`)
 - List links with status and tag filters
 - List available tags with counts
 - Add/remove tags on an item
@@ -117,6 +118,12 @@ Default in `.env.example`:
 STASH_DB_PATH=.db/stash.db
 ```
 
+Optional X extraction support:
+
+```bash
+STASH_X_BEARER_TOKEN=your_x_api_bearer_token
+```
+
 Path precedence remains:
 1. `--db-path <path>`
 2. `STASH_DB_PATH`
@@ -169,6 +176,8 @@ Notes:
 - API and PWA ports must be different.
 - Port conflicts fail fast (no automatic next-port fallback).
 - The PWA server proxies `/api/*` to the configured API server.
+- The UI is PWA-first only (single-column across viewport sizes; no separate desktop dashboard mode).
+- Core screen routes are `/` (inbox), `/save`, and `/item/:id`.
 
 Web UI stack:
 - React + Vite
@@ -192,6 +201,9 @@ Behavior:
 - Re-saving same URL is idempotent (`created: false`)
 - Tags are normalized (`trim + lowercase`)
 - Content is automatically extracted using Mozilla Readability (unless `--no-extract`)
+- Public X/Twitter status URLs (`x.com/.../status/<id>`, `twitter.com/.../status/<id>`) use X API extraction when `STASH_X_BEARER_TOKEN` is set (no browser automation required)
+- X extraction scope is public content only and single bookmarked status only (no thread/conversation expansion)
+- If X extraction is unavailable (missing token, unsupported payload, private/deleted/rate-limited content), `save` still succeeds and extraction is skipped
 - Thumbnail metadata is extracted and persisted to `items.thumbnail_url` (`og:image`/`twitter:image` first, article-image fallback)
 - Extracted title updates the item if no `--title` provided
 - Extracted text is stored in the `notes` table for future search/TTS features
@@ -265,10 +277,12 @@ stash extract <id> [--force] [--json]
 
 Behavior:
 - Fetches the URL and extracts readable content using Mozilla Readability
+- Uses X API extraction for supported public X/Twitter status URLs when `STASH_X_BEARER_TOKEN` is configured
 - Stores extracted text in the `notes` table
 - Persists extracted thumbnail metadata to `items.thumbnail_url`
 - Updates item title if extraction finds one and item has no title
 - Use `--force` to re-extract even if content already exists
+- X extraction remains public-only and single-status only (no thread expansion)
 - Useful for:
   - Backfilling items missing extracted text/thumbnail metadata (`stash extract <id> --force`)
   - Retrying failed extractions

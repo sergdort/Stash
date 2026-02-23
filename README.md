@@ -26,6 +26,11 @@ This script builds the TypeScript backend and React frontend, then starts:
 - API: `http://127.0.0.1:4173`
 - PWA: `http://127.0.0.1:5173`
 
+The web UI is PWA-first only (no separate desktop dashboard layout). Core screens use route-based navigation:
+- `/` inbox
+- `/save` save form
+- `/item/:id` item details + actions
+
 You can configure these via `.env`:
 
 ```bash
@@ -125,11 +130,12 @@ stash db doctor --json
 ## Features
 
 - Save URLs with automatic content + thumbnail extraction
+- Optional API-assisted extraction for public X/Twitter status URLs (`STASH_X_BEARER_TOKEN`)
 - Extract or re-extract content for existing items
 - Organize with tags
 - Mark items as read/unread
 - Generate TTS audio from extracted article content
-- Play previously generated TTS audio in the web UI
+- Play previously generated TTS audio in the PWA UI
 - Machine-friendly JSON output
 - Local SQLite storage
 
@@ -152,6 +158,19 @@ stash tts 1 --wait --json
 stash tts status 12 --json
 stash tts doctor --json
 stash jobs worker --once --json
+```
+
+## X / Twitter Extraction (Optional)
+
+- `stash` can extract public X/Twitter status URLs (`x.com/.../status/<id>` or `twitter.com/.../status/<id>`) via the X API when `STASH_X_BEARER_TOKEN` is configured.
+- This improves reliability for normal posts plus long-form X content (`note_tweet` / X Articles when full article body text is available in the API response).
+- Scope is public content only and single bookmarked status only (no thread/conversation expansion in phase 1).
+- If the token is missing or X content cannot be fetched reliably, `stash save` still succeeds and extraction is skipped (`has_extracted_content` remains `false` until a later successful extract).
+
+Example `.env` entry:
+
+```bash
+STASH_X_BEARER_TOKEN=your_x_api_bearer_token
 ```
 
 ## TTS Export
