@@ -17,6 +17,7 @@ Current implementation status:
 - Implemented: automatic migration application for normal data commands.
 - Implemented: content extraction on save using Mozilla Readability (stores in `notes` table).
 - Implemented: thumbnail extraction (metadata-first with content-image fallback) persisted on `items.thumbnail_url`.
+- Implemented: automatic X/Twitter `status/<id>` extraction via Playwright Chromium rendered DOM (public-only, single-status only, no generic fallback for X URLs).
 - Implemented: `extract` command to extract or re-extract content for existing items.
 - Not implemented yet: `archive`, `delete`, `open`, search command.
 
@@ -30,6 +31,7 @@ Current implementation status:
 - Drizzle ORM + Drizzle Kit (schema/migrations)
 - Package manager: `pnpm`
 - Content extraction: Mozilla Readability + linkedom
+- X/Twitter extraction: Playwright Chromium (headless browser) for public `status/<id>` URLs
 - TTS provider (default): Coqui TTS (Python 3.11 + espeak-ng)
 - Default Coqui voice: `tts_models/en/vctk/vits|p241`
 - CLI discovery standardized across providers: PATH first, optional env overrides (`STASH_GTTS_CLI`, `STASH_COQUI_TTS_CLI`, `STASH_FFMPEG_CLI`, `STASH_SAY_CLI`, `STASH_AFCONVERT_CLI`, `STASH_ESPEAK_CLI`)
@@ -85,6 +87,13 @@ pnpm install
 pnpm run web
 ```
 
+`pnpm run setup` also installs Playwright Chromium for X/Twitter `status/<id>` extraction.
+
+Manual recovery (for browser cache cleanup or Playwright updates):
+```bash
+pnpm exec playwright install chromium
+```
+
 Web server defaults (overridable in `.env` or CLI flags):
 - `STASH_WEB_HOST=127.0.0.1`
 - `STASH_API_PORT=4173`
@@ -126,6 +135,8 @@ When saving URLs, stash automatically:
 - Stores the text in the `notes` table
 - Extracts a thumbnail URL (`og:image`/`twitter:image` first, article image fallback) into `items.thumbnail_url`
 - Updates the item title if extraction finds a better one
+- For public X/Twitter `status/<id>` URLs, renders the page in Playwright Chromium and extracts from the rendered DOM
+- X extraction is public-only, single-status only, and does not fall back to generic Readability on failure (strict no-partial-text behavior)
 
 To skip extraction (for faster saves or non-article URLs):
 ```bash
@@ -296,6 +307,7 @@ Updates should include:
 
 - The CLI strips a standalone `--` separator in argv parsing to keep `pnpm run <script> -- --json` working.
 - `setup` builds and runs migrations for first-run convenience.
+- `setup` also installs Playwright Chromium (`pnpm exec playwright install chromium`) so X/Twitter headless extraction works after bootstrap.
 - Normal data commands auto-run pending migrations.
 - `.env` is git-ignored; `.env.example` is committed as the local template.
 - `.db/` is git-ignored local runtime data for repository-local development.
@@ -316,6 +328,7 @@ Updates should include:
 - `GET /api/tts-jobs/:id` and `GET /api/items/:id/tts-jobs` expose job status/history for polling/recovery.
 - `tts` auto-generated filenames use friendly slugs + timestamp + short random suffix and collision fallback (`_2`, `_3`, ...).
 - Vitest sets `STASH_TTS_MOCK_BASE64` in `test/vitest.setup.ts` for deterministic TTS tests; default `pnpm test` does not require local Coqui/espeak binaries.
+- `extractContent()` routes supported X/Twitter `status/<id>` URLs to a Playwright-based renderer/parser and may throw typed extraction errors (dependency/launch/timeout/render-blocked) so CLI/API layers can surface actionable diagnostics while preserving `EXTRACTION_FAILED`.
 
 ## Near-Term Roadmap
 

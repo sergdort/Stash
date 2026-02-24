@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+  <head>
+    <meta property="og:image" content="https://abs.twimg.com/rweb/ssr/default/v2/og/image.png">
+    <meta property="og:title" content="Alex Finn on X: &quot;Teaser post text only.&quot; / X">
+  </head>
+  <body>
+    <noscript>
+      <div class="errorContainer">
+        <h1>JavaScript is not available.</h1>
+      </div>
+    </noscript>
+    <main>
+      <div data-testid="primaryColumn">
+        <article data-testid="tweet">
+          <div data-testid="Tweet-User-Avatar">
+            <img src="https://pbs.twimg.com/profile_images/123/avatar_normal.jpg" alt="">
+          </div>
+          <div data-testid="twitterArticleReadView">
+            <div data-testid="tweetPhoto">
+              <img
+                src="https://pbs.twimg.com/media/article-cover?format=jpg&amp;name=small"
+                alt="cover"
+              >
+            </div>
+            <div data-testid="twitter-article-title">
+              <span>Your OpenClaw is useless without a Mission Control. Here's how to set it up</span>
+            </div>
+            <div data-testid="twitterArticleRichTextView">
+              <div data-testid="longformRichTextComponent">
+                <div class="longform-unstyled">
+                  <span data-text="true">This is the first paragraph of the rendered X article body.</span>
+                </div>
+                <div class="longform-unstyled">
+                  <span data-text="true">It is rendered client-side but still appears in page.content() after Playwright executes scripts.</span>
+                </div>
+                <div class="longform-blockquote">
+                  <span data-text="true">The extractor should read longform blocks instead of assuming JavaScript was disabled.</span>
+                </div>
+                <div class="longform-unstyled">
+                  <span data-text="true">This final paragraph is long enough to push the article-like threshold over the limit used by the parser and tests.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div data-testid="tweetText" lang="en">Teaser post text only.</div>
+        </article>
+      </div>
+    </main>
+  </body>
+</html>

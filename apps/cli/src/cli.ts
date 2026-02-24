@@ -19,6 +19,7 @@ import {
   waitForTtsJob,
 } from "../../../packages/core/src/features/tts/jobs.js"
 import { extractContent } from "../../../packages/core/src/lib/extract.js"
+import { isContentExtractionError } from "../../../packages/core/src/lib/extract-x-browser.js"
 import {
   DEFAULT_AUDIO_DIR,
   DEFAULT_DB_PATH,
@@ -880,7 +881,15 @@ program
         try {
           extracted = await extractContent(item.url)
         } catch (error) {
-          extractionError = error instanceof Error ? error.message : String(error)
+          if (isContentExtractionError(error)) {
+            const message = error.message
+            if (jsonMode) {
+              process.stderr.write(`${message}\n`)
+            }
+            extractionError = message
+          } else {
+            extractionError = error instanceof Error ? error.message : String(error)
+          }
         }
 
         if (!extracted || !extracted.textContent) {

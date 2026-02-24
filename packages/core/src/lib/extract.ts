@@ -1,5 +1,6 @@
 import { Readability } from "@mozilla/readability"
 import { parseHTML } from "linkedom"
+import { extractXContentFromUrl, parseXStatusUrl } from "./extract-x-browser.js"
 
 export interface ExtractedContent {
   title?: string
@@ -98,6 +99,10 @@ function extractThumbnailFromArticleContent(
 }
 
 export async function extractContent(url: string): Promise<ExtractedContent | null> {
+  if (parseXStatusUrl(url)) {
+    return await extractXContentFromUrl(url)
+  }
+
   try {
     // Fetch the HTML
     const response = await fetch(url, {

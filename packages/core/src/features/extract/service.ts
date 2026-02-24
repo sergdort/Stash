@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm"
 import * as schema from "../../db/schema.js"
 import { StashError } from "../../errors.js"
 import { extractContent } from "../../lib/extract.js"
+import { isContentExtractionError } from "../../lib/extract-x-browser.js"
 import type { ExtractItemResult, OperationContext } from "../../types.js"
 import { getItemRowById, withReadyDbAsync } from "../common/db.js"
 
@@ -27,7 +28,16 @@ export async function extractItem(
       )
     }
 
-    const extracted = await extractContent(item.url)
+    let extracted = null
+    try {
+      extracted = await extractContent(item.url)
+    } catch (error) {
+      if (isContentExtractionError(error)) {
+        throw new StashError(error.message, "EXTRACTION_FAILED", 1, 500)
+      }
+      throw error
+    }
+
     if (!extracted?.textContent) {
       throw new StashError("Failed to extract content", "EXTRACTION_FAILED", 1, 500)
     }

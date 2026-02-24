@@ -23,6 +23,14 @@ Optional (recommended once per machine) to honor the pinned `pnpm` version from 
 corepack enable
 ```
 
+`pnpm run setup` now also installs Playwright Chromium for X/Twitter `status/<id>` extraction support.
+
+If you need to re-download the browser later (for example after Playwright updates or cache cleanup), run:
+
+```bash
+pnpm exec playwright install chromium
+```
+
 ## Web App (One Command)
 
 Run the local PWA frontend + API with a single command:
@@ -144,6 +152,7 @@ stash db doctor --json
 ## Features
 
 - Save URLs with automatic content + thumbnail extraction
+- Public X/Twitter `status/<id>` extraction via Playwright Chromium (headless, public-only)
 - Extract or re-extract content for existing items
 - Organize with tags
 - Mark items as read/unread
@@ -171,6 +180,27 @@ stash tts 1 --wait --json
 stash tts status 12 --json
 stash tts doctor --json
 stash jobs worker --once --json
+```
+
+## X / Twitter Extraction (Headless Browser)
+
+- `stash` automatically uses a Playwright Chromium-based extractor for public X/Twitter status URLs (`x.com/.../status/<id>` and `twitter.com/.../status/<id>`).
+- The extractor renders the page in a headless browser and parses the rendered DOM for post/article text and thumbnail metadata.
+- Scope is public content only and single bookmarked status only (no thread/conversation expansion in phase 1).
+- X URLs do not fall back to the generic non-JS extractor to avoid storing partial/truncated content.
+- If X extraction fails (missing Playwright/Chromium, timeout, layout changes, blocked page), `stash save` still succeeds and skips extraction.
+- `stash extract <id>` returns `EXTRACTION_FAILED` and surfaces an actionable setup/rendering error message.
+
+Setup:
+
+```bash
+pnpm exec playwright install chromium
+```
+
+Linux note (if system deps are missing):
+
+```bash
+pnpm exec playwright install-deps chromium
 ```
 
 ## TTS Export

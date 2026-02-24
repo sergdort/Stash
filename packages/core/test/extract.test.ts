@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { extractContent } from "../src/lib/extract.js"
+import { __setPlaywrightLoaderForTests } from "../src/lib/extract-x-browser.js"
 
 const originalFetch = globalThis.fetch
 const LONG_PARAGRAPH =
@@ -22,6 +23,7 @@ function buildReadableBody(extra = ""): string {
 
 afterEach(() => {
   globalThis.fetch = originalFetch
+  __setPlaywrightLoaderForTests(null)
   vi.restoreAllMocks()
 })
 
@@ -88,5 +90,60 @@ describe("extractContent thumbnail extraction", () => {
 
     const result = await extractContent("https://example.com/post")
     expect(result?.thumbnailUrl).toBeUndefined()
+  })
+})
+
+describe("extractContent X routing", () => {
+  it("routes X status URLs to the browser extractor path", async () => {
+    const fetchMock = vi.fn(async () => new Response("should not fetch", { status: 200 }))
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    __setPlaywrightLoaderForTests(async () => ({
+      chromium: {
+        launch: async () => ({
+          newContext: async () => ({
+            newPage: async () => ({
+              goto: async () => {},
+              waitForSelector: async () => ({}),
+              content: async () =>
+                '<main><div data-testid="primaryColumn"><article><div data-testid="tweetText" lang="en">Hello from rendered X</div></article></div></main>',
+              close: async () => {},
+            }),
+            close: async () => {},
+          }),
+          close: async () => {},
+        }),
+      },
+    }))
+
+    const result = await extractContent("https://x.com/example/status/123")
+
+    expect(result?.textContent).toBe("Hello from rendered X")
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("keeps non-X URLs on the Readability HTML extraction path", async () => {
+    const fetchMock = vi.fn(async () => new Response(buildHtml("", buildReadableBody()), { status: 200 }))
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    const result = await extractContent("https://example.com/story")
+
+    expect(result?.textContent).toContain("Industrial software is evolving quickly")
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(String(fetchMock.mock.calls.at(0)?.at(0) ?? "")).toBe("https://example.com/story")
+  })
+
+  it("does not fall back to generic Readability when X browser extraction fails", async () => {
+    const fetchMock = vi.fn(async () => new Response(buildHtml("", buildReadableBody()), { status: 200 }))
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    __setPlaywrightLoaderForTests(async () => {
+      throw new Error("Cannot find package 'playwright'")
+    })
+
+    await expect(extractContent("https://x.com/example/status/123")).rejects.toMatchObject({
+      code: "X_BROWSER_DEPENDENCY_MISSING",
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

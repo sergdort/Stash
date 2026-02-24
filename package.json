@@ -8,7 +8,7 @@
     "stash": "dist/apps/cli/src/cli.js"
   },
   "scripts": {
-    "setup": "pnpm run build && node scripts/with-env.mjs node dist/apps/cli/src/cli.js db migrate --json",
+    "setup": "pnpm run build && pnpm exec playwright install chromium && node scripts/with-env.mjs node dist/apps/cli/src/cli.js db migrate --json",
     "build": "tsc -p tsconfig.json",
     "check": "pnpm run lint && pnpm run format:check && pnpm run build",
     "dev": "node scripts/with-env.mjs tsx apps/cli/src/cli.ts",
@@ -38,7 +38,8 @@
     "commander": "^13.1.0",
     "dotenv": "^17.3.1",
     "drizzle-orm": "^0.39.3",
-    "linkedom": "^0.18.12"
+    "linkedom": "^0.18.12",
+    "playwright": "^1.49.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.0",

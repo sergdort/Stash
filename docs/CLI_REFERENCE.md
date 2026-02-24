@@ -7,6 +7,7 @@ This document is the user-facing reference for the current `stash` feature set.
 ## Current Feature Set
 
 - Save links with automatic content + thumbnail extraction
+- Public X/Twitter `status/<id>` extraction via Playwright Chromium (headless, public-only)
 - List links with status and tag filters
 - List available tags with counts
 - Add/remove tags on an item
@@ -34,6 +35,14 @@ Optional (recommended once per machine) to honor the pinned `pnpm` version from 
 
 ```bash
 corepack enable
+```
+
+`pnpm run setup` now also installs Playwright Chromium for X/Twitter `status/<id>` extraction support.
+
+If you need to re-download the browser later (for example after Playwright updates or cache cleanup), run:
+
+```bash
+pnpm exec playwright install chromium
 ```
 
 If native SQLite bindings are missing, or you switched Node versions and hit a `NODE_MODULE_VERSION` mismatch:
@@ -211,6 +220,10 @@ Behavior:
 - Re-saving same URL is idempotent (`created: false`)
 - Tags are normalized (`trim + lowercase`)
 - Content is automatically extracted using Mozilla Readability (unless `--no-extract`)
+- Public X/Twitter `status/<id>` URLs (`x.com/.../status/<id>`, `twitter.com/.../status/<id>`) are rendered in Playwright Chromium and extracted from the rendered DOM
+- X extraction is public-only and single-status only (no thread/conversation expansion in phase 1)
+- X URLs do not fall back to the generic non-JS extractor (strict no-partial-text behavior)
+- If X rendering/extraction fails (missing Playwright/Chromium, timeout, layout changes, blocked page), `save` still succeeds and extraction is skipped
 - Thumbnail metadata is extracted and persisted to `items.thumbnail_url` (`og:image`/`twitter:image` first, article-image fallback)
 - Extracted title updates the item if no `--title` provided
 - Extracted text is stored in the `notes` table for future search/TTS features
@@ -284,10 +297,13 @@ stash extract <id> [--force] [--json]
 
 Behavior:
 - Fetches the URL and extracts readable content using Mozilla Readability
+- Uses Playwright Chromium rendered-DOM extraction for supported public X/Twitter `status/<id>` URLs
 - Stores extracted text in the `notes` table
 - Persists extracted thumbnail metadata to `items.thumbnail_url`
 - Updates item title if extraction finds one and item has no title
 - Use `--force` to re-extract even if content already exists
+- X extraction remains public-only and single-status only (no thread/conversation expansion)
+- `stash extract` surfaces actionable setup/rendering diagnostics for X browser extraction failures while preserving `EXTRACTION_FAILED`
 - Useful for:
   - Backfilling items missing extracted text/thumbnail metadata (`stash extract <id> --force`)
   - Retrying failed extractions
@@ -298,6 +314,18 @@ Error codes:
 - `NOT_FOUND` (3): Item ID doesn't exist
 - `CONTENT_EXISTS` (4): Content already extracted (use `--force`)
 - `EXTRACTION_FAILED` (1): Unable to extract readable content
+
+X browser extractor setup:
+
+```bash
+pnpm exec playwright install chromium
+```
+
+Linux (if Chromium system dependencies are missing):
+
+```bash
+pnpm exec playwright install-deps chromium
+```
 
 ## TTS Export
 

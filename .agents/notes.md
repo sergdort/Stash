@@ -10,7 +10,7 @@
 
 [0] When adding features or changing CLI behavior, always update three files: `AGENTS.md`, `README.md`, and `docs/CLI_REFERENCE.md`. This keeps all documentation in sync and helps future developers (including AI agents) understand the current state.
 
-[0] X Articles (long-form content on X/Twitter) cannot be extracted because they require JavaScript execution to render. The content is not in the initial HTML response. Sites that require JS rendering will need either headless browser integration or should be saved with --no-extract.
+[1] X/Twitter `status/<id>` pages often require JavaScript-rendered DOM extraction. A headless Playwright path can work without X API credits, but keep strict no-fallback behavior for X URLs and avoid over-aggressive title cleanup (e.g. stripping a meaningful `on X` phrase from article titles).
 
 [0] In Commander async actions, wrapping logic in a synchronous try/catch helper is not enough; promise rejections bypass that catch unless the helper also handles Promise returns (`result instanceof Promise ? result.catch(...) : result`).
 
@@ -39,3 +39,4 @@
 [0] CLI integration tests execute `dist/apps/cli/src/cli.js`; always run `pnpm run build` after source edits and before targeted integration runs, otherwise tests can fail against stale command behavior.
 [0] With VS Code `node-terminal` launch running `pnpm run dev -- web`, the debugger UI can show wrapper-process disconnect messages (`Debugger attached` / `Waiting for the debugger to disconnect...`) even while the actual `stash web` child process is still running; verify via `/api/health` and use an attach config for breakpoints in the real process.
 [0] `scripts/with-env.mjs` should forward `SIGINT`/`SIGTERM`/`SIGHUP` to its spawned child; otherwise VS Code stop/terminate can kill the wrapper and orphan long-running child processes (e.g., `stash web`) on their ports.
+[0] For X/Twitter pages, `page.content()` can include the `<noscript>` "JavaScript is not available" fallback even when Playwright successfully rendered the app DOM. Treat that message as non-authoritative and key extraction off rendered `data-testid` content instead.
