@@ -52,11 +52,8 @@ export function SaveForm({ onSave, saving }: SaveFormProps): JSX.Element {
         label="URL"
         value={url}
         onChange={(event) => setUrl(event.target.value)}
-        placeholder="https://example.com/…"
+        placeholder="https://example.com"
         helperText="Paste any article or page URL."
-        name="url"
-        type="url"
-        autoComplete="url"
         slotProps={{
           input: {
             startAdornment: (
@@ -74,7 +71,7 @@ export function SaveForm({ onSave, saving }: SaveFormProps): JSX.Element {
         sx={{
           display: "grid",
           gap: 1.75,
-          gridTemplateColumns: "1fr",
+          gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
         }}
       >
         <Box>
@@ -82,10 +79,8 @@ export function SaveForm({ onSave, saving }: SaveFormProps): JSX.Element {
             label="Title (optional)"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            placeholder="Override extracted title…"
+            placeholder="Override extracted title"
             helperText="Leave empty to use extracted page title."
-            name="title"
-            autoComplete="off"
             fullWidth
           />
         </Box>
@@ -94,10 +89,8 @@ export function SaveForm({ onSave, saving }: SaveFormProps): JSX.Element {
             label="Tags (comma separated)"
             value={tags}
             onChange={(event) => setTags(event.target.value)}
-            placeholder="ai, typescript, read-later…"
+            placeholder="ai, typescript, read-later"
             helperText="Tags are normalized to lowercase."
-            name="tags"
-            autoComplete="off"
             slotProps={{
               input: {
                 startAdornment: (
@@ -133,7 +126,7 @@ export function SaveForm({ onSave, saving }: SaveFormProps): JSX.Element {
           minWidth: { sm: 164 },
         }}
       >
-        {saving ? "Saving…" : "Save"}
+        {saving ? "Saving..." : "Save"}
       </Button>
     </Stack>
   )

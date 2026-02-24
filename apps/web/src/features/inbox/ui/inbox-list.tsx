@@ -1,4 +1,5 @@
-import { Box, Chip, Stack, Typography } from "@mui/material"
+import { Box, Chip, Stack, Typography, useMediaQuery } from "@mui/material"
+import { useTheme } from "@mui/material/styles"
 import type { JSX } from "react"
 
 import { formatDateTime } from "../../../shared/lib/date"
@@ -58,6 +59,9 @@ export function InboxList({
   onSelect,
   showCreatedAt = true,
 }: InboxListProps): JSX.Element {
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"))
+
   if (items.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary">
@@ -68,9 +72,11 @@ export function InboxList({
 
   return (
     <Stack
-      spacing={1}
+      spacing={isMobile ? 0 : 1}
       sx={{
-        overflow: "visible",
+        maxHeight: { xs: "none", md: 520 },
+        overflowY: { xs: "visible", md: "auto" },
+        pr: { xs: 0, md: 0.5 },
       }}
     >
       {items.map((item) => {
@@ -86,17 +92,18 @@ export function InboxList({
               textAlign: "left",
               border: "1px solid",
               borderColor: selected ? "primary.main" : "divider",
+              borderBottomColor: isMobile ? "divider" : undefined,
               bgcolor: selected ? "rgba(20, 184, 166, 0.11)" : "background.paper",
-              borderRadius: 1.5,
-              px: 1.5,
-              py: 1.4,
+              borderRadius: isMobile ? 0 : 1,
+              px: isMobile ? 1.75 : 1.5,
+              py: isMobile ? 1.6 : 1.4,
               cursor: "pointer",
               transition:
                 "background-color 180ms ease, border-color 180ms ease, transform 180ms ease",
-              minHeight: 110,
+              minHeight: isMobile ? 124 : 96,
               "&:hover": {
                 bgcolor: selected ? "rgba(20, 184, 166, 0.17)" : "rgba(15, 23, 42, 0.03)",
-                transform: "translateY(-1px)",
+                transform: isMobile ? "none" : "translateY(-1px)",
               },
               "&:focus-visible": {
                 outline: "3px solid",
@@ -108,11 +115,11 @@ export function InboxList({
             <Stack direction="row" spacing={1.5} alignItems="stretch">
               <Stack spacing={1} sx={{ minWidth: 0, flex: 1 }}>
                 <Typography
-                  variant="subtitle1"
+                  variant={isMobile ? "h6" : "subtitle2"}
                   sx={{
                     lineHeight: 1.28,
                     display: "-webkit-box",
-                    WebkitLineClamp: 2,
+                    WebkitLineClamp: isMobile ? 2 : 1,
                     WebkitBoxOrient: "vertical",
                     overflow: "hidden",
                   }}
@@ -120,7 +127,7 @@ export function InboxList({
                   {item.title ?? item.url}
                 </Typography>
 
-                <Typography variant="body2" color="text.secondary" noWrap>
+                <Typography variant={isMobile ? "body1" : "caption"} color="text.secondary" noWrap>
                   {item.domain ?? item.url}
                 </Typography>
 
@@ -158,8 +165,8 @@ export function InboxList({
               <ThumbnailPreview
                 key={`${item.id}-${item.thumbnail_url ?? "none"}`}
                 imageUrl={item.thumbnail_url}
-                width={96}
-                height={76}
+                width={isMobile ? 104 : 88}
+                height={isMobile ? 84 : 72}
               />
             </Stack>
           </Box>

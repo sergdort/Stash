@@ -105,28 +105,30 @@ export function InboxFilters({
         </Button>
       </Stack>
 
-      <ToggleButtonGroup
-        exclusive
-        value={status}
-        aria-label="inbox status filter"
-        onChange={(_, value: InboxStatusFilter | null) => {
-          if (!value) {
-            return
-          }
-          onStatusChange(value)
-        }}
-        sx={{ flexWrap: "wrap", gap: 1 }}
-      >
-        <ToggleButton value="unread" sx={{ minHeight: 44 }}>
-          Unread
-        </ToggleButton>
-        <ToggleButton value="read" sx={{ minHeight: 44 }}>
-          Read
-        </ToggleButton>
-        <ToggleButton value="all" sx={{ minHeight: 44 }}>
-          All
-        </ToggleButton>
-      </ToggleButtonGroup>
+      {!isMobile ? (
+        <ToggleButtonGroup
+          exclusive
+          value={status}
+          aria-label="inbox status filter"
+          onChange={(_, value: InboxStatusFilter | null) => {
+            if (!value) {
+              return
+            }
+            onStatusChange(value)
+          }}
+          sx={{ flexWrap: "wrap", gap: 1 }}
+        >
+          <ToggleButton value="unread" sx={{ minHeight: 44 }}>
+            Unread
+          </ToggleButton>
+          <ToggleButton value="read" sx={{ minHeight: 44 }}>
+            Read
+          </ToggleButton>
+          <ToggleButton value="all" sx={{ minHeight: 44 }}>
+            All
+          </ToggleButton>
+        </ToggleButtonGroup>
+      ) : null}
 
       <Typography
         variant="subtitle2"
@@ -205,7 +207,6 @@ export function InboxFilters({
             p: 2,
             maxHeight: "78vh",
             overflowY: "auto",
-            overscrollBehaviorY: "contain",
           },
         }}
       >

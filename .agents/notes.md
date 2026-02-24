@@ -1,5 +1,3 @@
-[0] `apps/web` `useSaveItem.save()` originally swallowed API errors after setting local state; route-based save flows can navigate/clear form incorrectly unless the hook rethrows (or returns explicit success/failure) so callers can gate navigation on success.
-
 [1] In this sandbox, dependency installs can fail for two environment reasons: `pnpm install` may require `CI=true` in non-TTY mode, and external registry resolution (`registry.npmjs.org`) may be unavailable, which blocks lockfile/dependency updates.
 
 [2] In this sandbox, integration tests that bind a local HTTP listener (e.g., `startWebServer` on `127.0.0.1`) can fail with `listen EPERM`; validate those tests in a less restricted environment.
@@ -12,7 +10,7 @@
 
 [0] When adding features or changing CLI behavior, always update three files: `AGENTS.md`, `README.md`, and `docs/CLI_REFERENCE.md`. This keeps all documentation in sync and helps future developers (including AI agents) understand the current state.
 
-[1] X/Twitter `status/<id>` URLs can be extracted reliably without browser automation by using an optional X API bearer token (`STASH_X_BEARER_TOKEN`). Use API-first extraction for public posts/`note_tweet`, and X Articles only when the API response includes full article body text; otherwise return no extracted content (no Readability fallback for X URLs).
+[0] X Articles (long-form content on X/Twitter) cannot be extracted because they require JavaScript execution to render. The content is not in the initial HTML response. Sites that require JS rendering will need either headless browser integration or should be saved with --no-extract.
 
 [0] In Commander async actions, wrapping logic in a synchronous try/catch helper is not enough; promise rejections bypass that catch unless the helper also handles Promise returns (`result instanceof Promise ? result.catch(...) : result`).
 
