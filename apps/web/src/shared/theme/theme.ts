@@ -20,7 +20,7 @@ export const appTheme = createTheme({
       main: "#F97316",
     },
     background: {
-      default: "#F4F8F8",
+      default: "#F8FAFC",
       paper: "#ffffff",
     },
     text: {
@@ -74,10 +74,10 @@ export const appTheme = createTheme({
       },
       styleOverrides: {
         root: {
-          borderColor: "rgba(15, 23, 42, 0.12)",
-          borderRadius: 20,
-          boxShadow: "0 8px 30px rgba(15, 23, 42, 0.06)",
-          backgroundImage: "linear-gradient(to bottom, rgba(255,255,255,0.95), rgba(255,255,255,0.98))",
+          borderColor: "rgba(15, 23, 42, 0.08)",
+          borderRadius: 16,
+          boxShadow: "0 6px 18px rgba(15, 23, 42, 0.05)",
+          backgroundImage: "none",
         },
       },
     },

@@ -1,10 +1,7 @@
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,700&display=swap");
 
 :root {
-  --stash-bg-0: #f4f8f8;
-  --stash-bg-1: #e7f2f1;
-  --stash-bg-2: #f7fafb;
-  --stash-grid-color: rgba(15, 23, 42, 0.035);
+  --stash-bg-0: #f8fafc;
   --stash-text-primary: #0f172a;
   --stash-focus: rgba(15, 118, 110, 0.35);
 }
@@ -32,22 +29,6 @@ body {
   font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
   color: var(--stash-text-primary);
   background-color: var(--stash-bg-0);
-  background-image:
-    radial-gradient(circle at 8% 0%, rgba(20, 184, 166, 0.17), transparent 38%),
-    radial-gradient(circle at 92% 0%, rgba(249, 115, 22, 0.09), transparent 36%),
-    linear-gradient(180deg, var(--stash-bg-1) 0%, var(--stash-bg-2) 34%, #f5f8fb 100%);
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(to right, var(--stash-grid-color) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--stash-grid-color) 1px, transparent 1px);
-  background-size: 40px 40px;
-  mask-image: linear-gradient(to bottom, black 25%, transparent 100%);
 }
 
 a {

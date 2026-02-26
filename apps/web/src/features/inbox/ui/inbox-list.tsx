@@ -15,20 +15,19 @@ type InboxListProps = {
 
 type ThumbnailPreviewProps = {
   imageUrl: string | null
-  width: number
-  height: number
+  size: number
 }
 
-function ThumbnailPreview({ imageUrl, width, height }: ThumbnailPreviewProps): JSX.Element {
+function ThumbnailPreview({ imageUrl, size }: ThumbnailPreviewProps): JSX.Element {
   return (
     <Box
       sx={{
-        width,
-        height,
-        borderRadius: 1,
+        width: size,
+        height: size,
+        borderRadius: 2,
         border: "1px solid",
-        borderColor: "divider",
-        bgcolor: "rgba(15,23,42,0.04)",
+        borderColor: "rgba(15,23,42,0.08)",
+        bgcolor: "rgba(15,23,42,0.03)",
         overflow: "hidden",
         flexShrink: 0,
       }}
@@ -39,8 +38,8 @@ function ThumbnailPreview({ imageUrl, width, height }: ThumbnailPreviewProps): J
           src={imageUrl}
           alt=""
           loading="lazy"
-          width={width}
-          height={height}
+          width={size}
+          height={size}
           sx={{
             width: "100%",
             height: "100%",
@@ -72,7 +71,7 @@ export function InboxList({
 
   return (
     <Stack
-      spacing={isMobile ? 0 : 1}
+      spacing={1}
       sx={{
         maxHeight: { xs: "none", md: 520 },
         overflowY: { xs: "visible", md: "auto" },
@@ -89,20 +88,20 @@ export function InboxList({
             sx={{
               width: "100%",
               textAlign: "left",
-              border: "1px solid",
-              borderColor: "divider",
-              borderBottomColor: isMobile ? "divider" : undefined,
+              border: "1px solid rgba(15, 23, 42, 0.08)",
               bgcolor: "background.paper",
-              borderRadius: isMobile ? 0 : 1,
-              px: isMobile ? 1.75 : 1.5,
-              py: isMobile ? 1.6 : 1.4,
+              borderRadius: 2,
+              px: 1.5,
+              py: 1.4,
               cursor: "pointer",
+              boxShadow: "0 3px 12px rgba(15, 23, 42, 0.04)",
               transition:
-                "background-color 180ms ease, border-color 180ms ease, transform 180ms ease",
-              minHeight: isMobile ? 124 : 96,
+                "background-color 180ms ease, border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease",
+              minHeight: isMobile ? 128 : 114,
               "&:hover": {
-                bgcolor: "rgba(15, 23, 42, 0.03)",
-                transform: isMobile ? "none" : "translateY(-1px)",
+                borderColor: "rgba(15, 118, 110, 0.3)",
+                boxShadow: "0 10px 24px rgba(15, 23, 42, 0.08)",
+                transform: "translateY(-1px)",
               },
               "&:focus-visible": {
                 outline: "3px solid",
@@ -113,12 +112,19 @@ export function InboxList({
           >
             <Stack direction="row" spacing={1.5} alignItems="stretch">
               <Stack spacing={1} sx={{ minWidth: 0, flex: 1 }}>
+                <Typography variant="caption" sx={{ color: "rgba(15, 23, 42, 0.52)", fontWeight: 500 }} noWrap>
+                  {item.domain ?? item.url}
+                </Typography>
+
                 <Typography
-                  variant={isMobile ? "h6" : "subtitle2"}
+                  variant="subtitle1"
                   sx={{
-                    lineHeight: 1.28,
+                    fontWeight: 700,
+                    fontFamily: '"IBM Plex Sans", "Segoe UI", sans-serif',
+                    color: "#0B1220",
+                    lineHeight: 1.3,
                     display: "-webkit-box",
-                    WebkitLineClamp: isMobile ? 2 : 1,
+                    WebkitLineClamp: isMobile ? 3 : 2,
                     WebkitBoxOrient: "vertical",
                     overflow: "hidden",
                   }}
@@ -126,29 +132,24 @@ export function InboxList({
                   {item.title ?? item.url}
                 </Typography>
 
-                <Typography variant={isMobile ? "body1" : "caption"} color="text.secondary" noWrap>
-                  {item.domain ?? item.url}
-                </Typography>
-
-                <Stack
-                  direction="row"
-                  spacing={0.75}
-                  useFlexGap
-                  flexWrap="wrap"
-                  alignItems="center"
-                >
-                  <Chip size="small" variant="outlined" label={`#${item.id}`} />
+                <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" alignItems="center">
                   <Chip
                     size="small"
-                    color={item.status === "read" ? "success" : "default"}
-                    label={item.status}
-                    variant={item.status === "read" ? "filled" : "outlined"}
+                    label={`#${item.id}`}
+                    sx={{
+                      bgcolor: "rgba(20, 184, 166, 0.14)",
+                      color: "#0F766E",
+                      border: "1px solid rgba(20, 184, 166, 0.2)",
+                    }}
                   />
                   <Chip
                     size="small"
-                    variant="outlined"
-                    color={item.has_extracted_content ? "success" : "default"}
-                    label={item.has_extracted_content ? "content" : "no content"}
+                    label={item.has_extracted_content ? "content" : item.status}
+                    sx={{
+                      bgcolor: "rgba(148, 163, 184, 0.14)",
+                      color: "#334155",
+                      border: "1px solid rgba(148, 163, 184, 0.2)",
+                    }}
                   />
                   {showCreatedAt ? (
                     <Chip
@@ -156,6 +157,11 @@ export function InboxList({
                       icon={<TimeIcon fontSize="small" />}
                       label={formatDateTime(item.created_at)}
                       variant="outlined"
+                      sx={{
+                        color: "rgba(15, 23, 42, 0.75)",
+                        borderColor: "rgba(15, 23, 42, 0.18)",
+                        "& .MuiChip-icon": { color: "rgba(15, 23, 42, 0.56)" },
+                      }}
                     />
                   ) : null}
                 </Stack>
@@ -164,8 +170,7 @@ export function InboxList({
               <ThumbnailPreview
                 key={`${item.id}-${item.thumbnail_url ?? "none"}`}
                 imageUrl={item.thumbnail_url}
-                width={isMobile ? 104 : 88}
-                height={isMobile ? 84 : 72}
+                size={isMobile ? 98 : 92}
               />
             </Stack>
           </Box>

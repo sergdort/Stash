@@ -6,7 +6,7 @@ import {
   Container,
   Divider,
   Drawer,
-  IconButton,
+  Fab,
   Paper,
   Stack,
   Typography,
@@ -148,34 +148,21 @@ export function AppShell(): JSX.Element {
             <Stack spacing={1.25}>
             <Paper sx={{ p: 1.5 }}>
               <Stack spacing={1.25}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between">
-                  <Typography variant="h4" component="h1">
-                    stash.
-                  </Typography>
-                  <IconButton
-                    aria-label="add link"
-                    onClick={() => setMobileSaveOpen(true)}
-                    sx={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: 2,
-                      border: "1px solid",
-                      borderColor: "primary.main",
-                      color: "primary.main",
-                      bgcolor: "rgba(20, 184, 166, 0.08)",
-                    }}
-                  >
-                    <AddIcon sx={{ fontSize: 28 }} />
-                  </IconButton>
-                </Stack>
-                <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" alignItems="center">
-                  <Chip
-                    size="small"
-                    variant={statusFilter === "all" ? "filled" : "outlined"}
-                    color={statusFilter === "all" ? "primary" : "default"}
-                    label="All"
-                    onClick={() => setStatusFilter("all")}
-                  />
+                <Typography variant="h4" component="h1">
+                  stash.
+                </Typography>
+
+                <Stack
+                  direction="row"
+                  spacing={0.75}
+                  alignItems="center"
+                  sx={{
+                    overflowX: "auto",
+                    pb: 0.5,
+                    "&::-webkit-scrollbar": { display: "none" },
+                    scrollbarWidth: "none",
+                  }}
+                >
                   <Chip
                     size="small"
                     variant={statusFilter === "unread" ? "filled" : "outlined"}
@@ -189,6 +176,13 @@ export function AppShell(): JSX.Element {
                     color={statusFilter === "read" ? "primary" : "default"}
                     label="Read"
                     onClick={() => setStatusFilter("read")}
+                  />
+                  <Chip
+                    size="small"
+                    variant={statusFilter === "all" ? "filled" : "outlined"}
+                    color={statusFilter === "all" ? "secondary" : "default"}
+                    label="Archive"
+                    onClick={() => setStatusFilter("all")}
                   />
                   <Chip size="small" icon={<InboxIcon fontSize="small" />} label={`${unreadInView} unread`} />
                 </Stack>
@@ -341,6 +335,22 @@ export function AppShell(): JSX.Element {
                 ) : null}
               </Stack>
             </Drawer>
+
+            <Fab
+              color="primary"
+              aria-label="add link"
+              onClick={() => setMobileSaveOpen(true)}
+              sx={{
+                position: "fixed",
+                right: 18,
+                bottom: 22,
+                width: 58,
+                height: 58,
+                boxShadow: "0 12px 28px rgba(15, 118, 110, 0.35)",
+              }}
+            >
+              <AddIcon sx={{ fontSize: 28 }} />
+            </Fab>
           </Stack>
           </Suspense>
         </Container>
@@ -363,10 +373,10 @@ export function AppShell(): JSX.Element {
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} justifyContent="space-between">
                 <Box>
                   <Typography variant="h3" component="h1">
-                    stash web
+                    stash.
                   </Typography>
                   <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 720, mt: 0.75 }}>
-                    Save links quickly, extract readable content, and manage reading flow with deterministic data.
+                    Clean, scannable feed for saving links and reading later.
                   </Typography>
                 </Box>
                 <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="flex-start">
