@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Chip,
+  Collapse,
   Container,
   Divider,
   Drawer,
@@ -58,12 +59,17 @@ export function AppShell(): JSX.Element {
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null)
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
   const [mobileSaveOpen, setMobileSaveOpen] = useState(false)
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const selectedId = selectedItemId
   const unreadInView = useMemo(
     () => items.filter((item) => item.status === "unread").length,
     [items],
   )
   const loadingStatusLabel = statusFilter === "all" ? "active" : statusFilter
+  const activeFilterCount =
+    (statusFilter !== "unread" ? 1 : 0) +
+    selectedTags.length +
+    (tagModeFilter !== "any" && selectedTags.length > 0 ? 1 : 0)
 
   const { item, loading: itemLoading, error: itemError, refresh: refreshItem } = useItem(selectedId)
   const saveState = useSaveItem()
@@ -142,10 +148,10 @@ export function AppShell(): JSX.Element {
 
   if (isMobile) {
     return (
-      <Box sx={{ minHeight: "100vh", py: 1.25 }}>
-        <Container maxWidth="sm" sx={{ px: 1.25 }}>
+      <Box sx={{ minHeight: "100vh", py: 2 }}>
+        <Container maxWidth="sm" sx={{ px: 2 }}>
           <Suspense fallback={lazyFallback}>
-            <Stack spacing={1.25}>
+            <Stack spacing={2}>
             <Paper sx={{ p: 1.5 }}>
               <Stack spacing={1.25}>
                 <Typography variant="h4" component="h1">
@@ -195,26 +201,53 @@ export function AppShell(): JSX.Element {
             </Paper>
 
             <Paper sx={{ p: 0, overflow: "hidden" }}>
-              <Box sx={{ px: 1.25, pt: 1.25 }}>
-                <InboxFilters
-                  status={statusFilter}
-                  onStatusChange={setStatusFilter}
-                  tagMode={tagModeFilter}
-                  onTagModeChange={setTagModeFilter}
-                  availableTags={availableTags}
-                  selectedTags={selectedTags}
-                  onSelectedTagsChange={setSelectedTags}
-                  onClear={clearFilters}
-                />
+              <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
+                <Stack spacing={1.25}>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between">
+                    <Typography variant="subtitle2">Filters</Typography>
+                    <Button
+                      size="small"
+                      onClick={() => setMobileFiltersOpen((v) => !v)}
+                      sx={{ minHeight: 32, px: 1 }}
+                    >
+                      {mobileFiltersOpen ? "Hide" : "Show"} filters
+                    </Button>
+                  </Stack>
+
+                  {activeFilterCount > 0 ? (
+                    <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
+                      {statusFilter !== "unread" ? (
+                        <Chip size="small" label={statusFilter === "all" ? "archive" : statusFilter} />
+                      ) : null}
+                      {selectedTags.slice(0, 3).map((tag) => (
+                        <Chip key={`active-${tag}`} size="small" label={tag} />
+                      ))}
+                      {selectedTags.length > 3 ? <Chip size="small" label={`+${selectedTags.length - 3}`} /> : null}
+                    </Stack>
+                  ) : null}
+
+                  <Collapse in={mobileFiltersOpen}>
+                    <InboxFilters
+                      status={statusFilter}
+                      onStatusChange={setStatusFilter}
+                      tagMode={tagModeFilter}
+                      onTagModeChange={setTagModeFilter}
+                      availableTags={availableTags}
+                      selectedTags={selectedTags}
+                      onSelectedTagsChange={setSelectedTags}
+                      onClear={clearFilters}
+                    />
+                  </Collapse>
+                </Stack>
               </Box>
-              <Divider sx={{ mt: 1.25 }} />
+              <Divider />
               {loading ? (
-                <Typography variant="body2" color="text.secondary" sx={{ px: 1.5, py: 1.25 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.25 }}>
                   Loading {loadingStatusLabel} items...
                 </Typography>
               ) : null}
               {inboxErrorMessage ? (
-                <Alert severity="warning" variant="outlined" sx={{ mx: 1.5, my: 1.25 }}>
+                <Alert severity="warning" variant="outlined" sx={{ mx: 2, my: 1.25 }}>
                   {inboxErrorMessage}
                 </Alert>
               ) : null}
@@ -343,7 +376,7 @@ export function AppShell(): JSX.Element {
               sx={{
                 position: "fixed",
                 right: 18,
-                bottom: 22,
+                bottom: 86,
                 width: 58,
                 height: 58,
                 boxShadow: "0 12px 28px rgba(15, 118, 110, 0.35)",

@@ -26,8 +26,8 @@ function ThumbnailPreview({ imageUrl, size }: ThumbnailPreviewProps): JSX.Elemen
         height: size,
         borderRadius: 2,
         border: "1px solid",
-        borderColor: "rgba(15,23,42,0.08)",
-        bgcolor: "rgba(15,23,42,0.03)",
+        borderColor: "rgba(15,23,42,0.06)",
+        bgcolor: "rgba(15,23,42,0.02)",
         overflow: "hidden",
         flexShrink: 0,
       }}
@@ -76,6 +76,7 @@ export function InboxList({
         maxHeight: { xs: "none", md: 520 },
         overflowY: { xs: "visible", md: "auto" },
         pr: { xs: 0, md: 0.5 },
+        pb: { xs: 10, md: 0.5 },
       }}
     >
       {items.map((item) => {
@@ -119,10 +120,10 @@ export function InboxList({
                 <Typography
                   variant="subtitle1"
                   sx={{
-                    fontWeight: 700,
+                    fontWeight: 650,
                     fontFamily: '"IBM Plex Sans", "Segoe UI", sans-serif',
                     color: "#0B1220",
-                    lineHeight: 1.3,
+                    lineHeight: 1.36,
                     display: "-webkit-box",
                     WebkitLineClamp: isMobile ? 3 : 2,
                     WebkitBoxOrient: "vertical",
@@ -132,37 +133,41 @@ export function InboxList({
                   {item.title ?? item.url}
                 </Typography>
 
-                <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" alignItems="center">
-                  <Chip
-                    size="small"
-                    label={`#${item.id}`}
-                    sx={{
-                      bgcolor: "rgba(20, 184, 166, 0.14)",
-                      color: "#0F766E",
-                      border: "1px solid rgba(20, 184, 166, 0.2)",
-                    }}
-                  />
-                  <Chip
-                    size="small"
-                    label={item.has_extracted_content ? "content" : item.status}
-                    sx={{
-                      bgcolor: "rgba(148, 163, 184, 0.14)",
-                      color: "#334155",
-                      border: "1px solid rgba(148, 163, 184, 0.2)",
-                    }}
-                  />
-                  {showCreatedAt ? (
+                <Stack spacing={0.8}>
+                  <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" alignItems="center">
                     <Chip
                       size="small"
-                      icon={<TimeIcon fontSize="small" />}
-                      label={formatDateTime(item.created_at)}
-                      variant="outlined"
+                      label={`#${item.id}`}
                       sx={{
-                        color: "rgba(15, 23, 42, 0.75)",
-                        borderColor: "rgba(15, 23, 42, 0.18)",
-                        "& .MuiChip-icon": { color: "rgba(15, 23, 42, 0.56)" },
+                        bgcolor: "rgba(20, 184, 166, 0.14)",
+                        color: "#0F766E",
+                        border: "1px solid rgba(20, 184, 166, 0.2)",
                       }}
                     />
+                    <Chip
+                      size="small"
+                      label={item.has_extracted_content ? "content" : item.status}
+                      sx={{
+                        bgcolor: "rgba(148, 163, 184, 0.14)",
+                        color: "#334155",
+                        border: "1px solid rgba(148, 163, 184, 0.2)",
+                      }}
+                    />
+                  </Stack>
+
+                  {showCreatedAt ? (
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 0.55,
+                        color: "rgba(15, 23, 42, 0.6)",
+                      }}
+                    >
+                      <TimeIcon fontSize="inherit" />
+                      {formatDateTime(item.created_at)}
+                    </Typography>
                   ) : null}
                 </Stack>
               </Stack>
