@@ -55,7 +55,7 @@ function ThumbnailPreview({ imageUrl, width, height }: ThumbnailPreviewProps): J
 
 export function InboxList({
   items,
-  selectedItemId,
+  selectedItemId: _selectedItemId,
   onSelect,
   showCreatedAt = true,
 }: InboxListProps): JSX.Element {
@@ -80,7 +80,6 @@ export function InboxList({
       }}
     >
       {items.map((item) => {
-        const selected = selectedItemId === item.id
         return (
           <Box
             key={item.id}
@@ -91,9 +90,9 @@ export function InboxList({
               width: "100%",
               textAlign: "left",
               border: "1px solid",
-              borderColor: selected ? "primary.main" : "divider",
+              borderColor: "divider",
               borderBottomColor: isMobile ? "divider" : undefined,
-              bgcolor: selected ? "rgba(20, 184, 166, 0.11)" : "background.paper",
+              bgcolor: "background.paper",
               borderRadius: isMobile ? 0 : 1,
               px: isMobile ? 1.75 : 1.5,
               py: isMobile ? 1.6 : 1.4,
@@ -102,7 +101,7 @@ export function InboxList({
                 "background-color 180ms ease, border-color 180ms ease, transform 180ms ease",
               minHeight: isMobile ? 124 : 96,
               "&:hover": {
-                bgcolor: selected ? "rgba(20, 184, 166, 0.17)" : "rgba(15, 23, 42, 0.03)",
+                bgcolor: "rgba(15, 23, 42, 0.03)",
                 transform: isMobile ? "none" : "translateY(-1px)",
               },
               "&:focus-visible": {
