@@ -190,7 +190,6 @@ export function AppShell(): JSX.Element {
                     label="Archive"
                     onClick={() => setStatusFilter("all")}
                   />
-                  <Chip size="small" icon={<InboxIcon fontSize="small" />} label={`${unreadInView} unread`} />
                 </Stack>
                 {saveState.error ? (
                   <Alert severity="error" variant="outlined">
@@ -203,8 +202,11 @@ export function AppShell(): JSX.Element {
             <Paper sx={{ p: 0, overflow: "hidden" }}>
               <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
                 <Stack spacing={1.25}>
-                  <Stack direction="row" alignItems="center" justifyContent="space-between">
-                    <Typography variant="subtitle2">Filters</Typography>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+                    <Stack direction="row" spacing={0.75} alignItems="center">
+                      <Typography variant="subtitle2">Filters</Typography>
+                      <Chip size="small" icon={<InboxIcon fontSize="small" />} label={`${unreadInView} unread`} />
+                    </Stack>
                     <Button
                       size="small"
                       onClick={() => setMobileFiltersOpen((v) => !v)}
