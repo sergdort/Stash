@@ -43,6 +43,10 @@ This script builds the TypeScript backend and React frontend, then starts:
 - API: `http://127.0.0.1:4173`
 - PWA: `http://127.0.0.1:5173`
 
+Web UI behavior:
+- The PWA now uses a single mobile-first, single-column layout path on all viewport sizes.
+- Desktop split-pane layout has been removed to reduce UI complexity.
+
 You can configure these via `.env`:
 
 ```bash
@@ -55,6 +59,24 @@ Or override at runtime:
 
 ```bash
 stash web --host 127.0.0.1 --api-port 4173 --pwa-port 5173
+```
+
+### Web Development (Vite HMR)
+
+Use this for frontend hot reloading:
+
+```bash
+pnpm run dev:stack
+```
+
+This starts:
+- API on `127.0.0.1:4173` (via CLI dev command)
+- Vite dev server on `127.0.0.1:5173` with HMR
+
+If you only need the frontend dev server (and already have API running elsewhere):
+
+```bash
+pnpm run dev:web
 ```
 
 If you see a `better-sqlite3` binding error on first run, or after switching Node versions:

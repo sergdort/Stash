@@ -2,11 +2,25 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Stash API: Launch (pnpm dev web)",
+      "name": "Stash API: Launch (no HMR)",
       "type": "node-terminal",
       "request": "launch",
       "cwd": "${workspaceFolder}",
-      "command": "pnpm run dev -- web"
+      "command": "pnpm run dev:api"
+    },
+    {
+      "name": "Stash Web: Launch (Vite HMR + API)",
+      "type": "node-terminal",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "command": "pnpm run dev:stack"
+    },
+    {
+      "name": "Stash Web: Launch (Vite only)",
+      "type": "node-terminal",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "command": "pnpm run dev:web"
     },
     {
       "name": "Stash API: Attach (Pick Process)",
