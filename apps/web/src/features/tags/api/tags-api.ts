@@ -9,7 +9,10 @@ export async function addTag(itemId: number, tag: string): Promise<{ ok: true; a
   return httpClient.post<{ ok: true; added: boolean }>(`/api/items/${itemId}/tags`, { tag })
 }
 
-export async function removeTag(itemId: number, tag: string): Promise<{ ok: true; removed: boolean }> {
+export async function removeTag(
+  itemId: number,
+  tag: string,
+): Promise<{ ok: true; removed: boolean }> {
   return httpClient.delete<{ ok: true; removed: boolean }>(
     `/api/items/${itemId}/tags/${encodeURIComponent(tag)}`,
   )

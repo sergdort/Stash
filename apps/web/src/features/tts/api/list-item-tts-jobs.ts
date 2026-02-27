@@ -21,5 +21,7 @@ export async function listItemTtsJobs(
     limit: String(limit),
     offset: String(offset),
   })
-  return httpClient.get<ListItemTtsJobsResponse>(`/api/items/${itemId}/tts-jobs?${query.toString()}`)
+  return httpClient.get<ListItemTtsJobsResponse>(
+    `/api/items/${itemId}/tts-jobs?${query.toString()}`,
+  )
 }

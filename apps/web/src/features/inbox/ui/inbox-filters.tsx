@@ -75,13 +75,16 @@ export function InboxFilters({
 
   const selectedTagSet = useMemo(() => new Set(selectedTags), [selectedTags])
 
-  const toggleTag = useCallback((tagName: string): void => {
-    if (selectedTagSet.has(tagName)) {
-      onSelectedTagsChange(selectedTags.filter((name) => name !== tagName))
-      return
-    }
-    onSelectedTagsChange([...selectedTags, tagName])
-  }, [onSelectedTagsChange, selectedTagSet, selectedTags])
+  const toggleTag = useCallback(
+    (tagName: string): void => {
+      if (selectedTagSet.has(tagName)) {
+        onSelectedTagsChange(selectedTags.filter((name) => name !== tagName))
+        return
+      }
+      onSelectedTagsChange([...selectedTags, tagName])
+    },
+    [onSelectedTagsChange, selectedTagSet, selectedTags],
+  )
 
   const handleOpenTagsDrawer = useCallback((): void => {
     setTagsDrawerOpen(true)

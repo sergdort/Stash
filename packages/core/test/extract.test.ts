@@ -10,7 +10,9 @@ const LONG_PARAGRAPH =
   )
 
 function mockFetchHtml(html: string): void {
-  globalThis.fetch = vi.fn(async () => new Response(html, { status: 200 })) as unknown as typeof fetch
+  globalThis.fetch = vi.fn(
+    async () => new Response(html, { status: 200 }),
+  ) as unknown as typeof fetch
 }
 
 function buildHtml(head: string, body: string): string {
@@ -123,7 +125,9 @@ describe("extractContent X routing", () => {
   })
 
   it("keeps non-X URLs on the Readability HTML extraction path", async () => {
-    const fetchMock = vi.fn(async () => new Response(buildHtml("", buildReadableBody()), { status: 200 }))
+    const fetchMock = vi.fn(
+      async () => new Response(buildHtml("", buildReadableBody()), { status: 200 }),
+    )
     globalThis.fetch = fetchMock as unknown as typeof fetch
 
     const result = await extractContent("https://example.com/story")
@@ -134,7 +138,9 @@ describe("extractContent X routing", () => {
   })
 
   it("does not fall back to generic Readability when X browser extraction fails", async () => {
-    const fetchMock = vi.fn(async () => new Response(buildHtml("", buildReadableBody()), { status: 200 }))
+    const fetchMock = vi.fn(
+      async () => new Response(buildHtml("", buildReadableBody()), { status: 200 }),
+    )
     globalThis.fetch = fetchMock as unknown as typeof fetch
 
     __setPlaywrightLoaderForTests(async () => {

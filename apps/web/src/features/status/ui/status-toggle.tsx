@@ -11,7 +11,12 @@ type StatusToggleProps = {
   onToggle: (itemId: number, status: "read" | "unread") => Promise<void>
 }
 
-export function StatusToggle({ itemId, status, loading, onToggle }: StatusToggleProps): JSX.Element {
+export function StatusToggle({
+  itemId,
+  status,
+  loading,
+  onToggle,
+}: StatusToggleProps): JSX.Element {
   const nextStatus = status === "read" ? "unread" : "read"
 
   return (

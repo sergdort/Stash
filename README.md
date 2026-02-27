@@ -104,6 +104,14 @@ pnpm run format:check
 pnpm run check
 ```
 
+## CI
+
+GitHub Actions runs on pull requests and pushes to `main` with strict checks:
+
+```bash
+pnpm run format:check && pnpm run lint && pnpm run test && pnpm --dir apps/web build
+```
+
 To apply formatting and safe lint fixes:
 
 ```bash

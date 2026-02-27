@@ -17,7 +17,11 @@ import { useEffect, useMemo, useRef, useState } from "react"
 
 import { useExtract } from "../features/extract"
 import { useInbox } from "../features/inbox"
-import type { InboxStatusFilter, InboxTagModeFilter, ListInboxItemsInput } from "../features/inbox/api/list-items"
+import type {
+  InboxStatusFilter,
+  InboxTagModeFilter,
+  ListInboxItemsInput,
+} from "../features/inbox/api/list-items"
 import { useItem } from "../features/item"
 import { useSaveItem } from "../features/save"
 import { useStatus } from "../features/status"
@@ -25,14 +29,30 @@ import { useTags } from "../features/tags"
 import { useTts } from "../features/tts"
 import { AddIcon, InboxIcon } from "../shared/ui/icons"
 
-const SaveForm = lazy(() => import("../features/save/ui/save-form").then((m) => ({ default: m.SaveForm })))
-const InboxFilters = lazy(() => import("../features/inbox/ui/inbox-filters").then((m) => ({ default: m.InboxFilters })))
-const InboxList = lazy(() => import("../features/inbox/ui/inbox-list").then((m) => ({ default: m.InboxList })))
-const ItemDetail = lazy(() => import("../features/item/ui/item-detail").then((m) => ({ default: m.ItemDetail })))
-const StatusToggle = lazy(() => import("../features/status/ui/status-toggle").then((m) => ({ default: m.StatusToggle })))
-const TagEditor = lazy(() => import("../features/tags/ui/tag-editor").then((m) => ({ default: m.TagEditor })))
-const ExtractButton = lazy(() => import("../features/extract/ui/extract-button").then((m) => ({ default: m.ExtractButton })))
-const TtsPanel = lazy(() => import("../features/tts/ui/tts-panel").then((m) => ({ default: m.TtsPanel })))
+const SaveForm = lazy(() =>
+  import("../features/save/ui/save-form").then((m) => ({ default: m.SaveForm })),
+)
+const InboxFilters = lazy(() =>
+  import("../features/inbox/ui/inbox-filters").then((m) => ({ default: m.InboxFilters })),
+)
+const InboxList = lazy(() =>
+  import("../features/inbox/ui/inbox-list").then((m) => ({ default: m.InboxList })),
+)
+const ItemDetail = lazy(() =>
+  import("../features/item/ui/item-detail").then((m) => ({ default: m.ItemDetail })),
+)
+const StatusToggle = lazy(() =>
+  import("../features/status/ui/status-toggle").then((m) => ({ default: m.StatusToggle })),
+)
+const TagEditor = lazy(() =>
+  import("../features/tags/ui/tag-editor").then((m) => ({ default: m.TagEditor })),
+)
+const ExtractButton = lazy(() =>
+  import("../features/extract/ui/extract-button").then((m) => ({ default: m.ExtractButton })),
+)
+const TtsPanel = lazy(() =>
+  import("../features/tts/ui/tts-panel").then((m) => ({ default: m.TtsPanel })),
+)
 
 const MOBILE_SHELL_MAX_WIDTH = 680
 
@@ -166,9 +186,17 @@ export function AppShell(): JSX.Element {
                   <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
                     <Stack direction="row" spacing={0.75} alignItems="center">
                       <Typography variant="subtitle2">Filters</Typography>
-                      <Chip size="small" icon={<InboxIcon fontSize="small" />} label={`${unreadInView} unread`} />
+                      <Chip
+                        size="small"
+                        icon={<InboxIcon fontSize="small" />}
+                        label={`${unreadInView} unread`}
+                      />
                     </Stack>
-                    <Button size="small" onClick={() => setFiltersOpen((value) => !value)} sx={{ minHeight: 44, px: 1 }}>
+                    <Button
+                      size="small"
+                      onClick={() => setFiltersOpen((value) => !value)}
+                      sx={{ minHeight: 44, px: 1 }}
+                    >
                       {filtersOpen ? "Hide" : "Show"} filters
                     </Button>
                   </Stack>
@@ -210,12 +238,17 @@ export function AppShell(): JSX.Element {
                   {activeFilterCount > 0 ? (
                     <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
                       {statusFilter !== "unread" ? (
-                        <Chip size="small" label={statusFilter === "all" ? "archive" : statusFilter} />
+                        <Chip
+                          size="small"
+                          label={statusFilter === "all" ? "archive" : statusFilter}
+                        />
                       ) : null}
                       {selectedTags.slice(0, 3).map((tag) => (
                         <Chip key={`active-${tag}`} size="small" label={tag} />
                       ))}
-                      {selectedTags.length > 3 ? <Chip size="small" label={`+${selectedTags.length - 3}`} /> : null}
+                      {selectedTags.length > 3 ? (
+                        <Chip size="small" label={`+${selectedTags.length - 3}`} />
+                      ) : null}
                     </Stack>
                   ) : null}
 

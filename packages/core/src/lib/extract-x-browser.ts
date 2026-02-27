@@ -19,10 +19,7 @@ type BrowserContextLike = {
 }
 
 type PageLike = {
-  goto(
-    url: string,
-    options: { waitUntil: "domcontentloaded"; timeout: number },
-  ): Promise<unknown>
+  goto(url: string, options: { waitUntil: "domcontentloaded"; timeout: number }): Promise<unknown>
   waitForSelector(
     selector: string,
     options: { timeout: number; state?: "attached" | "visible" },
@@ -72,10 +69,7 @@ const X_ARTICLE_THUMBNAIL_SCOPE_SELECTORS = [
   '[data-testid="twitterArticleRichTextView"]',
   '[data-testid="longformRichTextComponent"]',
 ]
-const X_PREFERRED_MEDIA_IMAGE_SELECTORS = [
-  '[data-testid="tweetPhoto"] img',
-  "video[poster]",
-]
+const X_PREFERRED_MEDIA_IMAGE_SELECTORS = ['[data-testid="tweetPhoto"] img', "video[poster]"]
 const X_LONGFORM_ROOT_SELECTORS = [
   '[data-testid="twitterArticleRichTextView"]',
   '[data-testid="longformRichTextComponent"]',
@@ -98,10 +92,7 @@ const METADATA_IMAGE_SELECTORS = [
   'meta[property="twitter:image"]',
 ]
 
-const METADATA_TITLE_SELECTORS = [
-  'meta[property="og:title"]',
-  'meta[name="twitter:title"]',
-]
+const METADATA_TITLE_SELECTORS = ['meta[property="og:title"]', 'meta[name="twitter:title"]']
 
 const TWEET_TEXT_SELECTORS = ['[data-testid="tweetText"]', "[lang]"]
 
@@ -139,9 +130,7 @@ function normalizeTitle(text: string | null | undefined): string | undefined {
     return undefined
   }
 
-  const stripped = normalized
-    .replace(/\s+\/\s+X$/i, "")
-    .trim()
+  const stripped = normalized.replace(/\s+\/\s+X$/i, "").trim()
 
   if (stripped.length === 0 || /^x$/i.test(stripped)) {
     return undefined
@@ -223,7 +212,10 @@ function getMetadataTitle(document: ParsedDocument): string | undefined {
   return undefined
 }
 
-function extractThumbnailFromMetadata(document: ParsedDocument, pageUrl: string): string | undefined {
+function extractThumbnailFromMetadata(
+  document: ParsedDocument,
+  pageUrl: string,
+): string | undefined {
   for (const selector of METADATA_IMAGE_SELECTORS) {
     const content = document.querySelector(selector)?.getAttribute("content") ?? null
     const resolved = normalizeHttpUrl(content, pageUrl)
@@ -272,7 +264,10 @@ function extractThumbnailFromScope(scope: QueryScope | null, pageUrl: string): s
     const src = normalizeHttpUrl(image.getAttribute("src"), pageUrl)
     if (src && !isPlaceholderOrAvatarImage(src)) return src
 
-    const srcsetUrl = normalizeHttpUrl(getFirstSrcsetCandidate(image.getAttribute("srcset")) ?? null, pageUrl)
+    const srcsetUrl = normalizeHttpUrl(
+      getFirstSrcsetCandidate(image.getAttribute("srcset")) ?? null,
+      pageUrl,
+    )
     if (srcsetUrl && !isPlaceholderOrAvatarImage(srcsetUrl)) return srcsetUrl
   }
 
@@ -450,7 +445,8 @@ export function extractXContentFromRenderedHtml(
   const primaryArticle = getPrimaryArticle(document)
 
   const articleLike = extractArticleLikeContent(document)
-  const textContent = articleLike?.textContent ?? (primaryArticle ? extractTweetText(primaryArticle) : undefined)
+  const textContent =
+    articleLike?.textContent ?? (primaryArticle ? extractTweetText(primaryArticle) : undefined)
   if (!textContent) {
     return null
   }

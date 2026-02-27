@@ -5,7 +5,11 @@ export function parseItemId(params: Record<string, string>): number {
   return asPositiveInt(params.id, "id")
 }
 
-export function parseTtsBody(body: unknown): { voice: string; format?: "mp3" | "wav"; wait?: boolean } {
+export function parseTtsBody(body: unknown): {
+  voice: string
+  format?: "mp3" | "wav"
+  wait?: boolean
+} {
   if (!body || typeof body !== "object") {
     return { voice: "tts_models/en/vctk/vits|p241", format: "mp3", wait: false }
   }

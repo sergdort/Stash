@@ -54,7 +54,11 @@ function serializeTtsJob(row: TtsJobRow): TtsJob {
   }
 }
 
-function getActiveJobForItem(dbPath: string, migrationsDir: string, itemId: number): TtsJobRow | undefined {
+function getActiveJobForItem(
+  dbPath: string,
+  migrationsDir: string,
+  itemId: number,
+): TtsJobRow | undefined {
   return withReadyDb(dbPath, migrationsDir, (db) =>
     db
       .select()
@@ -189,7 +193,11 @@ export function listTtsJobsForItem(
   offset = 0,
 ): TtsJob[] {
   return withReadyDb(context.dbPath, context.migrationsDir, (db) => {
-    const item = db.select({ id: schema.items.id }).from(schema.items).where(eq(schema.items.id, itemId)).get()
+    const item = db
+      .select({ id: schema.items.id })
+      .from(schema.items)
+      .where(eq(schema.items.id, itemId))
+      .get()
     if (!item) {
       throw new StashError(`Item ${itemId} not found.`, "NOT_FOUND", 3, 404)
     }
@@ -375,7 +383,10 @@ export async function waitForTtsJob(
   }
 }
 
-export function startTtsWorker(context: OperationContext, options: TtsWorkerOptions = {}): TtsWorkerHandle {
+export function startTtsWorker(
+  context: OperationContext,
+  options: TtsWorkerOptions = {},
+): TtsWorkerHandle {
   const pollMs = options.pollMs ?? DEFAULT_TTS_JOB_POLL_MS
   let shouldStop = false
   let timer: NodeJS.Timeout | null = null

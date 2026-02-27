@@ -54,7 +54,7 @@ export const macOSSayProvider: TtsProvider = {
       if (sayResult.code !== 0) {
         throw new TtsProviderError(
           `macOS say command failed: ${sayResult.stderr || sayResult.code}`,
-          "TTS_PROVIDER_ERROR"
+          "TTS_PROVIDER_ERROR",
         )
       }
 
@@ -63,7 +63,14 @@ export const macOSSayProvider: TtsProvider = {
       const afconvertCli = resolveAfconvertCli()
 
       if (format === "wav") {
-        const r = await runCommand(afconvertCli, ["-f", "WAVE", "-d", "LEI16", tempAiffFile, tempWavFile])
+        const r = await runCommand(afconvertCli, [
+          "-f",
+          "WAVE",
+          "-d",
+          "LEI16",
+          tempAiffFile,
+          tempWavFile,
+        ])
         if (r.code === 0) {
           outputBuffer = await fs.readFile(tempWavFile)
         } else {
@@ -86,12 +93,28 @@ export const macOSSayProvider: TtsProvider = {
             outputBuffer = await fs.readFile(tempMp3File)
             outputFormat = "mp3"
           } else {
-            const r = await runCommand(afconvertCli, ["-f", "WAVE", "-d", "LEI16", tempAiffFile, tempWavFile])
-            outputBuffer = r.code === 0 ? await fs.readFile(tempWavFile) : await fs.readFile(tempAiffFile)
+            const r = await runCommand(afconvertCli, [
+              "-f",
+              "WAVE",
+              "-d",
+              "LEI16",
+              tempAiffFile,
+              tempWavFile,
+            ])
+            outputBuffer =
+              r.code === 0 ? await fs.readFile(tempWavFile) : await fs.readFile(tempAiffFile)
           }
         } else {
-          const r = await runCommand(afconvertCli, ["-f", "WAVE", "-d", "LEI16", tempAiffFile, tempWavFile])
-          outputBuffer = r.code === 0 ? await fs.readFile(tempWavFile) : await fs.readFile(tempAiffFile)
+          const r = await runCommand(afconvertCli, [
+            "-f",
+            "WAVE",
+            "-d",
+            "LEI16",
+            tempAiffFile,
+            tempWavFile,
+          ])
+          outputBuffer =
+            r.code === 0 ? await fs.readFile(tempWavFile) : await fs.readFile(tempAiffFile)
         }
       } else {
         outputBuffer = await fs.readFile(tempAiffFile)

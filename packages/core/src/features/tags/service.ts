@@ -2,13 +2,7 @@ import { and, asc, eq, sql } from "drizzle-orm"
 
 import * as schema from "../../db/schema.js"
 import type { OperationContext, TagsListInput, TagsListResult } from "../../types.js"
-import {
-  ensureItemExists,
-  ensureTagId,
-  normalizeTag,
-  nowMs,
-  withReadyDb,
-} from "../common/db.js"
+import { ensureItemExists, ensureTagId, normalizeTag, nowMs, withReadyDb } from "../common/db.js"
 
 export function listTags(context: OperationContext, input: TagsListInput): TagsListResult {
   const limit = input.limit ?? 50
@@ -41,7 +35,11 @@ export function listTags(context: OperationContext, input: TagsListInput): TagsL
   })
 }
 
-export function addTag(context: OperationContext, itemId: number, tag: string): {
+export function addTag(
+  context: OperationContext,
+  itemId: number,
+  tag: string,
+): {
   item_id: number
   tag: string
   added: boolean
@@ -73,7 +71,11 @@ export function addTag(context: OperationContext, itemId: number, tag: string): 
   })
 }
 
-export function removeTag(context: OperationContext, itemId: number, tag: string): {
+export function removeTag(
+  context: OperationContext,
+  itemId: number,
+  tag: string,
+): {
   item_id: number
   tag: string
   removed: boolean

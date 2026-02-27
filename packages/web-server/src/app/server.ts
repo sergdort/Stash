@@ -98,7 +98,9 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
 
 function createListenError(role: "API" | "PWA", host: string, port: number, error: unknown): Error {
   if (isErrnoException(error) && error.code === "EADDRINUSE") {
-    const wrapped = new Error(`${role} port ${port} on ${host} is already in use.`) as NodeJS.ErrnoException
+    const wrapped = new Error(
+      `${role} port ${port} on ${host} is already in use.`,
+    ) as NodeJS.ErrnoException
     wrapped.code = "EADDRINUSE"
     return wrapped
   }

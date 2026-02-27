@@ -171,7 +171,11 @@ describe("tts jobs service", () => {
 
     const { db, sqlite } = openDb(context.dbPath)
     try {
-      const row = db.select().from(schema.itemAudio).where(eq(schema.itemAudio.itemId, itemId)).get()
+      const row = db
+        .select()
+        .from(schema.itemAudio)
+        .where(eq(schema.itemAudio.itemId, itemId))
+        .get()
       expect(row).toBeTruthy()
       expect(row?.fileName).toBe(finalJob.output_file_name)
     } finally {

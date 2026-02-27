@@ -20,7 +20,11 @@ export interface TtsProvider {
   synthesize(request: TtsRequest): Promise<TtsResult>
 }
 
-export type TtsProviderErrorCode = "TTS_PROVIDER_UNAVAILABLE" | "TTS_PROVIDER_ERROR" | "TTS_NOT_INSTALLED" | "TTS_SYNTHESIS_ERROR"
+export type TtsProviderErrorCode =
+  | "TTS_PROVIDER_UNAVAILABLE"
+  | "TTS_PROVIDER_ERROR"
+  | "TTS_NOT_INSTALLED"
+  | "TTS_SYNTHESIS_ERROR"
 
 export class TtsProviderError extends Error {
   code: TtsProviderErrorCode

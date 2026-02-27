@@ -48,7 +48,10 @@ function markItemStatus(
   })
 }
 
-export function markRead(context: OperationContext, itemId: number): {
+export function markRead(
+  context: OperationContext,
+  itemId: number,
+): {
   item_id: number
   action: "mark_read"
   status: "read"
@@ -60,7 +63,10 @@ export function markRead(context: OperationContext, itemId: number): {
   }
 }
 
-export function markUnread(context: OperationContext, itemId: number): {
+export function markUnread(
+  context: OperationContext,
+  itemId: number,
+): {
   item_id: number
   action: "mark_unread"
   status: "unread"

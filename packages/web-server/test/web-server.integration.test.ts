@@ -169,9 +169,7 @@ function probeLocalhostListenCapability(): boolean {
   return result.status === 0
 }
 
-async function occupyPort(
-  host: string,
-): Promise<{
+async function occupyPort(host: string): Promise<{
   port: number
   close: () => Promise<void>
 }> {
@@ -282,12 +280,10 @@ webServerSuite(webServerSuiteTitle, () => {
     const itemId = save.item.id as number
 
     const list = await fetch(`${baseUrl}/api/items?status=unread`).then((response) =>
-      readJson<
-        {
-          ok: boolean
-          items: Array<{ id: number; has_extracted_content: boolean; tts_audio: object | null }>
-        }
-      >(response),
+      readJson<{
+        ok: boolean
+        items: Array<{ id: number; has_extracted_content: boolean; tts_audio: object | null }>
+      }>(response),
     )
     expect(list.ok).toBe(true)
     expect(Array.isArray(list.items)).toBe(true)
@@ -296,9 +292,10 @@ webServerSuite(webServerSuiteTitle, () => {
     expect(list.items[0]?.tts_audio).toBeNull()
 
     const item = await fetch(`${baseUrl}/api/items/${itemId}`).then((response) =>
-      readJson<
-        { ok: boolean; item: { id: number; has_extracted_content: boolean; tts_audio: object | null } }
-      >(response),
+      readJson<{
+        ok: boolean
+        item: { id: number; has_extracted_content: boolean; tts_audio: object | null }
+      }>(response),
     )
     expect(item.ok).toBe(true)
     expect(item.item.id).toBe(itemId)
@@ -372,23 +369,21 @@ webServerSuite(webServerSuiteTitle, () => {
     expect(completedJob.output_file_name).toBeTruthy()
 
     const itemAfterTts = await fetch(`${baseUrl}/api/items/${itemId}`).then((response) =>
-      readJson<
-        {
-          ok: boolean
-          item: {
-            id: number
-            has_extracted_content: boolean
-            tts_audio: {
-              file_name: string
-              format: "mp3" | "wav"
-              provider: string
-              voice: string
-              bytes: number
-              generated_at: string
-            } | null
-          }
+      readJson<{
+        ok: boolean
+        item: {
+          id: number
+          has_extracted_content: boolean
+          tts_audio: {
+            file_name: string
+            format: "mp3" | "wav"
+            provider: string
+            voice: string
+            bytes: number
+            generated_at: string
+          } | null
         }
-      >(response),
+      }>(response),
     )
     expect(itemAfterTts.ok).toBe(true)
     expect(itemAfterTts.item.id).toBe(itemId)
@@ -398,12 +393,13 @@ webServerSuite(webServerSuiteTitle, () => {
     expect(itemAfterTts.item.tts_audio?.bytes).toBeGreaterThan(0)
     expect(itemAfterTts.item.tts_audio?.file_name).toBe(completedJob.output_file_name)
 
-    const itemJobs = await fetch(`${baseUrl}/api/items/${itemId}/tts-jobs?limit=10`).then((response) =>
-      readJson<{
-        ok: true
-        jobs: Array<{ id: number }>
-        paging: { limit: number; offset: number; returned: number }
-      }>(response),
+    const itemJobs = await fetch(`${baseUrl}/api/items/${itemId}/tts-jobs?limit=10`).then(
+      (response) =>
+        readJson<{
+          ok: true
+          jobs: Array<{ id: number }>
+          paging: { limit: number; offset: number; returned: number }
+        }>(response),
     )
     expect(itemJobs.ok).toBe(true)
     expect(itemJobs.paging.returned).toBeGreaterThan(0)
@@ -553,12 +549,14 @@ webServerSuite(webServerSuiteTitle, () => {
     setItemThumbnail(dbPath, itemId, thumbnailUrl)
 
     const list = await fetch(`${baseUrl}/api/items?status=unread`).then((response) =>
-      readJson<{ ok: boolean; items: Array<{ id: number; thumbnail_url: string | null }> }>(response),
+      readJson<{ ok: boolean; items: Array<{ id: number; thumbnail_url: string | null }> }>(
+        response,
+      ),
     )
     expect(list.ok).toBe(true)
-    expect(list.items.some((item) => item.id === itemId && item.thumbnail_url === thumbnailUrl)).toBe(
-      true,
-    )
+    expect(
+      list.items.some((item) => item.id === itemId && item.thumbnail_url === thumbnailUrl),
+    ).toBe(true)
 
     const itemAfterThumbnail = await fetch(`${baseUrl}/api/items/${itemId}`).then((response) =>
       readJson<{ ok: boolean; item: { id: number; thumbnail_url: string | null } }>(response),

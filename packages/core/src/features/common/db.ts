@@ -47,11 +47,7 @@ export async function withDbAsync<T>(dbPath: string, action: (db: Db) => Promise
   }
 }
 
-export function withReadyDb<T>(
-  dbPath: string,
-  migrationsDir: string,
-  action: (db: Db) => T,
-): T {
+export function withReadyDb<T>(dbPath: string, migrationsDir: string, action: (db: Db) => T): T {
   ensureDbReady(dbPath, migrationsDir)
   return withDb(dbPath, action)
 }
