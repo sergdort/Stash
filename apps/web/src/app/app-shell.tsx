@@ -3,16 +3,15 @@ import {
   Box,
   Button,
   Chip,
+  Collapse,
   Container,
   Divider,
   Drawer,
-  IconButton,
+  Fab,
   Paper,
   Stack,
   Typography,
-  useMediaQuery,
 } from "@mui/material"
-import { useTheme } from "@mui/material/styles"
 import { Suspense, lazy, type JSX } from "react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
@@ -24,7 +23,7 @@ import { useSaveItem } from "../features/save"
 import { useStatus } from "../features/status"
 import { useTags } from "../features/tags"
 import { useTts } from "../features/tts"
-import { AddIcon, InboxIcon, StatusIcon } from "../shared/ui/icons"
+import { AddIcon, InboxIcon } from "../shared/ui/icons"
 
 const SaveForm = lazy(() => import("../features/save/ui/save-form").then((m) => ({ default: m.SaveForm })))
 const InboxFilters = lazy(() => import("../features/inbox/ui/inbox-filters").then((m) => ({ default: m.InboxFilters })))
@@ -35,10 +34,9 @@ const TagEditor = lazy(() => import("../features/tags/ui/tag-editor").then((m) =
 const ExtractButton = lazy(() => import("../features/extract/ui/extract-button").then((m) => ({ default: m.ExtractButton })))
 const TtsPanel = lazy(() => import("../features/tts/ui/tts-panel").then((m) => ({ default: m.TtsPanel })))
 
-export function AppShell(): JSX.Element {
-  const theme = useTheme()
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"))
+const MOBILE_SHELL_MAX_WIDTH = 680
 
+export function AppShell(): JSX.Element {
   const [statusFilter, setStatusFilter] = useState<InboxStatusFilter>("unread")
   const [tagModeFilter, setTagModeFilter] = useState<InboxTagModeFilter>("any")
   const [selectedTags, setSelectedTags] = useState<string[]>([])
@@ -56,14 +54,19 @@ export function AppShell(): JSX.Element {
   const { items, loading, error, refresh } = useInbox(inboxFilters)
   const { tags: availableTags, refresh: refreshTags } = useTags()
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null)
-  const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
-  const [mobileSaveOpen, setMobileSaveOpen] = useState(false)
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [saveOpen, setSaveOpen] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const selectedId = selectedItemId
   const unreadInView = useMemo(
     () => items.filter((item) => item.status === "unread").length,
     [items],
   )
   const loadingStatusLabel = statusFilter === "all" ? "active" : statusFilter
+  const activeFilterCount =
+    (statusFilter !== "unread" ? 1 : 0) +
+    selectedTags.length +
+    (tagModeFilter !== "any" && selectedTags.length > 0 ? 1 : 0)
 
   const { item, loading: itemLoading, error: itemError, refresh: refreshItem } = useItem(selectedId)
   const saveState = useSaveItem()
@@ -83,7 +86,7 @@ export function AppShell(): JSX.Element {
       return
     }
 
-    if (!items.some((item) => item.id === selectedItemId)) {
+    if (!items.some((entry) => entry.id === selectedItemId)) {
       setSelectedItemId(items[0].id)
     }
   }, [items, selectedItemId])
@@ -135,63 +138,20 @@ export function AppShell(): JSX.Element {
 
   const handleSelectItem = (itemId: number): void => {
     setSelectedItemId(itemId)
-    if (isMobile) {
-      setMobileDetailOpen(true)
-    }
+    setDetailOpen(true)
   }
 
-  if (isMobile) {
-    return (
-      <Box sx={{ minHeight: "100vh", py: 1.25 }}>
-        <Container maxWidth="sm" sx={{ px: 1.25 }}>
-          <Suspense fallback={lazyFallback}>
-            <Stack spacing={1.25}>
+  return (
+    <Box sx={{ minHeight: "100vh", py: 2 }}>
+      <Container maxWidth={false} sx={{ px: 2, maxWidth: MOBILE_SHELL_MAX_WIDTH, mx: "auto" }}>
+        <Suspense fallback={lazyFallback}>
+          <Stack spacing={2}>
             <Paper sx={{ p: 1.5 }}>
               <Stack spacing={1.25}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between">
-                  <Typography variant="h4" component="h1">
-                    stash.
-                  </Typography>
-                  <IconButton
-                    aria-label="add link"
-                    onClick={() => setMobileSaveOpen(true)}
-                    sx={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: 2,
-                      border: "1px solid",
-                      borderColor: "primary.main",
-                      color: "primary.main",
-                      bgcolor: "rgba(20, 184, 166, 0.08)",
-                    }}
-                  >
-                    <AddIcon sx={{ fontSize: 28 }} />
-                  </IconButton>
-                </Stack>
-                <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" alignItems="center">
-                  <Chip
-                    size="small"
-                    variant={statusFilter === "all" ? "filled" : "outlined"}
-                    color={statusFilter === "all" ? "primary" : "default"}
-                    label="All"
-                    onClick={() => setStatusFilter("all")}
-                  />
-                  <Chip
-                    size="small"
-                    variant={statusFilter === "unread" ? "filled" : "outlined"}
-                    color={statusFilter === "unread" ? "primary" : "default"}
-                    label="Unread"
-                    onClick={() => setStatusFilter("unread")}
-                  />
-                  <Chip
-                    size="small"
-                    variant={statusFilter === "read" ? "filled" : "outlined"}
-                    color={statusFilter === "read" ? "primary" : "default"}
-                    label="Read"
-                    onClick={() => setStatusFilter("read")}
-                  />
-                  <Chip size="small" icon={<InboxIcon fontSize="small" />} label={`${unreadInView} unread`} />
-                </Stack>
+                <Typography variant="h4" component="h1">
+                  stash.
+                </Typography>
+
                 {saveState.error ? (
                   <Alert severity="error" variant="outlined">
                     {saveState.error}
@@ -201,36 +161,95 @@ export function AppShell(): JSX.Element {
             </Paper>
 
             <Paper sx={{ p: 0, overflow: "hidden" }}>
-              <Box sx={{ px: 1.25, pt: 1.25 }}>
-                <InboxFilters
-                  status={statusFilter}
-                  onStatusChange={setStatusFilter}
-                  tagMode={tagModeFilter}
-                  onTagModeChange={setTagModeFilter}
-                  availableTags={availableTags}
-                  selectedTags={selectedTags}
-                  onSelectedTagsChange={setSelectedTags}
-                  onClear={clearFilters}
-                />
+              <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
+                <Stack spacing={1.25}>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+                    <Stack direction="row" spacing={0.75} alignItems="center">
+                      <Typography variant="subtitle2">Filters</Typography>
+                      <Chip size="small" icon={<InboxIcon fontSize="small" />} label={`${unreadInView} unread`} />
+                    </Stack>
+                    <Button size="small" onClick={() => setFiltersOpen((value) => !value)} sx={{ minHeight: 44, px: 1 }}>
+                      {filtersOpen ? "Hide" : "Show"} filters
+                    </Button>
+                  </Stack>
+
+                  <Stack
+                    direction="row"
+                    spacing={0.75}
+                    alignItems="center"
+                    sx={{
+                      overflowX: "auto",
+                      pb: 0.25,
+                      "&::-webkit-scrollbar": { display: "none" },
+                      scrollbarWidth: "none",
+                    }}
+                  >
+                    <Chip
+                      size="small"
+                      variant={statusFilter === "unread" ? "filled" : "outlined"}
+                      color={statusFilter === "unread" ? "primary" : "default"}
+                      label="Unread"
+                      onClick={() => setStatusFilter("unread")}
+                    />
+                    <Chip
+                      size="small"
+                      variant={statusFilter === "read" ? "filled" : "outlined"}
+                      color={statusFilter === "read" ? "primary" : "default"}
+                      label="Read"
+                      onClick={() => setStatusFilter("read")}
+                    />
+                    <Chip
+                      size="small"
+                      variant={statusFilter === "all" ? "filled" : "outlined"}
+                      color={statusFilter === "all" ? "secondary" : "default"}
+                      label="Archive"
+                      onClick={() => setStatusFilter("all")}
+                    />
+                  </Stack>
+
+                  {activeFilterCount > 0 ? (
+                    <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
+                      {statusFilter !== "unread" ? (
+                        <Chip size="small" label={statusFilter === "all" ? "archive" : statusFilter} />
+                      ) : null}
+                      {selectedTags.slice(0, 3).map((tag) => (
+                        <Chip key={`active-${tag}`} size="small" label={tag} />
+                      ))}
+                      {selectedTags.length > 3 ? <Chip size="small" label={`+${selectedTags.length - 3}`} /> : null}
+                    </Stack>
+                  ) : null}
+
+                  <Collapse in={filtersOpen}>
+                    <InboxFilters
+                      hasActiveFilters={activeFilterCount > 0}
+                      tagMode={tagModeFilter}
+                      onTagModeChange={setTagModeFilter}
+                      availableTags={availableTags}
+                      selectedTags={selectedTags}
+                      onSelectedTagsChange={setSelectedTags}
+                      onClear={clearFilters}
+                    />
+                  </Collapse>
+                </Stack>
               </Box>
-              <Divider sx={{ mt: 1.25 }} />
+              <Divider />
               {loading ? (
-                <Typography variant="body2" color="text.secondary" sx={{ px: 1.5, py: 1.25 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.25 }}>
                   Loading {loadingStatusLabel} items...
                 </Typography>
               ) : null}
               {inboxErrorMessage ? (
-                <Alert severity="warning" variant="outlined" sx={{ mx: 1.5, my: 1.25 }}>
+                <Alert severity="warning" variant="outlined" sx={{ mx: 2, my: 1.25 }}>
                   {inboxErrorMessage}
                 </Alert>
               ) : null}
-              <InboxList items={items} selectedItemId={selectedId} onSelect={handleSelectItem} />
+              <InboxList items={items} onSelect={handleSelectItem} />
             </Paper>
 
             <Drawer
               anchor="bottom"
-              open={mobileSaveOpen}
-              onClose={() => setMobileSaveOpen(false)}
+              open={saveOpen}
+              onClose={() => setSaveOpen(false)}
               PaperProps={{
                 sx: {
                   borderTopLeftRadius: 14,
@@ -238,13 +257,19 @@ export function AppShell(): JSX.Element {
                   p: 2,
                   maxHeight: "82vh",
                   overflowY: "auto",
+                  overscrollBehavior: "contain",
+                  width: "100%",
+                  maxWidth: MOBILE_SHELL_MAX_WIDTH,
+                  left: 0,
+                  right: 0,
+                  mx: "auto",
                 },
               }}
             >
               <Stack spacing={1.5}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
                   <Typography variant="subtitle1">Save a new link</Typography>
-                  <Button size="small" onClick={() => setMobileSaveOpen(false)}>
+                  <Button size="small" onClick={() => setSaveOpen(false)}>
                     Close
                   </Button>
                 </Stack>
@@ -255,7 +280,7 @@ export function AppShell(): JSX.Element {
                     await saveState.save(payload)
                     await refresh()
                     await refreshTags()
-                    setMobileSaveOpen(false)
+                    setSaveOpen(false)
                   }}
                 />
                 {saveState.error ? (
@@ -268,8 +293,8 @@ export function AppShell(): JSX.Element {
 
             <Drawer
               anchor="bottom"
-              open={mobileDetailOpen && Boolean(item)}
-              onClose={() => setMobileDetailOpen(false)}
+              open={detailOpen && Boolean(item)}
+              onClose={() => setDetailOpen(false)}
               PaperProps={{
                 sx: {
                   borderTopLeftRadius: 14,
@@ -277,13 +302,19 @@ export function AppShell(): JSX.Element {
                   p: 2,
                   maxHeight: "82vh",
                   overflowY: "auto",
+                  overscrollBehavior: "contain",
+                  width: "100%",
+                  maxWidth: MOBILE_SHELL_MAX_WIDTH,
+                  left: 0,
+                  right: 0,
+                  mx: "auto",
                 },
               }}
             >
               <Stack spacing={1.5}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
                   <Typography variant="subtitle1">Item details</Typography>
-                  <Button size="small" onClick={() => setMobileDetailOpen(false)}>
+                  <Button size="small" onClick={() => setDetailOpen(false)}>
                     Close
                   </Button>
                 </Stack>
@@ -341,160 +372,22 @@ export function AppShell(): JSX.Element {
                 ) : null}
               </Stack>
             </Drawer>
-          </Stack>
-          </Suspense>
-        </Container>
-      </Box>
-    )
-  }
 
-  return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        py: { xs: 2, md: 4 },
-      }}
-    >
-      <Container maxWidth="xl">
-        <Suspense fallback={lazyFallback}>
-          <Stack spacing={2.5}>
-          <Paper sx={{ p: { xs: 2, md: 3 } }}>
-            <Stack spacing={2}>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} justifyContent="space-between">
-                <Box>
-                  <Typography variant="h3" component="h1">
-                    stash web
-                  </Typography>
-                  <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 720, mt: 0.75 }}>
-                    Save links quickly, extract readable content, and manage reading flow with deterministic data.
-                  </Typography>
-                </Box>
-                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="flex-start">
-                  <Chip size="small" icon={<InboxIcon fontSize="small" />} label={`${unreadInView} unread in view`} />
-                  <Chip size="small" color="warning" icon={<StatusIcon fontSize="small" />} label="Light mode" />
-                </Stack>
-              </Stack>
-
-              <SaveForm
-                saving={saveState.saving}
-                onSave={async (payload) => {
-                  await saveState.save(payload)
-                  await refresh()
-                  await refreshTags()
-                }}
-              />
-              {saveState.error ? (
-                <Alert severity="error" variant="outlined">
-                  {saveState.error}
-                </Alert>
-              ) : null}
-            </Stack>
-          </Paper>
-
-          <Box
-            sx={{
-              display: "grid",
-              gap: 2.5,
-              gridTemplateColumns: {
-                xs: "1fr",
-                lg: "minmax(320px, 420px) minmax(0, 1fr)",
-              },
-            }}
-          >
-            <Box>
-              <Paper sx={{ p: 2, height: "100%" }}>
-                <Stack spacing={1.5}>
-                  <Stack direction="row" alignItems="center" spacing={1}>
-                    <InboxIcon fontSize="small" color="primary" />
-                    <Typography variant="h6">Inbox</Typography>
-                  </Stack>
-                  <InboxFilters
-                    status={statusFilter}
-                    onStatusChange={setStatusFilter}
-                    tagMode={tagModeFilter}
-                    onTagModeChange={setTagModeFilter}
-                    availableTags={availableTags}
-                    selectedTags={selectedTags}
-                    onSelectedTagsChange={setSelectedTags}
-                    onClear={clearFilters}
-                  />
-                  {loading ? (
-                    <Typography variant="body2" color="text.secondary">
-                      Loading {loadingStatusLabel} items...
-                    </Typography>
-                  ) : null}
-                  {inboxErrorMessage ? (
-                    <Alert severity="warning" variant="outlined">
-                      {inboxErrorMessage}
-                    </Alert>
-                  ) : null}
-                  <InboxList items={items} selectedItemId={selectedId} onSelect={handleSelectItem} />
-                </Stack>
-              </Paper>
-            </Box>
-
-            <Box>
-              <Paper sx={{ p: 2, height: "100%" }}>
-                <Stack spacing={2}>
-                  <ItemDetail item={item} loading={itemLoading} error={itemError} />
-                  {item ? (
-                    <>
-                      <Divider />
-                      <Stack spacing={1.5}>
-                        <Typography variant="subtitle1">Operations</Typography>
-
-                        <StatusToggle
-                          itemId={item.id}
-                          status={item.status}
-                          loading={statusState.loading}
-                          onToggle={async (itemId, status) => {
-                            await statusState.updateStatus(itemId, status)
-                            await refreshAll()
-                          }}
-                        />
-
-                        <TagEditor
-                          itemId={item.id}
-                          tags={item.tags}
-                          onChanged={async () => {
-                            await refreshAll()
-                          }}
-                        />
-
-                        <ExtractButton
-                          itemId={item.id}
-                          loading={extractState.loading}
-                          onExtract={async (itemId, force) => {
-                            await extractState.runExtract(itemId, force)
-                            await refreshAll()
-                          }}
-                        />
-
-                        <TtsPanel
-                          itemId={item.id}
-                          title={item.title ?? item.url}
-                          loading={ttsState.loading}
-                          error={ttsState.error}
-                          job={ttsState.job}
-                          hasExtractedContent={item.has_extracted_content}
-                          ttsAudio={item.tts_audio}
-                          onGenerate={async (itemId) => {
-                            try {
-                              await ttsState.runTts(itemId)
-                            } catch {
-                              // Error is stored in useTts state.
-                            }
-                            await refreshItem()
-                            await refresh()
-                          }}
-                        />
-                      </Stack>
-                    </>
-                  ) : null}
-                </Stack>
-              </Paper>
-            </Box>
-          </Box>
+            <Fab
+              color="primary"
+              aria-label="add link"
+              onClick={() => setSaveOpen(true)}
+              sx={{
+                position: "fixed",
+                right: 18,
+                bottom: 86,
+                width: 58,
+                height: 58,
+                boxShadow: "0 12px 28px rgba(15, 118, 110, 0.35)",
+              }}
+            >
+              <AddIcon sx={{ fontSize: 28 }} />
+            </Fab>
           </Stack>
         </Suspense>
       </Container>

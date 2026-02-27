@@ -87,6 +87,13 @@ pnpm install
 pnpm run web
 ```
 
+For frontend development with Vite hot reload, use:
+```bash
+pnpm run dev:stack
+```
+
+`dev:stack` runs API on `4173` and Vite HMR on `5173`.
+
 `pnpm run setup` also installs Playwright Chromium for X/Twitter `status/<id>` extraction.
 
 Manual recovery (for browser cache cleanup or Playwright updates):
@@ -316,6 +323,8 @@ Updates should include:
 - `stash web` now accepts `--host`, `--api-port`, `--pwa-port` (`--port` removed).
 - `stash web` runs split listeners (API + PWA) and fails fast on port conflicts or identical API/PWA ports.
 - Web dev (`apps/web` Vite) reads the same root `.env` port variables and uses strict port binding.
+- `pnpm run dev:stack` starts API (`pnpm run dev:api`, default API port `4173`) and Vite HMR (`pnpm run dev:web`, default `5173`) together for frontend hot reload.
+- Web UI uses a single mobile-first, single-column layout path across all viewport sizes; desktop split-pane rendering paths were intentionally removed.
 - Async TTS defaults:
   - `stash tts <id>` enqueues and returns immediately.
   - `stash tts <id> --wait` waits for terminal status.

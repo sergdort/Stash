@@ -198,9 +198,14 @@ Notes:
 - Port conflicts fail fast (no automatic next-port fallback).
 - The PWA server proxies `/api/*` to the configured API server.
 
+Development (HMR):
+- `pnpm run dev:stack` runs API (`4173`) + Vite HMR (`5173`) together.
+- `pnpm run dev:web` runs only Vite dev server (expects API available on configured API port).
+
 Web UI stack:
 - React + Vite
 - Material UI (MUI)
+- Mobile-first single-column layout path across all viewport sizes (desktop split-pane UI removed)
 
 Web API item payloads (`GET /api/items`, `GET /api/items/:id`, `POST /api/items`) include:
 - `thumbnail_url: string | null`

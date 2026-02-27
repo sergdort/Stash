@@ -53,8 +53,13 @@ export function SaveForm({ onSave, saving }: SaveFormProps): JSX.Element {
         value={url}
         onChange={(event) => setUrl(event.target.value)}
         placeholder="https://example.com"
+        type="url"
         helperText="Paste any article or page URL."
         slotProps={{
+          htmlInput: {
+            name: "url",
+            autoComplete: "url",
+          },
           input: {
             startAdornment: (
               <InputAdornment position="start">
@@ -67,42 +72,44 @@ export function SaveForm({ onSave, saving }: SaveFormProps): JSX.Element {
         fullWidth
       />
 
-      <Box
-        sx={{
-          display: "grid",
-          gap: 1.75,
-          gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-        }}
-      >
-        <Box>
-          <TextField
-            label="Title (optional)"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder="Override extracted title"
-            helperText="Leave empty to use extracted page title."
-            fullWidth
-          />
-        </Box>
-        <Box>
-          <TextField
-            label="Tags (comma separated)"
-            value={tags}
-            onChange={(event) => setTags(event.target.value)}
-            placeholder="ai, typescript, read-later"
-            helperText="Tags are normalized to lowercase."
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <TagIcon fontSize="small" color="secondary" />
-                  </InputAdornment>
-                ),
-              },
-            }}
-            fullWidth
-          />
-        </Box>
+      <Box>
+        <TextField
+          label="Title (optional)"
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          placeholder="Override extracted title"
+          helperText="Leave empty to use extracted page title."
+          slotProps={{
+            htmlInput: {
+              name: "title",
+              autoComplete: "off",
+            },
+          }}
+          fullWidth
+        />
+      </Box>
+      <Box>
+        <TextField
+          label="Tags (comma separated)"
+          value={tags}
+          onChange={(event) => setTags(event.target.value)}
+          placeholder="ai, typescript, read-later"
+          helperText="Tags are normalized to lowercase."
+          slotProps={{
+            htmlInput: {
+              name: "tags",
+              autoComplete: "off",
+            },
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <TagIcon fontSize="small" color="secondary" />
+                </InputAdornment>
+              ),
+            },
+          }}
+          fullWidth
+        />
       </Box>
 
       <FormControlLabel
@@ -122,8 +129,7 @@ export function SaveForm({ onSave, saving }: SaveFormProps): JSX.Element {
         startIcon={<AddIcon />}
         disabled={saving || url.trim().length === 0}
         sx={{
-          alignSelf: { xs: "stretch", sm: "flex-start" },
-          minWidth: { sm: 164 },
+          alignSelf: "stretch",
         }}
       >
         {saving ? "Saving..." : "Save"}

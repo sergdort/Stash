@@ -8,22 +8,45 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Typography,
-  useMediaQuery,
 } from "@mui/material"
-import { useTheme } from "@mui/material/styles"
-import type { JSX } from "react"
-import { useMemo, useState } from "react"
+import type { ChangeEvent, JSX, MouseEvent } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { StatusIcon, TagIcon } from "../../../shared/ui/icons"
-import type { InboxStatusFilter, InboxTagModeFilter } from "../api/list-items"
+import type { InboxTagModeFilter } from "../api/list-items"
 
 type TagOption = {
   name: string
   item_count: number
 }
 
+type TagFilterChipProps = {
+  tag: TagOption
+  selected: boolean
+  onToggle: (tagName: string) => void
+}
+
+const TAG_DRAWER_MAX_WIDTH = 680
+
+function TagFilterChip({ tag, selected, onToggle }: TagFilterChipProps): JSX.Element {
+  const handleClick = useCallback((): void => {
+    onToggle(tag.name)
+  }, [onToggle, tag.name])
+
+  return (
+    <Chip
+      clickable
+      color={selected ? "primary" : "default"}
+      variant={selected ? "filled" : "outlined"}
+      aria-pressed={selected}
+      label={`${tag.name} (${tag.item_count})`}
+      onClick={handleClick}
+      sx={{ minHeight: 40 }}
+    />
+  )
+}
+
 type InboxFiltersProps = {
-  status: InboxStatusFilter
-  onStatusChange: (status: InboxStatusFilter) => void
+  hasActiveFilters: boolean
   tagMode: InboxTagModeFilter
   onTagModeChange: (mode: InboxTagModeFilter) => void
   availableTags: TagOption[]
@@ -33,8 +56,7 @@ type InboxFiltersProps = {
 }
 
 export function InboxFilters({
-  status,
-  onStatusChange,
+  hasActiveFilters,
   tagMode,
   onTagModeChange,
   availableTags,
@@ -42,12 +64,8 @@ export function InboxFilters({
   onSelectedTagsChange,
   onClear,
 }: InboxFiltersProps): JSX.Element {
-  const theme = useTheme()
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"))
   const [tagsDrawerOpen, setTagsDrawerOpen] = useState(false)
   const [tagSearch, setTagSearch] = useState("")
-
-  const hasActiveFilters = status !== "unread" || selectedTags.length > 0 || tagMode !== "any"
 
   const filteredTags = useMemo(() => {
     const query = tagSearch.trim().toLowerCase()
@@ -57,17 +75,37 @@ export function InboxFilters({
 
   const selectedTagSet = useMemo(() => new Set(selectedTags), [selectedTags])
 
-  const toggleTag = (tagName: string): void => {
+  const toggleTag = useCallback((tagName: string): void => {
     if (selectedTagSet.has(tagName)) {
       onSelectedTagsChange(selectedTags.filter((name) => name !== tagName))
       return
     }
     onSelectedTagsChange([...selectedTags, tagName])
-  }
+  }, [onSelectedTagsChange, selectedTagSet, selectedTags])
 
-  const mobileVisibleTags = useMemo(() => {
-    if (!isMobile) return availableTags
+  const handleOpenTagsDrawer = useCallback((): void => {
+    setTagsDrawerOpen(true)
+  }, [])
 
+  const handleCloseTagsDrawer = useCallback((): void => {
+    setTagsDrawerOpen(false)
+  }, [])
+
+  const handleTagSearchChange = useCallback((event: ChangeEvent<HTMLInputElement>): void => {
+    setTagSearch(event.target.value)
+  }, [])
+
+  const handleTagModeChange = useCallback(
+    (_event: MouseEvent<HTMLElement>, value: InboxTagModeFilter | null): void => {
+      if (!value) {
+        return
+      }
+      onTagModeChange(value)
+    },
+    [onTagModeChange],
+  )
+
+  const visibleTags = useMemo(() => {
     const selected = availableTags.filter((tag) => selectedTagSet.has(tag.name))
     const unselected = availableTags
       .filter((tag) => !selectedTagSet.has(tag.name))
@@ -75,7 +113,7 @@ export function InboxFilters({
       .slice(0, 6)
 
     return [...selected, ...unselected]
-  }, [availableTags, isMobile, selectedTagSet])
+  }, [availableTags, selectedTagSet])
 
   return (
     <Stack spacing={1.25}>
@@ -105,31 +143,6 @@ export function InboxFilters({
         </Button>
       </Stack>
 
-      {!isMobile ? (
-        <ToggleButtonGroup
-          exclusive
-          value={status}
-          aria-label="inbox status filter"
-          onChange={(_, value: InboxStatusFilter | null) => {
-            if (!value) {
-              return
-            }
-            onStatusChange(value)
-          }}
-          sx={{ flexWrap: "wrap", gap: 1 }}
-        >
-          <ToggleButton value="unread" sx={{ minHeight: 44 }}>
-            Unread
-          </ToggleButton>
-          <ToggleButton value="read" sx={{ minHeight: 44 }}>
-            Read
-          </ToggleButton>
-          <ToggleButton value="all" sx={{ minHeight: 44 }}>
-            All
-          </ToggleButton>
-        </ToggleButtonGroup>
-      ) : null}
-
       <Typography
         variant="subtitle2"
         sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}
@@ -143,12 +156,7 @@ export function InboxFilters({
           exclusive
           value={tagMode}
           aria-label="tag matching mode"
-          onChange={(_, value: InboxTagModeFilter | null) => {
-            if (!value) {
-              return
-            }
-            onTagModeChange(value)
-          }}
+          onChange={handleTagModeChange}
           sx={{ gap: 1 }}
           size="small"
         >
@@ -160,16 +168,14 @@ export function InboxFilters({
           </ToggleButton>
         </ToggleButtonGroup>
 
-        {isMobile ? (
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={() => setTagsDrawerOpen(true)}
-            sx={{ minHeight: 36 }}
-          >
-            Show all tags ({availableTags.length})
-          </Button>
-        ) : null}
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={handleOpenTagsDrawer}
+          sx={{ minHeight: 36 }}
+        >
+          Show all tags ({availableTags.length})
+        </Button>
       </Stack>
 
       {availableTags.length === 0 ? (
@@ -178,18 +184,13 @@ export function InboxFilters({
         </Typography>
       ) : (
         <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap" }}>
-          {(isMobile ? mobileVisibleTags : availableTags).map((tag) => {
-            const selected = selectedTagSet.has(tag.name)
+          {visibleTags.map((tag) => {
             return (
-              <Chip
+              <TagFilterChip
                 key={tag.name}
-                clickable
-                color={selected ? "primary" : "default"}
-                variant={selected ? "filled" : "outlined"}
-                aria-pressed={selected}
-                label={`${tag.name} (${tag.item_count})`}
-                onClick={() => toggleTag(tag.name)}
-                sx={{ minHeight: 40 }}
+                tag={tag}
+                selected={selectedTagSet.has(tag.name)}
+                onToggle={toggleTag}
               />
             )
           })}
@@ -199,7 +200,7 @@ export function InboxFilters({
       <Drawer
         anchor="bottom"
         open={tagsDrawerOpen}
-        onClose={() => setTagsDrawerOpen(false)}
+        onClose={handleCloseTagsDrawer}
         PaperProps={{
           sx: {
             borderTopLeftRadius: 14,
@@ -207,13 +208,19 @@ export function InboxFilters({
             p: 2,
             maxHeight: "78vh",
             overflowY: "auto",
+            overscrollBehavior: "contain",
+            width: "100%",
+            maxWidth: TAG_DRAWER_MAX_WIDTH,
+            left: 0,
+            right: 0,
+            mx: "auto",
           },
         }}
       >
         <Stack spacing={1.25}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography variant="subtitle1">Filter tags</Typography>
-            <Button size="small" onClick={() => setTagsDrawerOpen(false)}>
+            <Button size="small" onClick={handleCloseTagsDrawer}>
               Close
             </Button>
           </Stack>
@@ -222,24 +229,25 @@ export function InboxFilters({
             size="small"
             label="Search tags"
             value={tagSearch}
-            onChange={(event) => setTagSearch(event.target.value)}
+            onChange={handleTagSearchChange}
             placeholder="e.g. ai, finance"
+            slotProps={{
+              htmlInput: {
+                name: "tag-search",
+                autoComplete: "off",
+              },
+            }}
             fullWidth
           />
 
           <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap" }}>
             {filteredTags.map((tag) => {
-              const selected = selectedTagSet.has(tag.name)
               return (
-                <Chip
+                <TagFilterChip
                   key={tag.name}
-                  clickable
-                  color={selected ? "primary" : "default"}
-                  variant={selected ? "filled" : "outlined"}
-                  aria-pressed={selected}
-                  label={`${tag.name} (${tag.item_count})`}
-                  onClick={() => toggleTag(tag.name)}
-                  sx={{ minHeight: 40 }}
+                  tag={tag}
+                  selected={selectedTagSet.has(tag.name)}
+                  onToggle={toggleTag}
                 />
               )
             })}
