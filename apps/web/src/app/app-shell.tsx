@@ -158,39 +158,6 @@ export function AppShell(): JSX.Element {
                   stash.
                 </Typography>
 
-                <Stack
-                  direction="row"
-                  spacing={0.75}
-                  alignItems="center"
-                  sx={{
-                    overflowX: "auto",
-                    pb: 0.5,
-                    "&::-webkit-scrollbar": { display: "none" },
-                    scrollbarWidth: "none",
-                  }}
-                >
-                  <Chip
-                    size="small"
-                    variant={statusFilter === "unread" ? "filled" : "outlined"}
-                    color={statusFilter === "unread" ? "primary" : "default"}
-                    label="Unread"
-                    onClick={() => setStatusFilter("unread")}
-                  />
-                  <Chip
-                    size="small"
-                    variant={statusFilter === "read" ? "filled" : "outlined"}
-                    color={statusFilter === "read" ? "primary" : "default"}
-                    label="Read"
-                    onClick={() => setStatusFilter("read")}
-                  />
-                  <Chip
-                    size="small"
-                    variant={statusFilter === "all" ? "filled" : "outlined"}
-                    color={statusFilter === "all" ? "secondary" : "default"}
-                    label="Archive"
-                    onClick={() => setStatusFilter("all")}
-                  />
-                </Stack>
                 {saveState.error ? (
                   <Alert severity="error" variant="outlined">
                     {saveState.error}
@@ -214,6 +181,40 @@ export function AppShell(): JSX.Element {
                     >
                       {mobileFiltersOpen ? "Hide" : "Show"} filters
                     </Button>
+                  </Stack>
+
+                  <Stack
+                    direction="row"
+                    spacing={0.75}
+                    alignItems="center"
+                    sx={{
+                      overflowX: "auto",
+                      pb: 0.25,
+                      "&::-webkit-scrollbar": { display: "none" },
+                      scrollbarWidth: "none",
+                    }}
+                  >
+                    <Chip
+                      size="small"
+                      variant={statusFilter === "unread" ? "filled" : "outlined"}
+                      color={statusFilter === "unread" ? "primary" : "default"}
+                      label="Unread"
+                      onClick={() => setStatusFilter("unread")}
+                    />
+                    <Chip
+                      size="small"
+                      variant={statusFilter === "read" ? "filled" : "outlined"}
+                      color={statusFilter === "read" ? "primary" : "default"}
+                      label="Read"
+                      onClick={() => setStatusFilter("read")}
+                    />
+                    <Chip
+                      size="small"
+                      variant={statusFilter === "all" ? "filled" : "outlined"}
+                      color={statusFilter === "all" ? "secondary" : "default"}
+                      label="Archive"
+                      onClick={() => setStatusFilter("all")}
+                    />
                   </Stack>
 
                   {activeFilterCount > 0 ? (
