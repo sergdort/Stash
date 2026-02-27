@@ -76,7 +76,6 @@ export function InboxList({
         maxHeight: { xs: "none", md: 520 },
         overflowY: { xs: "visible", md: "auto" },
         pr: { xs: 0, md: 0.5 },
-        pb: { xs: 10, md: 0.5 },
       }}
     >
       {items.map((item) => {
@@ -89,19 +88,19 @@ export function InboxList({
             sx={{
               width: "100%",
               textAlign: "left",
-              border: "1px solid rgba(15, 23, 42, 0.08)",
-              bgcolor: "background.paper",
-              borderRadius: 2,
-              px: 1.5,
-              py: 1.4,
+              border: "1px solid rgba(15, 23, 42, 0.07)",
+              bgcolor: "#FFFFFF",
+              borderRadius: 2.5,
+              px: 1.6,
+              py: 1.5,
               cursor: "pointer",
-              boxShadow: "0 3px 12px rgba(15, 23, 42, 0.04)",
+              boxShadow: "0 6px 18px rgba(15, 23, 42, 0.045)",
               transition:
                 "background-color 180ms ease, border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease",
               minHeight: isMobile ? 128 : 114,
               "&:hover": {
-                borderColor: "rgba(15, 118, 110, 0.3)",
-                boxShadow: "0 10px 24px rgba(15, 23, 42, 0.08)",
+                borderColor: "rgba(15, 118, 110, 0.24)",
+                boxShadow: "0 12px 28px rgba(15, 23, 42, 0.08)",
                 transform: "translateY(-1px)",
               },
               "&:focus-visible": {
