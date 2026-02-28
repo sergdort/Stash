@@ -59,7 +59,10 @@ function getFirstSrcsetCandidate(srcset: string | null): string | undefined {
   return undefined
 }
 
-function extractThumbnailFromMetadata(document: ParsedDocument, pageUrl: string): string | undefined {
+function extractThumbnailFromMetadata(
+  document: ParsedDocument,
+  pageUrl: string,
+): string | undefined {
   for (const selector of METADATA_IMAGE_SELECTORS) {
     const content = document.querySelector(selector)?.getAttribute("content") ?? null
     const resolved = normalizeThumbnailUrl(content, pageUrl)

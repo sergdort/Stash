@@ -23,7 +23,7 @@ function resolveGttsCli(): string {
   if (!cli) {
     throw new TtsProviderError(
       "gTTS CLI not found. Install with `pip install --user gtts`, ensure gtts-cli is in PATH, or set STASH_GTTS_CLI=/full/path/to/gtts-cli.",
-      "TTS_NOT_INSTALLED"
+      "TTS_NOT_INSTALLED",
     )
   }
 
@@ -63,7 +63,7 @@ export const gTtsProvider: TtsProvider = {
       if (gttsResult.code !== 0) {
         throw new TtsProviderError(
           `gTTS synthesis failed: ${gttsResult.stderr || `exit code ${gttsResult.code}`}`,
-          "TTS_SYNTHESIS_ERROR"
+          "TTS_SYNTHESIS_ERROR",
         )
       }
 

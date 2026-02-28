@@ -2,7 +2,13 @@ import { and, desc, eq, exists, inArray, sql, type SQL } from "drizzle-orm"
 
 import * as schema from "../../db/schema.js"
 import { extractContent } from "../../lib/extract.js"
-import type { ListItemsInput, ListItemsResult, OperationContext, SaveItemInput, SaveItemResult } from "../../types.js"
+import type {
+  ListItemsInput,
+  ListItemsResult,
+  OperationContext,
+  SaveItemInput,
+  SaveItemResult,
+} from "../../types.js"
 import {
   ensureTagId,
   getExtractedContentForItem,
@@ -22,7 +28,10 @@ import {
 } from "../common/db.js"
 import { parseListItemsStatusFilter, parseTagMode, parseUrl } from "../common/validation.js"
 
-export async function saveItem(context: OperationContext, input: SaveItemInput): Promise<SaveItemResult> {
+export async function saveItem(
+  context: OperationContext,
+  input: SaveItemInput,
+): Promise<SaveItemResult> {
   const parsedUrl = parseUrl(input.url)
   const normalizedTags = normalizeTags(input.tags ?? [])
 
@@ -229,7 +238,10 @@ export function listItems(context: OperationContext, input: ListItemsInput): Lis
   })
 }
 
-export function getItem(context: OperationContext, itemId: number): SaveItemResult["item"] | undefined {
+export function getItem(
+  context: OperationContext,
+  itemId: number,
+): SaveItemResult["item"] | undefined {
   return withReadyDb(context.dbPath, context.migrationsDir, (db) => {
     const row = getItemRowById(db, itemId)
     if (!row) {

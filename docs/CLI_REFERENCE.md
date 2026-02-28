@@ -196,6 +196,7 @@ Defaults:
 Notes:
 - API and PWA ports must be different.
 - Port conflicts fail fast (no automatic next-port fallback).
+- API listener is implemented in `apps/api` with Fastify.
 - The PWA server proxies `/api/*` to the configured API server.
 
 Development (HMR):

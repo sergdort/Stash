@@ -12,7 +12,7 @@
     "build": "tsc -p tsconfig.json",
     "check": "pnpm run lint && pnpm run format:check && pnpm run build",
     "dev": "node scripts/with-env.mjs tsx apps/cli/src/cli.ts",
-    "dev:api": "pnpm run dev -- web --pwa-port 5174",
+    "dev:api": "pnpm run dev -- web",
     "dev:web": "pnpm --dir apps/web dev",
     "dev:stack": "node scripts/dev-web-stack.mjs",
     "lint": "biome lint . --error-on-warnings",
@@ -40,6 +40,7 @@
     "commander": "^13.1.0",
     "dotenv": "^17.3.1",
     "drizzle-orm": "^0.39.3",
+    "fastify": "^5.6.1",
     "linkedom": "^0.18.12",
     "playwright": "^1.49.0"
   },

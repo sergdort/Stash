@@ -17,10 +17,10 @@
   "include": [
     "apps/cli/src/**/*.ts",
     "apps/cli/test/**/*.ts",
+    "apps/api/src/**/*.ts",
+    "apps/api/test/**/*.ts",
     "packages/core/src/**/*.ts",
-    "packages/core/test/**/*.ts",
-    "packages/web-server/src/**/*.ts",
-    "packages/web-server/test/**/*.ts"
+    "packages/core/test/**/*.ts"
   ],
   "exclude": ["dist", "node_modules"]
 }

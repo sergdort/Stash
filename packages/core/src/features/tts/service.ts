@@ -31,7 +31,10 @@ function resolveCliPath(input: string): string {
   return path.resolve(input)
 }
 
-function getItemTextForTts(context: OperationContext, itemId: number): { title: string | null; text: string } {
+function getItemTextForTts(
+  context: OperationContext,
+  itemId: number,
+): { title: string | null; text: string } {
   return withReadyDb(context.dbPath, context.migrationsDir, (db) => {
     const row = db
       .select({
@@ -77,7 +80,12 @@ function resolveTtsOutputPath(
     const resolved = resolveCliPath(outputFilePath)
     const ext = path.extname(resolved).toLowerCase()
     if (ext.length > 0 && ext !== ".mp3" && ext !== ".wav") {
-      throw new StashError("Output file extension must be .mp3 or .wav.", "VALIDATION_ERROR", 2, 400)
+      throw new StashError(
+        "Output file extension must be .mp3 or .wav.",
+        "VALIDATION_ERROR",
+        2,
+        400,
+      )
     }
 
     if (resolved.endsWith(path.sep)) {
@@ -103,7 +111,9 @@ function resolveTtsOutputPath(
     return withExtension
   }
 
-  const resolvedAudioDir = resolveAudioDir(audioDirInput ?? process.env.STASH_AUDIO_DIR ?? DEFAULT_AUDIO_DIR)
+  const resolvedAudioDir = resolveAudioDir(
+    audioDirInput ?? process.env.STASH_AUDIO_DIR ?? DEFAULT_AUDIO_DIR,
+  )
   fs.mkdirSync(resolvedAudioDir, { recursive: true })
 
   const fileName = buildFriendlyFilename({
@@ -143,7 +153,12 @@ export async function executeTtsForItem(
   } catch (error) {
     if (error instanceof TtsProviderError) {
       if (error.code === "TTS_PROVIDER_UNAVAILABLE") {
-        throw new StashError(`TTS is unavailable. ${error.message}`, "TTS_PROVIDER_UNAVAILABLE", 2, 503)
+        throw new StashError(
+          `TTS is unavailable. ${error.message}`,
+          "TTS_PROVIDER_UNAVAILABLE",
+          2,
+          503,
+        )
       }
       throw new StashError(`TTS provider error: ${error.message}`, "INTERNAL_ERROR", 1, 500)
     }

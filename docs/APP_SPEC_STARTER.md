@@ -256,7 +256,7 @@ Use this block to avoid re-explaining architecture every time:
 Use APP_SPEC.md as the source of truth.
 Scaffold in this order:
 1) packages/core schema + services
-2) packages/web-server routes/handlers
+2) apps/api routes/handlers
 3) apps/cli commands (JSON-first)
 4) apps/web PWA screens
 5) smoke tests + docs

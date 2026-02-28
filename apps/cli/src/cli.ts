@@ -26,7 +26,7 @@ import {
   resolveAudioDir,
   resolveDbPath,
 } from "../../../packages/core/src/lib/paths.js"
-import { startWebStack } from "../../../packages/web-server/src/index.js"
+import { startWebStack } from "../../api/src/index.js"
 
 const CLI_DIR = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_MIGRATIONS_DIR = resolveExistingPath([
@@ -40,12 +40,8 @@ const DEFAULT_WEB_DIST_DIR = resolveExistingPath([
   path.resolve(process.cwd(), "apps/web/dist"),
 ])
 const DEFAULT_WEB_HOST = process.env.STASH_WEB_HOST ?? "127.0.0.1"
-const DEFAULT_API_PORT = process.env.STASH_API_PORT
-  ? parsePort(process.env.STASH_API_PORT)
-  : 4173
-const DEFAULT_PWA_PORT = process.env.STASH_PWA_PORT
-  ? parsePort(process.env.STASH_PWA_PORT)
-  : 5173
+const DEFAULT_API_PORT = process.env.STASH_API_PORT ? parsePort(process.env.STASH_API_PORT) : 4173
+const DEFAULT_PWA_PORT = process.env.STASH_PWA_PORT ? parsePort(process.env.STASH_PWA_PORT) : 5173
 const DEFAULT_TTS_VOICE = "tts_models/en/vctk/vits|p241" // Coqui male voice
 
 type ItemStatus = "unread" | "read" | "archived"

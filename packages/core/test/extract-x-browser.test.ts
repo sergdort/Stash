@@ -68,7 +68,9 @@ describe("extractXContentFromRenderedHtml", () => {
     const result = extractXContentFromRenderedHtml(html, "https://x.com/example/status/333")
 
     expect(result?.title).toBe("Deep Workflows on X")
-    expect(result?.textContent).toContain("Building practical agent workflows takes tooling discipline")
+    expect(result?.textContent).toContain(
+      "Building practical agent workflows takes tooling discipline",
+    )
     expect(result?.textContent).not.toContain("Teaser post text only.")
     expect(result?.thumbnailUrl).toBe("https://cdn.example.com/x-article-cover.png")
   })
@@ -76,16 +78,23 @@ describe("extractXContentFromRenderedHtml", () => {
   it("extracts rendered X longform article DOM and ignores noscript placeholder/generic og image", () => {
     const html = readFixture("post-article-longform-rendered.html")
 
-    const result = extractXContentFromRenderedHtml(html, "https://x.com/AlexFinn/status/2024169334344679783")
+    const result = extractXContentFromRenderedHtml(
+      html,
+      "https://x.com/AlexFinn/status/2024169334344679783",
+    )
 
     expect(result?.title).toBe(
       "Your OpenClaw is useless without a Mission Control. Here's how to set it up",
     )
     expect(result?.textContent).toContain("first paragraph of the rendered X article body")
-    expect(result?.textContent).toContain("appears in page.content() after Playwright executes scripts")
+    expect(result?.textContent).toContain(
+      "appears in page.content() after Playwright executes scripts",
+    )
     expect(result?.textContent).not.toContain("Teaser post text only.")
     expect(result?.textContent).not.toContain("JavaScript is not available.")
-    expect(result?.thumbnailUrl).toBe("https://pbs.twimg.com/media/article-cover?format=jpg&name=small")
+    expect(result?.thumbnailUrl).toBe(
+      "https://pbs.twimg.com/media/article-cover?format=jpg&name=small",
+    )
   })
 
   it("returns null when rendered page does not expose readable post content", () => {

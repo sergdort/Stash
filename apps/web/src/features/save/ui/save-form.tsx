@@ -14,7 +14,12 @@ import {
 import { AddIcon, ExternalLinkIcon, TagIcon } from "../../../shared/ui/icons"
 
 type SaveFormProps = {
-  onSave: (payload: { url: string; title?: string; tags?: string[]; extract?: boolean }) => Promise<void>
+  onSave: (payload: {
+    url: string
+    title?: string
+    tags?: string[]
+    extract?: boolean
+  }) => Promise<void>
   saving: boolean
 }
 

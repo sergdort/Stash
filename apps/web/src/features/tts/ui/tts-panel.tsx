@@ -1,5 +1,15 @@
 import { type JSX, useEffect, useMemo, useRef, useState } from "react"
-import { Alert, Box, Button, Chip, IconButton, Link, Slider, Stack, Typography } from "@mui/material"
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  IconButton,
+  Link,
+  Slider,
+  Stack,
+  Typography,
+} from "@mui/material"
 
 import type { ItemTtsAudio } from "../../../shared/types"
 import type { TtsJob } from "../api/generate-tts"
@@ -36,6 +46,11 @@ export function TtsPanel({
   const [audioError, setAudioError] = useState<string | null>(null)
   const playbackUrl = ttsAudio ? `/api/audio/${encodeURIComponent(ttsAudio.file_name)}` : null
   const downloadUrl = ttsAudio ? `${playbackUrl}?download=1` : null
+  const captionText = title?.trim().replace(/\s+/g, " ") || "stash audio"
+  const captionTrackSrc = useMemo(() => {
+    const vtt = `WEBVTT\n\n00:00:00.000 --> 99:59:59.000\n${captionText}\n`
+    return `data:text/vtt;charset=utf-8,${encodeURIComponent(vtt)}`
+  }, [captionText])
   const isActiveJob = job?.status === "queued" || job?.status === "running"
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -48,11 +63,14 @@ export function TtsPanel({
     setIsPlaying(false)
     setDuration(0)
     setCurrentTime(0)
+    if (!playbackUrl) {
+      return
+    }
   }, [playbackUrl])
 
   useEffect(() => {
     const audio = audioRef.current
-    if (!audio) return
+    if (!playbackUrl || !audio) return
 
     const onLoadedMetadata = (): void => {
       setDuration(audio.duration || 0)
@@ -117,7 +135,10 @@ export function TtsPanel({
       audio.currentTime = Math.max(0, audio.currentTime - 10)
     })
     mediaSession.setActionHandler("seekforward", () => {
-      audio.currentTime = Math.min(audio.duration || Number.MAX_SAFE_INTEGER, audio.currentTime + 10)
+      audio.currentTime = Math.min(
+        audio.duration || Number.MAX_SAFE_INTEGER,
+        audio.currentTime + 10,
+      )
     })
 
     return () => {
@@ -212,7 +233,15 @@ export function TtsPanel({
             bgcolor: "rgba(15,23,42,0.03)",
           }}
         >
-          <audio ref={audioRef} preload="metadata" src={playbackUrl} />
+          <audio ref={audioRef} preload="metadata" src={playbackUrl}>
+            <track
+              kind="captions"
+              srcLang="en"
+              label="English captions"
+              src={captionTrackSrc}
+              default
+            />
+          </audio>
           <Stack spacing={0.75}>
             <Stack direction="row" alignItems="center" spacing={1}>
               <IconButton

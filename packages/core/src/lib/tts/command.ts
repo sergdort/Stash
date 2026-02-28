@@ -26,7 +26,11 @@ export function resolveBinary(options: {
   return null
 }
 
-export async function runCommand(bin: string, args: string[], stdinText?: string): Promise<{ code: number; stderr: string }> {
+export async function runCommand(
+  bin: string,
+  args: string[],
+  stdinText?: string,
+): Promise<{ code: number; stderr: string }> {
   return await new Promise((resolve, reject) => {
     const proc = spawn(bin, args)
     let stderr = ""
