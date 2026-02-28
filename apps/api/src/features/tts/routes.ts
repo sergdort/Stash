@@ -35,18 +35,8 @@ const ttsFileParamsSchema = {
 const ttsJobListQuerySchema = {
   type: "object",
   properties: {
-    limit: {
-      oneOf: [
-        { type: "integer", minimum: 1 },
-        { type: "string", pattern: "^[1-9][0-9]*$" },
-      ],
-    },
-    offset: {
-      oneOf: [
-        { type: "integer", minimum: 0 },
-        { type: "string", pattern: "^[0-9]+$" },
-      ],
-    },
+    limit: { type: "string", pattern: "^[1-9][0-9]*$" },
+    offset: { type: "string", pattern: "^[0-9]+$" },
   },
 } as const
 

@@ -12,7 +12,7 @@
     "build": "tsc -p tsconfig.json",
     "check": "pnpm run lint && pnpm run format:check && pnpm run build",
     "dev": "node scripts/with-env.mjs tsx apps/cli/src/cli.ts",
-    "dev:api": "pnpm run dev -- web --pwa-port 5174",
+    "dev:api": "pnpm run dev -- web",
     "dev:web": "pnpm --dir apps/web dev",
     "dev:stack": "node scripts/dev-web-stack.mjs",
     "lint": "biome lint . --error-on-warnings",

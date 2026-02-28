@@ -42,3 +42,4 @@
 [0] For X/Twitter pages, `page.content()` can include the `<noscript>` "JavaScript is not available" fallback even when Playwright successfully rendered the app DOM. Treat that message as non-authoritative and key extraction off rendered `data-testid` content instead.
 [0] `pnpm run dev -- web` launches the CLI web stack (API + built static PWA) and does not provide Vite HMR. For frontend hot reload, run Vite (`pnpm run dev:web`) with API separately (now `pnpm run dev:stack` does both).
 [0] Current web UI architecture is intentionally mobile-first single-column across all viewport sizes; desktop split-pane branches were removed from `app-shell`, `inbox-filters`, and `inbox-list`.
+[0] In Fastify/Ajv query validation, `oneOf` with numeric query params can produce false validation failures (e.g. `querystring/limit must match exactly one schema in oneOf`) due to coercion behavior; use a single string schema pattern for query params and parse downstream.
