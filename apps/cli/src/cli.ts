@@ -26,7 +26,7 @@ import {
   resolveAudioDir,
   resolveDbPath,
 } from "../../../packages/core/src/lib/paths.js"
-import { startWebStack } from "../../../packages/web-server/src/index.js"
+import { startWebStack } from "../../api/src/index.js"
 
 const CLI_DIR = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_MIGRATIONS_DIR = resolveExistingPath([

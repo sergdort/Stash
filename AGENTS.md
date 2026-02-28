@@ -26,6 +26,7 @@ Current implementation status:
 - Node.js 22.x (see `.nvmrc`; `.node-version` is included for tool compatibility)
 - TypeScript
 - Commander (CLI framework)
+- Fastify (API server framework)
 - SQLite via `better-sqlite3`
 - dotenv for local script `.env` loading
 - Drizzle ORM + Drizzle Kit (schema/migrations)
@@ -44,9 +45,9 @@ Current implementation status:
 ## Repository Layout
 
 - `apps/cli/src/cli.ts`: Main CLI command handlers (including `stash web`).
+- `apps/api/`: Local REST API server (Fastify) + PWA static/proxy split-stack orchestration.
 - `apps/web/`: React web frontend (feature-centered structure).
-- `packages/web-server/`: Local REST API server + PWA static server with `/api/*` proxying to API.
-- `packages/core/`: Shared DB/domain logic used by CLI + web server.
+- `packages/core/`: Shared DB/domain logic used by CLI + API app.
 - `scripts/with-env.mjs`: Script wrapper to auto-load `.env` for local npm scripts.
 - `drizzle/`: SQL migration files.
 - `drizzle.config.ts`: Drizzle config.

@@ -43,6 +43,10 @@ This script builds the TypeScript backend and React frontend, then starts:
 - API: `http://127.0.0.1:4173`
 - PWA: `http://127.0.0.1:5173`
 
+Implementation notes:
+- API server lives in `apps/api` and is powered by Fastify.
+- PWA listener remains a lightweight static/proxy Node server.
+
 Web UI behavior:
 - The PWA now uses a single mobile-first, single-column layout path on all viewport sizes.
 - Desktop split-pane layout has been removed to reduce UI complexity.
@@ -279,6 +283,7 @@ pnpm exec playwright install-deps chromium
 
 - TypeScript
 - Commander (CLI)
+- Fastify (API server)
 - SQLite (`better-sqlite3`)
 - dotenv (local dev script env loading)
 - Drizzle ORM + Drizzle Kit
