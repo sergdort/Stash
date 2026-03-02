@@ -14,6 +14,7 @@ const saveBodySchema = {
       items: { type: "string" },
     },
     extract: { type: "boolean" },
+    autoTags: { type: "boolean" },
   },
   required: ["url"],
 } as const

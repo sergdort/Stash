@@ -4,13 +4,15 @@ import * as schema from "../../db/schema.js"
 import { StashError } from "../../errors.js"
 import { extractContent } from "../../lib/extract.js"
 import { isContentExtractionError } from "../../lib/extract-x-browser.js"
-import type { ExtractItemResult, OperationContext } from "../../types.js"
+import type { ExtractItemOptions, ExtractItemResult, OperationContext } from "../../types.js"
+import { resolveAutoTagsRequested } from "../auto-tags/config.js"
+import { applyAutoTags } from "../auto-tags/service.js"
 import { getItemRowById, withReadyDbAsync } from "../common/db.js"
 
 export async function extractItem(
   context: OperationContext,
   itemId: number,
-  force = false,
+  options: ExtractItemOptions = {},
 ): Promise<ExtractItemResult> {
   return withReadyDbAsync(context.dbPath, context.migrationsDir, async (db) => {
     const item = getItemRowById(db, itemId)
@@ -19,7 +21,7 @@ export async function extractItem(
     }
 
     const existing = db.select().from(schema.notes).where(eq(schema.notes.itemId, itemId)).get()
-    if (existing && !force) {
+    if (existing && !options.force) {
       throw new StashError(
         `Item ${itemId} already has extracted content. Use --force to re-extract.`,
         "CONTENT_EXISTS",
@@ -79,12 +81,32 @@ export async function extractItem(
         .run()
     }
 
-    return {
+    const runAutoTags = resolveAutoTagsRequested(options.autoTags)
+    const autoTagResult = runAutoTags
+      ? await applyAutoTags(db, {
+          itemId,
+          url: item.url,
+          title: extracted.title ?? item.title ?? null,
+          domain: item.domain,
+          content: extracted.textContent,
+        })
+      : null
+
+    const result: ExtractItemResult = {
       item_id: itemId,
       title_extracted: extracted.title || null,
       title_updated: titleUpdated,
       content_length: extracted.textContent.length,
       updated_at: timestamp.toISOString(),
     }
+    if (autoTagResult) {
+      result.auto_tags = autoTagResult.applied
+      result.auto_tag_scores = autoTagResult.scores
+      if (autoTagResult.warning) {
+        result.auto_tag_warning = autoTagResult.warning
+      }
+    }
+
+    return result
   })
 }

@@ -17,6 +17,7 @@ export function parseSaveBody(body: unknown): SaveItemInput {
     ? raw.tags.filter((value): value is string => typeof value === "string")
     : undefined
   const extract = typeof raw.extract === "boolean" ? raw.extract : undefined
+  const autoTags = typeof raw.autoTags === "boolean" ? raw.autoTags : undefined
 
   const input: SaveItemInput = { url }
   if (title !== undefined) {
@@ -27,6 +28,9 @@ export function parseSaveBody(body: unknown): SaveItemInput {
   }
   if (extract !== undefined) {
     input.extract = extract
+  }
+  if (autoTags !== undefined) {
+    input.autoTags = autoTags
   }
   return input
 }

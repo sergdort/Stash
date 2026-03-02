@@ -12,3 +12,12 @@ export function parseForce(body: unknown): boolean {
   const raw = body as Record<string, unknown>
   return Boolean(raw.force)
 }
+
+export function parseAutoTags(body: unknown): boolean | undefined {
+  if (!body || typeof body !== "object") {
+    return undefined
+  }
+
+  const raw = body as Record<string, unknown>
+  return typeof raw.autoTags === "boolean" ? raw.autoTags : undefined
+}

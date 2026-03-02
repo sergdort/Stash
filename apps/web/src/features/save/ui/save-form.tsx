@@ -19,6 +19,7 @@ type SaveFormProps = {
     title?: string
     tags?: string[]
     extract?: boolean
+    autoTags?: boolean
   }) => Promise<void>
   saving: boolean
 }
@@ -45,6 +46,7 @@ export function SaveForm({ onSave, saving }: SaveFormProps): JSX.Element {
           title: title || undefined,
           tags: normalizedTags,
           extract,
+          autoTags: normalizedTags.length === 0,
         }).then(() => {
           setUrl("")
           setTitle("")
@@ -98,8 +100,8 @@ export function SaveForm({ onSave, saving }: SaveFormProps): JSX.Element {
           label="Tags (comma separated)"
           value={tags}
           onChange={(event) => setTags(event.target.value)}
-          placeholder="ai, typescript, read-later"
-          helperText="Tags are normalized to lowercase."
+          placeholder="Optional manual tags (auto-tagging runs when empty)"
+          helperText="Tags are normalized to lowercase. Leave empty to auto-tag."
           slotProps={{
             htmlInput: {
               name: "tags",

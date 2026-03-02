@@ -10,6 +10,10 @@ import { openDb, type StashDb } from "../../../packages/core/src/db/client.js"
 import { getMigrationStatus, runMigrations } from "../../../packages/core/src/db/migrate.js"
 import * as schema from "../../../packages/core/src/db/schema.js"
 import { StashError } from "../../../packages/core/src/errors.js"
+import { inspectAutoTagsHealth } from "../../../packages/core/src/features/auto-tags/doctor.js"
+import { extractItem } from "../../../packages/core/src/features/extract/service.js"
+import { saveItem } from "../../../packages/core/src/features/items/service.js"
+import { addTag, listTags, removeTag } from "../../../packages/core/src/features/tags/service.js"
 import { inspectCoquiTtsHealth } from "../../../packages/core/src/features/tts/doctor.js"
 import {
   enqueueTtsJob,
@@ -18,8 +22,6 @@ import {
   startTtsWorker,
   waitForTtsJob,
 } from "../../../packages/core/src/features/tts/jobs.js"
-import { extractContent } from "../../../packages/core/src/lib/extract.js"
-import { isContentExtractionError } from "../../../packages/core/src/lib/extract-x-browser.js"
 import {
   DEFAULT_AUDIO_DIR,
   DEFAULT_DB_PATH,
@@ -49,7 +51,6 @@ type TagMode = "any" | "all"
 
 type ItemRow = typeof schema.items.$inferSelect & { status: ItemStatus }
 type Db = StashDb
-type DbExecutor = Pick<Db, "insert" | "select">
 
 type StashItem = {
   id: number
@@ -169,14 +170,6 @@ function parsePort(value: string): number {
   return port
 }
 
-function parseUrl(value: string): URL {
-  try {
-    return new URL(value)
-  } catch {
-    throw new CliError(`Invalid URL: ${value}`, "VALIDATION_ERROR", 2)
-  }
-}
-
 function serializeItem(row: ItemRow, tags: string[]): StashItem {
   return {
     id: row.id,
@@ -247,16 +240,6 @@ function withDb<T>(dbPath: string, action: (db: Db) => T): T {
   }
 }
 
-async function withDbAsync<T>(dbPath: string, action: (db: Db) => Promise<T>): Promise<T> {
-  ensureDbDirectory(dbPath)
-  const { db, sqlite } = openDb(dbPath)
-  try {
-    return await action(db)
-  } finally {
-    sqlite.close()
-  }
-}
-
 function resolveMigrationsDir(value?: string): string {
   if (!value || value.trim().length === 0) {
     return DEFAULT_MIGRATIONS_DIR
@@ -286,26 +269,6 @@ function withReadyDb<T>(dbPath: string, action: (db: Db) => T): T {
   return withDb(dbPath, action)
 }
 
-async function withReadyDbAsync<T>(dbPath: string, action: (db: Db) => Promise<T>): Promise<T> {
-  ensureDbReady(dbPath)
-  return withDbAsync(dbPath, action)
-}
-
-function getItemRowById(db: Db, id: number): ItemRow | undefined {
-  return db.select().from(schema.items).where(eq(schema.items.id, id)).get() as ItemRow | undefined
-}
-
-function getItemTags(db: Db, itemId: number): string[] {
-  const rows = db
-    .select({ name: schema.tags.name })
-    .from(schema.itemTags)
-    .innerJoin(schema.tags, eq(schema.tags.id, schema.itemTags.tagId))
-    .where(eq(schema.itemTags.itemId, itemId))
-    .orderBy(asc(schema.tags.name))
-    .all()
-  return rows.map((row) => row.name)
-}
-
 function getTagsMap(db: Db, itemIds: number[]): Map<number, string[]> {
   const map = new Map<number, string[]>()
   if (itemIds.length === 0) {
@@ -330,37 +293,6 @@ function getTagsMap(db: Db, itemIds: number[]): Map<number, string[]> {
   }
 
   return map
-}
-
-function ensureTagId(db: DbExecutor, tag: string, createdAt: Date): number {
-  db.insert(schema.tags)
-    .values({
-      name: tag,
-      createdAt,
-    })
-    .onConflictDoNothing({ target: schema.tags.name })
-    .run()
-
-  const row = db
-    .select({ id: schema.tags.id })
-    .from(schema.tags)
-    .where(eq(schema.tags.name, tag))
-    .get()
-  if (!row) {
-    throw new CliError(`Could not resolve tag '${tag}'.`, "INTERNAL_ERROR", 1)
-  }
-  return row.id
-}
-
-function ensureItemExists(db: Db, itemId: number): void {
-  const row = db
-    .select({ id: schema.items.id })
-    .from(schema.items)
-    .where(eq(schema.items.id, itemId))
-    .get()
-  if (!row) {
-    throw new CliError(`Item ${itemId} not found.`, "NOT_FOUND", 3)
-  }
 }
 
 function runDbAction<T>(jsonMode: boolean, action: () => T | Promise<T>): T | Promise<T> {
@@ -391,16 +323,17 @@ program.addHelpText(
   "afterAll",
   `
 Quick Reference:
-  stash save <url> [--title <text>] [--tag <name> ...] [--json]
+  stash save <url> [--title <text>] [--tag <name> ...] [--auto-tags|--no-auto-tags] [--json]
   stash list [--status unread|read|archived] [--tag <name> ...] [--tag-mode any|all] [--limit <n>] [--offset <n>] [--json]
   stash tags list [--limit <n>] [--offset <n>] [--json]
+  stash tags doctor [--json]
   stash tag add <id> <tag> [--json]
   stash tag rm <id> <tag> [--json]
   stash mark read <id> [--json]
   stash mark unread <id> [--json]
   stash read <id> [--json]
   stash unread <id> [--json]
-  stash extract <id> [--force] [--json]
+  stash extract <id> [--force] [--auto-tags|--no-auto-tags] [--json]
   stash tts <id> [--voice <name>] [--format mp3|wav] [--wait] [--json]
   stash tts status <jobId> [--json]
   stash tts doctor [--json]
@@ -516,145 +449,54 @@ program
   .option("--title <text>", "Optional title")
   .option("--tag <name>", "Tag to attach (repeatable)", collectValues, [])
   .option("--no-extract", "Skip content extraction")
+  .option("--auto-tags", "Apply auto-generated tags")
+  .option("--no-auto-tags", "Disable auto-generated tags")
   .option("--json", "Print machine-readable JSON output")
   .action(
     async (
       url: string,
-      options: { title?: string; tag: string[]; extract?: boolean; json?: boolean },
+      options: {
+        title?: string
+        tag: string[]
+        extract?: boolean
+        autoTags?: boolean
+        json?: boolean
+      },
     ) => {
       const jsonMode = Boolean(options.json)
+      const context = {
+        dbPath: resolveDbPath(program.opts().dbPath as string),
+        migrationsDir: resolveMigrationsDir(),
+      }
 
-      return runDbAction(jsonMode, async () =>
-        withReadyDbAsync(resolveDbPath(program.opts().dbPath as string), async (db) => {
-          const parsedUrl = parseUrl(url)
-          const normalizedTags = normalizeTags(options.tag ?? [])
-          const existing = db
-            .select()
-            .from(schema.items)
-            .where(eq(schema.items.url, parsedUrl.toString()))
-            .get() as ItemRow | undefined
-          const timestamp = new Date(nowMs())
-          let created = false
-          let itemId: number | undefined
+      return runDbAction(jsonMode, async () => {
+        const saveInput = {
+          url,
+          tags: options.tag ?? [],
+          ...(options.title !== undefined ? { title: options.title } : {}),
+          ...(options.extract !== undefined ? { extract: options.extract } : {}),
+          ...(options.autoTags !== undefined ? { autoTags: options.autoTags } : {}),
+        }
+        const result = await saveItem(context, saveInput)
 
-          db.transaction((tx) => {
-            if (existing) {
-              itemId = existing.id
-              if (!existing.title && options.title) {
-                tx.update(schema.items)
-                  .set({
-                    title: options.title.trim(),
-                    updatedAt: timestamp,
-                  })
-                  .where(eq(schema.items.id, existing.id))
-                  .run()
-              }
-            } else {
-              const result = tx
-                .insert(schema.items)
-                .values({
-                  url: parsedUrl.toString(),
-                  title: options.title?.trim() || null,
-                  domain: parsedUrl.hostname,
-                  status: "unread",
-                  isStarred: false,
-                  createdAt: timestamp,
-                  updatedAt: timestamp,
-                  readAt: null,
-                  archivedAt: null,
-                })
-                .run()
-              itemId = Number(result.lastInsertRowid)
-              created = true
-            }
-
-            if (itemId === undefined) {
-              throw new CliError("Saved item id could not be determined.", "INTERNAL_ERROR", 1)
-            }
-
-            for (const tag of normalizedTags) {
-              const tagId = ensureTagId(tx, tag, timestamp)
-              tx.insert(schema.itemTags)
-                .values({
-                  itemId,
-                  tagId,
-                  createdAt: timestamp,
-                })
-                .onConflictDoNothing()
-                .run()
-            }
+        if (jsonMode) {
+          printJson({
+            ok: true,
+            ...result,
           })
+          return
+        }
 
-          if (itemId === undefined) {
-            throw new CliError("Saved item id could not be determined.", "INTERNAL_ERROR", 1)
-          }
-
-          const row = getItemRowById(db, itemId)
-          if (!row) {
-            throw new CliError("Saved item could not be reloaded.", "INTERNAL_ERROR", 1)
-          }
-
-          // Extract content if not disabled
-          if (options.extract !== false && created) {
-            try {
-              const extracted = await extractContent(parsedUrl.toString())
-              if (extracted?.textContent) {
-                // Save to notes table
-                db.insert(schema.notes)
-                  .values({
-                    itemId,
-                    content: extracted.textContent,
-                    updatedAt: timestamp,
-                  })
-                  .onConflictDoUpdate({
-                    target: schema.notes.itemId,
-                    set: {
-                      content: extracted.textContent,
-                      updatedAt: timestamp,
-                    },
-                  })
-                  .run()
-
-                // Update title if we got a better one
-                if (extracted.title && !options.title) {
-                  db.update(schema.items)
-                    .set({
-                      title: extracted.title,
-                      thumbnailUrl: extracted.thumbnailUrl ?? null,
-                      updatedAt: timestamp,
-                    })
-                    .where(eq(schema.items.id, itemId))
-                    .run()
-                } else {
-                  db.update(schema.items)
-                    .set({
-                      thumbnailUrl: extracted.thumbnailUrl ?? null,
-                      updatedAt: timestamp,
-                    })
-                    .where(eq(schema.items.id, itemId))
-                    .run()
-                }
-              }
-            } catch (error) {
-              console.error("Failed to extract content:", error)
-              // Continue without extraction on error
-            }
-          }
-
-          const item = serializeItem(row, getItemTags(db, row.id))
-
-          if (jsonMode) {
-            printJson({
-              ok: true,
-              created,
-              item,
-            })
-            return
-          }
-
-          process.stdout.write(`${created ? "saved" : "exists"} #${item.id} ${item.url}\n`)
-        }),
-      )
+        process.stdout.write(
+          `${result.created ? "saved" : "exists"} #${result.item.id} ${result.item.url}\n`,
+        )
+        if (result.auto_tags && result.auto_tags.length > 0) {
+          process.stdout.write(`auto-tags: ${result.auto_tags.join(", ")}\n`)
+        }
+        if (result.auto_tag_warning) {
+          process.stdout.write(`auto-tags warning: ${result.auto_tag_warning}\n`)
+        }
+      })
     },
   )
 
@@ -836,130 +678,40 @@ program
   .command("extract <id>")
   .description("Extract or re-extract content for an item")
   .option("--force", "Re-extract even if content already exists")
+  .option("--auto-tags", "Apply auto-generated tags")
+  .option("--no-auto-tags", "Disable auto-generated tags")
   .option("--json", "Print machine-readable JSON output")
-  .action(async (id: string, options: { force?: boolean; json?: boolean }) => {
+  .action(async (id: string, options: { force?: boolean; autoTags?: boolean; json?: boolean }) => {
     const jsonMode = Boolean(options.json)
+    const context = {
+      dbPath: resolveDbPath(program.opts().dbPath as string),
+      migrationsDir: resolveMigrationsDir(),
+    }
+    const itemId = parseItemId(id)
 
-    return runDbAction(jsonMode, async () =>
-      withReadyDbAsync(resolveDbPath(program.opts().dbPath as string), async (db) => {
-        const itemId = parseItemId(id)
+    return runDbAction(jsonMode, async () => {
+      const extractOptions = {
+        ...(options.force !== undefined ? { force: options.force } : {}),
+        ...(options.autoTags !== undefined ? { autoTags: options.autoTags } : {}),
+      }
+      const result = await extractItem(context, itemId, extractOptions)
 
-        // Get the item
-        const item = getItemRowById(db, itemId)
-        if (!item) {
-          throw new CliError(`Item ${itemId} not found.`, "NOT_FOUND", 3)
-        }
+      if (jsonMode) {
+        printJson({
+          ok: true,
+          ...result,
+        })
+        return
+      }
 
-        // Check if content already exists
-        const existing = db.select().from(schema.notes).where(eq(schema.notes.itemId, itemId)).get()
-
-        if (existing && !options.force) {
-          if (jsonMode) {
-            printJson({
-              ok: false,
-              error: {
-                code: "CONTENT_EXISTS",
-                message: `Item ${itemId} already has extracted content. Use --force to re-extract.`,
-              },
-            })
-            return
-          }
-          throw new CliError(
-            `Item ${itemId} already has extracted content. Use --force to re-extract.`,
-            "CONTENT_EXISTS",
-            4,
-          )
-        }
-
-        // Extract content
-        let extracted = null
-        let extractionError = null
-        try {
-          extracted = await extractContent(item.url)
-        } catch (error) {
-          if (isContentExtractionError(error)) {
-            const message = error.message
-            if (jsonMode) {
-              process.stderr.write(`${message}\n`)
-            }
-            extractionError = message
-          } else {
-            extractionError = error instanceof Error ? error.message : String(error)
-          }
-        }
-
-        if (!extracted || !extracted.textContent) {
-          if (jsonMode) {
-            printJson({
-              ok: false,
-              error: {
-                code: "EXTRACTION_FAILED",
-                message: extractionError || "Failed to extract content",
-              },
-            })
-            return
-          }
-          throw new CliError(
-            `Failed to extract content: ${extractionError || "No readable content found"}`,
-            "EXTRACTION_FAILED",
-            1,
-          )
-        }
-
-        // Save to notes table
-        const timestamp = new Date()
-        db.insert(schema.notes)
-          .values({
-            itemId,
-            content: extracted.textContent,
-            updatedAt: timestamp,
-          })
-          .onConflictDoUpdate({
-            target: schema.notes.itemId,
-            set: {
-              content: extracted.textContent,
-              updatedAt: timestamp,
-            },
-          })
-          .run()
-
-        // Update title if we got a better one and item doesn't have one
-        if (extracted.title && !item.title) {
-          db.update(schema.items)
-            .set({
-              title: extracted.title,
-              thumbnailUrl: extracted.thumbnailUrl ?? null,
-              updatedAt: timestamp,
-            })
-            .where(eq(schema.items.id, itemId))
-            .run()
-        } else {
-          db.update(schema.items)
-            .set({
-              thumbnailUrl: extracted.thumbnailUrl ?? null,
-              updatedAt: timestamp,
-            })
-            .where(eq(schema.items.id, itemId))
-            .run()
-        }
-
-        if (jsonMode) {
-          printJson({
-            ok: true,
-            item_id: itemId,
-            title_extracted: extracted.title || null,
-            title_updated: Boolean(extracted.title && !item.title),
-            content_length: extracted.textContent.length,
-            updated_at: timestamp.toISOString(),
-          })
-          return
-        }
-
-        process.stdout.write(
-          `extracted #${itemId} ${item.url} (${extracted.textContent.length} chars)\n`,
-        )
-      }),
-    )
+      process.stdout.write(`extracted #${itemId} (${result.content_length} chars)\n`)
+      if (result.auto_tags && result.auto_tags.length > 0) {
+        process.stdout.write(`auto-tags: ${result.auto_tags.join(", ")}\n`)
+      }
+      if (result.auto_tag_warning) {
+        process.stdout.write(`auto-tags warning: ${result.auto_tag_warning}\n`)
+      }
+    })
   })
 
 program
@@ -1081,6 +833,7 @@ tagsCommand.addHelpText(
 Examples:
   stash tags list
   stash tags list --limit 100 --offset 0 --json
+  stash tags doctor --json
 `,
 )
 
@@ -1092,47 +845,71 @@ tagsCommand
   .option("--json", "Print machine-readable JSON output")
   .action((options: { limit: number; offset: number; json?: boolean }) => {
     const jsonMode = Boolean(options.json)
+    const context = {
+      dbPath: resolveDbPath(program.opts().dbPath as string),
+      migrationsDir: resolveMigrationsDir(),
+    }
 
-    runDbAction(jsonMode, () =>
-      withReadyDb(resolveDbPath(program.opts().dbPath as string), (db) => {
-        const rows = db
-          .select({
-            name: schema.tags.name,
-            itemCount: sql<number>`count(${schema.itemTags.itemId})`,
-          })
-          .from(schema.tags)
-          .leftJoin(schema.itemTags, eq(schema.itemTags.tagId, schema.tags.id))
-          .groupBy(schema.tags.id)
-          .orderBy(asc(schema.tags.name))
-          .limit(options.limit)
-          .offset(options.offset)
-          .all()
+    runDbAction(jsonMode, () => {
+      const result = listTags(context, {
+        limit: options.limit,
+        offset: options.offset,
+      })
 
-        const tags = rows.map((row) => ({ name: row.name, item_count: Number(row.itemCount) }))
+      if (jsonMode) {
+        printJson({
+          ok: true,
+          ...result,
+        })
+        return
+      }
 
-        if (jsonMode) {
-          printJson({
-            ok: true,
-            tags,
-            paging: {
-              limit: options.limit,
-              offset: options.offset,
-              returned: tags.length,
-            },
-          })
-          return
+      if (result.tags.length === 0) {
+        process.stdout.write("No tags found.\n")
+        return
+      }
+
+      for (const tag of result.tags) {
+        process.stdout.write(`${tag.name}\t${tag.item_count}\n`)
+      }
+    })
+  })
+
+tagsCommand
+  .command("doctor")
+  .description("Inspect auto-tags dependency health")
+  .option("--json", "Print machine-readable JSON output")
+  .action((options: { json?: boolean }) => {
+    const jsonMode = Boolean(options.json)
+
+    runDbAction(jsonMode, () => {
+      const report = inspectAutoTagsHealth()
+
+      if (jsonMode) {
+        printJson({
+          ok: true,
+          ...report,
+        })
+      } else {
+        process.stdout.write(`tags doctor: ${report.healthy ? "healthy" : "unhealthy"}\n`)
+        process.stdout.write(`backend: ${report.backend}\n`)
+        process.stdout.write(`model: ${report.model}\n`)
+        process.stdout.write(`helper: ${report.helper_path}\n`)
+        process.stdout.write(`python: ${report.python_path ?? "-"}\n`)
+        for (const check of report.checks) {
+          const requirement = check.required ? "required" : "optional"
+          const status = check.ok ? "ok" : "failed"
+          process.stdout.write(`${check.id} (${requirement}): ${status} [${check.path ?? "-"}]\n`)
+          if (check.message) {
+            process.stdout.write(`  ${check.message}\n`)
+          }
         }
+      }
 
-        if (tags.length === 0) {
-          process.stdout.write("No tags found.\n")
-          return
-        }
-
-        for (const tag of tags) {
-          process.stdout.write(`${tag.name}\t${tag.item_count}\n`)
-        }
-      }),
-    )
+      if (!report.healthy) {
+        process.exitCode = 2
+      }
+    })
   })
 
 const tagCommand = program.command("tag").description("Manage item tags")
@@ -1152,40 +929,25 @@ tagCommand
   .option("--json", "Print machine-readable JSON output")
   .action((id: string, tag: string, options: { json?: boolean }) => {
     const jsonMode = Boolean(options.json)
+    const context = {
+      dbPath: resolveDbPath(program.opts().dbPath as string),
+      migrationsDir: resolveMigrationsDir(),
+    }
 
-    runDbAction(jsonMode, () =>
-      withReadyDb(resolveDbPath(program.opts().dbPath as string), (db) => {
-        const itemId = parseItemId(id)
-        const normalizedTag = normalizeTag(tag)
-        ensureItemExists(db, itemId)
-        const timestamp = new Date(nowMs())
-        const result = db.transaction((tx) => {
-          const tagId = ensureTagId(tx, normalizedTag, timestamp)
-          return tx
-            .insert(schema.itemTags)
-            .values({
-              itemId,
-              tagId,
-              createdAt: timestamp,
-            })
-            .onConflictDoNothing()
-            .run()
+    runDbAction(jsonMode, () => {
+      const result = addTag(context, parseItemId(id), tag)
+      if (jsonMode) {
+        printJson({
+          ok: true,
+          ...result,
         })
-        const added = Number(result.changes) > 0
+        return
+      }
 
-        if (jsonMode) {
-          printJson({
-            ok: true,
-            item_id: itemId,
-            tag: normalizedTag,
-            added,
-          })
-          return
-        }
-
-        process.stdout.write(`${added ? "added" : "exists"} tag '${normalizedTag}' on #${itemId}\n`)
-      }),
-    )
+      process.stdout.write(
+        `${result.added ? "added" : "exists"} tag '${result.tag}' on #${result.item_id}\n`,
+      )
+    })
   })
 
 tagCommand
@@ -1194,42 +956,25 @@ tagCommand
   .option("--json", "Print machine-readable JSON output")
   .action((id: string, tag: string, options: { json?: boolean }) => {
     const jsonMode = Boolean(options.json)
+    const context = {
+      dbPath: resolveDbPath(program.opts().dbPath as string),
+      migrationsDir: resolveMigrationsDir(),
+    }
 
-    runDbAction(jsonMode, () =>
-      withReadyDb(resolveDbPath(program.opts().dbPath as string), (db) => {
-        const itemId = parseItemId(id)
-        const normalizedTag = normalizeTag(tag)
-        ensureItemExists(db, itemId)
-        const row = db
-          .select({ id: schema.tags.id })
-          .from(schema.tags)
-          .where(eq(schema.tags.name, normalizedTag))
-          .get()
-        let removed = false
+    runDbAction(jsonMode, () => {
+      const result = removeTag(context, parseItemId(id), tag)
+      if (jsonMode) {
+        printJson({
+          ok: true,
+          ...result,
+        })
+        return
+      }
 
-        if (row) {
-          const result = db
-            .delete(schema.itemTags)
-            .where(and(eq(schema.itemTags.itemId, itemId), eq(schema.itemTags.tagId, row.id)))
-            .run()
-          removed = Number(result.changes) > 0
-        }
-
-        if (jsonMode) {
-          printJson({
-            ok: true,
-            item_id: itemId,
-            tag: normalizedTag,
-            removed,
-          })
-          return
-        }
-
-        process.stdout.write(
-          `${removed ? "removed" : "missing"} tag '${normalizedTag}' on #${itemId}\n`,
-        )
-      }),
-    )
+      process.stdout.write(
+        `${result.removed ? "removed" : "missing"} tag '${result.tag}' on #${result.item_id}\n`,
+      )
+    })
   })
 
 function markItemStatus(

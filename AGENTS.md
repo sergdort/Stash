@@ -19,6 +19,9 @@ Current implementation status:
 - Implemented: thumbnail extraction (metadata-first with content-image fallback) persisted on `items.thumbnail_url`.
 - Implemented: automatic X/Twitter `status/<id>` extraction via Playwright Chromium rendered DOM (public-only, single-status only, no generic fallback for X URLs).
 - Implemented: `extract` command to extract or re-extract content for existing items.
+- Implemented: optional local auto-tagging on `save`/`extract` (`--auto-tags`) with deterministic rules + Python sentence-transformers backend fallback behavior.
+- Implemented: auto-tag provenance tracking in `item_tags` (`is_manual`, `is_auto`, `auto_score`, `auto_source`, `auto_model`, `auto_updated_at`).
+- Implemented: `stash tags doctor` diagnostics for local auto-tags runtime checks.
 - Not implemented yet: `archive`, `delete`, `open`, search command.
 
 ## Stack
@@ -33,6 +36,7 @@ Current implementation status:
 - Package manager: `pnpm`
 - Content extraction: Mozilla Readability + linkedom
 - X/Twitter extraction: Playwright Chromium (headless browser) for public `status/<id>` URLs
+- Auto-tags embeddings backend: Python `sentence-transformers` helper (`scripts/auto-tags-embed.py`)
 - TTS provider (default): Coqui TTS (Python 3.11 + espeak-ng)
 - Default Coqui voice: `tts_models/en/vctk/vits|p241`
 - CLI discovery standardized across providers: PATH first, optional env overrides (`STASH_GTTS_CLI`, `STASH_COQUI_TTS_CLI`, `STASH_FFMPEG_CLI`, `STASH_SAY_CLI`, `STASH_AFCONVERT_CLI`, `STASH_ESPEAK_CLI`)
@@ -156,6 +160,7 @@ stash save https://example.com --no-extract
 Save URL:
 ```bash
 stash save https://example.com --title "Example" --tag ai --tag typescript --json
+stash save https://example.com --auto-tags --json
 ```
 
 Save without content extraction:
@@ -204,6 +209,8 @@ Extract or re-extract content:
 ```bash
 stash extract 1 --json
 stash extract 1 --force --json
+stash extract 1 --auto-tags --json
+stash tags doctor --json
 ```
 
 ## UI/UX Workflow for Agents
@@ -269,7 +276,8 @@ Typical error shape:
 - `tags`
   - Unique tag names.
 - `item_tags`
-  - Many-to-many link between items and tags.
+  - Many-to-many link between items and tags with provenance metadata:
+    - `is_manual`, `is_auto`, `auto_score`, `auto_source`, `auto_model`, `auto_updated_at`.
 - `notes`
   - Optional per-item note content.
 - `item_audio`
@@ -321,6 +329,9 @@ Updates should include:
 - `.db/` is git-ignored local runtime data for repository-local development.
 - Local npm scripts load `.env` using `dotenv` via `scripts/with-env.mjs`.
 - CLI DB path precedence remains: `--db-path` > `STASH_DB_PATH` > `~/.stash/stash.db`.
+- Auto-tags env controls:
+  - `STASH_AUTO_TAGS_ENABLED`, `STASH_AUTO_TAGS_MAX`, `STASH_AUTO_TAGS_MIN_SCORE`
+  - `STASH_AUTO_TAGS_MODEL`, `STASH_AUTO_TAGS_BACKEND`, `STASH_AUTO_TAGS_PYTHON`, `STASH_AUTO_TAGS_HELPER`
 - `stash web` now accepts `--host`, `--api-port`, `--pwa-port` (`--port` removed).
 - `stash web` runs split listeners (API + PWA) and fails fast on port conflicts or identical API/PWA ports.
 - Web dev (`apps/web` Vite) reads the same root `.env` port variables and uses strict port binding.
@@ -335,6 +346,8 @@ Updates should include:
   - `has_extracted_content: boolean`
   - `tts_audio: null | { file_name, format, provider, voice, bytes, generated_at }`
 - `POST /api/items/:id/tts` is enqueue-first and returns job metadata (`job`, `poll_url`, `poll_interval_ms`).
+- `POST /api/items` and `POST /api/items/:id/extract` accept optional `autoTags: boolean`.
+- Web save UX requests auto-tags when the tags field is left empty.
 - `GET /api/tts-jobs/:id` and `GET /api/items/:id/tts-jobs` expose job status/history for polling/recovery.
 - `tts` auto-generated filenames use friendly slugs + timestamp + short random suffix and collision fallback (`_2`, `_3`, ...).
 - Vitest sets `STASH_TTS_MOCK_BASE64` in `test/vitest.setup.ts` for deterministic TTS tests; default `pnpm test` does not require local Coqui/espeak binaries.

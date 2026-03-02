@@ -45,6 +45,18 @@ type SaveResponse = {
   ok: boolean
   created: boolean
   item: StashItem
+  auto_tags?: string[]
+  auto_tag_scores?: Array<{ tag: string; score: number; source: "embedding" | "rule" }>
+  auto_tag_warning?: string
+}
+
+type ExtractResponse = {
+  ok: boolean
+  item_id: number
+  content_length: number
+  auto_tags?: string[]
+  auto_tag_scores?: Array<{ tag: string; score: number; source: "embedding" | "rule" }>
+  auto_tag_warning?: string
 }
 
 type TagsListResponse = {
@@ -123,6 +135,22 @@ type TtsDoctorResponse = {
     supports_progress_bar: boolean
   }
   invocation_strategy: "text_file_then_fallback_text"
+}
+
+type AutoTagsDoctorResponse = {
+  ok: boolean
+  backend: "python" | "rule"
+  healthy: boolean
+  model: string
+  helper_path: string
+  python_path: string | null
+  checks: Array<{
+    id: "python" | "helper_script" | "sentence_transformers" | "helper_runtime"
+    required: boolean
+    ok: boolean
+    path: string | null
+    message: string | null
+  }>
 }
 
 type ErrorResponse = {
@@ -296,6 +324,49 @@ function getItemThumbnailUrl(dbPath: string, itemId: number): string | null {
   return JSON.parse(result.stdout.trim()) as string | null
 }
 
+function getItemTagProvenance(
+  dbPath: string,
+  itemId: number,
+): Array<{ tag: string; is_manual: number; is_auto: number }> {
+  const result = spawnSync(
+    process.execPath,
+    [
+      "-e",
+      `import("better-sqlite3").then((mod) => {
+  const Database = mod.default
+  const db = new Database(process.env.DB_PATH)
+  const rows = db
+    .prepare("select t.name as tag, it.is_manual, it.is_auto from item_tags it inner join tags t on t.id = it.tag_id where it.item_id = ? order by t.name asc")
+    .all(Number(process.env.ITEM_ID))
+  db.close()
+  process.stdout.write(JSON.stringify(rows))
+}).catch((error) => {
+  console.error(error?.message ?? String(error))
+  process.exit(1)
+})`,
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        DB_PATH: dbPath,
+        ITEM_ID: String(itemId),
+      },
+    },
+  )
+
+  if (result.status !== 0) {
+    throw new Error(`Failed to read item tag provenance:\n${result.stdout}\n${result.stderr}`)
+  }
+
+  return JSON.parse(result.stdout.trim()) as Array<{
+    tag: string
+    is_manual: number
+    is_auto: number
+  }>
+}
+
 const sqliteProbe = probeSqliteBinding()
 const sqliteProbeOutput = `${sqliteProbe.stdout}\n${sqliteProbe.stderr}`
 const sqliteBindingsMissing =
@@ -330,7 +401,7 @@ integrationSuite(integrationTitle, () => {
 
         const migrationStatus = runJson<DoctorResponse>(["db", "doctor"], { dbPath })
         expect(migrationStatus.ok).toBe(true)
-        expect(migrationStatus.applied_count).toBe(4)
+        expect(migrationStatus.applied_count).toBe(5)
         expect(migrationStatus.pending_count).toBe(0)
       } finally {
         cleanup()
@@ -383,6 +454,111 @@ integrationSuite(integrationTitle, () => {
         expect(getItemThumbnailUrl(dbPath, savedWithoutExtract.item.id)).toBe(
           "https://cdn.example.com/extract-cover.png",
         )
+      } finally {
+        cleanup()
+      }
+    })
+  })
+
+  describe("auto-tags", () => {
+    const autoTagsEnv: NodeJS.ProcessEnv = {
+      STASH_AUTO_TAGS_BACKEND: "rule",
+      STASH_AUTO_TAGS_MIN_SCORE: "0.62",
+      STASH_AUTO_TAGS_MAX: "3",
+    }
+
+    it("returns auto-tag fields from save --auto-tags and stores auto provenance", () => {
+      const { dbPath, cleanup } = createTempDb()
+      try {
+        const html = `<!doctype html><html><body><article><h1>TypeScript backend API guide</h1><p>${"TypeScript backend API architecture. ".repeat(10)}</p></article></body></html>`
+        const url = buildDataHtmlUrl(html)
+
+        const saved = runJson<SaveResponse>(["save", url, "--auto-tags"], {
+          dbPath,
+          env: autoTagsEnv,
+        })
+
+        expect(saved.ok).toBe(true)
+        expect((saved.auto_tags ?? []).length).toBeGreaterThan(0)
+        expect((saved.auto_tag_scores ?? []).length).toBeGreaterThan(0)
+
+        const rows = getItemTagProvenance(dbPath, saved.item.id)
+        const autoRows = rows.filter((row) => row.is_auto === 1)
+        expect(autoRows.length).toBeGreaterThan(0)
+      } finally {
+        cleanup()
+      }
+    })
+
+    it("re-runs auto-tags on existing URLs and replaces stale auto-only tags", () => {
+      const { dbPath, cleanup } = createTempDb()
+      try {
+        const url = "https://example.com/auto-tags-refresh"
+        const first = runJson<SaveResponse>(
+          ["save", url, "--title", "Refresh Item", "--no-extract"],
+          {
+            dbPath,
+          },
+        )
+        expect(first.created).toBe(true)
+
+        upsertNoteContent(
+          dbPath,
+          first.item.id,
+          "TypeScript backend API architecture and implementation details.",
+        )
+        runJson<SaveResponse>(["save", url, "--auto-tags", "--no-extract"], {
+          dbPath,
+          env: autoTagsEnv,
+        })
+
+        upsertNoteContent(
+          dbPath,
+          first.item.id,
+          "Security hardening and performance profiling in production systems.",
+        )
+
+        const second = runJson<SaveResponse>(["save", url, "--auto-tags", "--no-extract"], {
+          dbPath,
+          env: autoTagsEnv,
+        })
+        expect(second.created).toBe(false)
+        expect(second.auto_tags ?? []).not.toContain("typescript")
+        expect(
+          (second.auto_tags ?? []).some((tag) => ["security", "performance"].includes(tag)),
+        ).toBe(true)
+
+        const rows = getItemTagProvenance(dbPath, first.item.id)
+        const tags = rows.map((row) => row.tag)
+        expect(tags).toContain("security")
+        expect(tags).not.toContain("typescript")
+      } finally {
+        cleanup()
+      }
+    })
+
+    it("supports extract --auto-tags", () => {
+      const { dbPath, cleanup } = createTempDb()
+      try {
+        const html = `<!doctype html><html><body><article><h1>Python security reference</h1><p>${"Python security and backend API reference. ".repeat(10)}</p></article></body></html>`
+        const url = buildDataHtmlUrl(html)
+        const saved = runJson<SaveResponse>(
+          ["save", url, "--title", "No extract", "--no-extract"],
+          {
+            dbPath,
+          },
+        )
+
+        const extracted = runJson<ExtractResponse>(
+          ["extract", String(saved.item.id), "--auto-tags"],
+          {
+            dbPath,
+            env: autoTagsEnv,
+          },
+        )
+
+        expect(extracted.ok).toBe(true)
+        expect((extracted.auto_tags ?? []).length).toBeGreaterThan(0)
       } finally {
         cleanup()
       }
@@ -690,6 +866,89 @@ exit 0
         expect(report.healthy).toBe(false)
         expect(report.checks.find((check) => check.id === "coqui_cli")?.ok).toBe(true)
         expect(report.checks.find((check) => check.id === "espeak")?.ok).toBe(false)
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true })
+      }
+    })
+  })
+
+  describe("tags doctor", () => {
+    it("returns auto-tags health details in JSON", () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "stash-auto-tags-doctor-cli-"))
+      const dbPath = path.join(tempDir, "stash.db")
+      try {
+        const helperPath = path.join(tempDir, "auto-tags-helper.py")
+        fs.writeFileSync(helperPath, "print('helper')\n", "utf8")
+        const pythonPath = path.join(tempDir, "fake-python.sh")
+        writeExecutable(
+          pythonPath,
+          `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "Python 3.11.0"
+  exit 0
+fi
+if [ "$1" = "-c" ]; then
+  exit 0
+fi
+echo '{"ok":true,"scores":[{"tag":"health","score":0.9}]}'
+exit 0
+`,
+        )
+
+        const report = runJson<AutoTagsDoctorResponse>(["tags", "doctor"], {
+          dbPath,
+          env: {
+            STASH_AUTO_TAGS_BACKEND: "python",
+            STASH_AUTO_TAGS_PYTHON: pythonPath,
+            STASH_AUTO_TAGS_HELPER: helperPath,
+          },
+        })
+
+        expect(report.ok).toBe(true)
+        expect(report.backend).toBe("python")
+        expect(report.healthy).toBe(true)
+        expect(report.checks.find((check) => check.id === "python")?.ok).toBe(true)
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true })
+      }
+    })
+
+    it("exits with code 2 when auto-tags dependencies are unhealthy", () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "stash-auto-tags-doctor-cli-"))
+      const dbPath = path.join(tempDir, "stash.db")
+      try {
+        const helperPath = path.join(tempDir, "auto-tags-helper.py")
+        fs.writeFileSync(helperPath, "print('helper')\n", "utf8")
+        const pythonPath = path.join(tempDir, "fake-python.sh")
+        writeExecutable(
+          pythonPath,
+          `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "Python 3.11.0"
+  exit 0
+fi
+if [ "$1" = "-c" ]; then
+  echo "ImportError: sentence_transformers missing" >&2
+  exit 1
+fi
+echo '{"ok":true,"scores":[{"tag":"health","score":0.9}]}'
+exit 0
+`,
+        )
+
+        const report = runJson<AutoTagsDoctorResponse>(["tags", "doctor"], {
+          dbPath,
+          expectedCode: 2,
+          env: {
+            STASH_AUTO_TAGS_BACKEND: "python",
+            STASH_AUTO_TAGS_PYTHON: pythonPath,
+            STASH_AUTO_TAGS_HELPER: helperPath,
+          },
+        })
+
+        expect(report.ok).toBe(true)
+        expect(report.healthy).toBe(false)
+        expect(report.checks.find((check) => check.id === "sentence_transformers")?.ok).toBe(false)
       } finally {
         fs.rmSync(tempDir, { recursive: true, force: true })
       }

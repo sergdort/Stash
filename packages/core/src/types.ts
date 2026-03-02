@@ -1,6 +1,13 @@
 export type ItemStatus = "unread" | "read" | "archived"
 export type ListItemsStatusFilter = ItemStatus | "active"
 export type TagMode = "any" | "all"
+export type AutoTagSource = "embedding" | "rule"
+
+export type AutoTagScore = {
+  tag: string
+  score: number
+  source: AutoTagSource
+}
 
 export type ItemTtsAudio = {
   file_name: string
@@ -52,11 +59,15 @@ export type SaveItemInput = {
   title?: string
   tags?: string[]
   extract?: boolean
+  autoTags?: boolean
 }
 
 export type SaveItemResult = {
   created: boolean
   item: StashItem
+  auto_tags?: string[]
+  auto_tag_scores?: AutoTagScore[]
+  auto_tag_warning?: string
 }
 
 export type TagsListInput = {
@@ -75,6 +86,14 @@ export type ExtractItemResult = {
   title_updated: boolean
   content_length: number
   updated_at: string
+  auto_tags?: string[]
+  auto_tag_scores?: AutoTagScore[]
+  auto_tag_warning?: string
+}
+
+export type ExtractItemOptions = {
+  force?: boolean
+  autoTags?: boolean
 }
 
 export type TtsResult = {

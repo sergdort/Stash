@@ -4,6 +4,7 @@ import {
   index,
   integer,
   primaryKey,
+  real,
   sqliteTable,
   text,
   uniqueIndex,
@@ -53,10 +54,23 @@ export const itemTags = sqliteTable(
       .notNull()
       .references(() => tags.id, { onDelete: "cascade" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    isManual: integer("is_manual", { mode: "boolean" }).notNull().default(true),
+    isAuto: integer("is_auto", { mode: "boolean" }).notNull().default(false),
+    autoScore: real("auto_score"),
+    autoSource: text("auto_source"),
+    autoModel: text("auto_model"),
+    autoUpdatedAt: integer("auto_updated_at", { mode: "timestamp_ms" }),
   },
   (table) => [
     primaryKey({ columns: [table.itemId, table.tagId] }),
     index("idx_item_tags_tag_item").on(table.tagId, table.itemId),
+    index("idx_item_tags_item_auto").on(table.itemId, table.isAuto, table.tagId),
+    index("idx_item_tags_tag_manual").on(table.tagId, table.isManual, table.itemId),
+    check("item_tags_source_presence_check", sql`is_manual = 1 OR is_auto = 1`),
+    check(
+      "item_tags_auto_source_check",
+      sql`auto_source is null or auto_source in ('embedding','rule')`,
+    ),
   ],
 )
 
