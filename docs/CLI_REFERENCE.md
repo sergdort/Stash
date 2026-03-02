@@ -218,7 +218,7 @@ Web API item payloads (`GET /api/items`, `GET /api/items/:id`, `POST /api/items`
 Save a URL:
 
 ```bash
-stash save <url> [--title <text>] [--tag <name> ...] [--no-extract] [--json]
+stash save <url> [--title <text>] [--tag <name> ...] [--no-extract] [--auto-tags|--no-auto-tags] [--json]
 ```
 
 Behavior:
@@ -233,6 +233,8 @@ Behavior:
 - Thumbnail metadata is extracted and persisted to `items.thumbnail_url` (`og:image`/`twitter:image` first, article-image fallback)
 - Extracted title updates the item if no `--title` provided
 - Extracted text is stored in the `notes` table for future search/TTS features
+- `--auto-tags` runs local auto-tagging and returns `auto_tags` / `auto_tag_scores` in JSON output
+- `save --auto-tags` also runs for existing URLs and refreshes auto-only tags using current note content
 
 ## List
 
@@ -254,6 +256,12 @@ List all tags:
 
 ```bash
 stash tags list [--limit <n>] [--offset <n>] [--json]
+```
+
+Auto-tags runtime diagnostics:
+
+```bash
+stash tags doctor [--json]
 ```
 
 Attach tag to item:
@@ -298,7 +306,7 @@ stash unread <id> [--json]
 Extract or re-extract content for an item:
 
 ```bash
-stash extract <id> [--force] [--json]
+stash extract <id> [--force] [--auto-tags|--no-auto-tags] [--json]
 ```
 
 Behavior:
@@ -308,6 +316,7 @@ Behavior:
 - Persists extracted thumbnail metadata to `items.thumbnail_url`
 - Updates item title if extraction finds one and item has no title
 - Use `--force` to re-extract even if content already exists
+- `--auto-tags` runs local auto-tagging after extraction and returns `auto_tags` / `auto_tag_scores` in JSON output
 - X extraction remains public-only and single-status only (no thread/conversation expansion)
 - `stash extract` surfaces actionable setup/rendering diagnostics for X browser extraction failures while preserving `EXTRACTION_FAILED`
 - Useful for:
@@ -332,6 +341,33 @@ Linux (if Chromium system dependencies are missing):
 ```bash
 pnpm exec playwright install-deps chromium
 ```
+
+## Auto Tags
+
+Auto-tags are local-only and opt-in by default.
+
+Commands:
+
+```bash
+stash save <url> --auto-tags --json
+stash extract <id> --auto-tags --json
+stash tags doctor --json
+```
+
+Environment:
+- `STASH_AUTO_TAGS_ENABLED=false`
+- `STASH_AUTO_TAGS_MAX=3`
+- `STASH_AUTO_TAGS_MIN_SCORE=0.62`
+- `STASH_AUTO_TAGS_MODEL=sentence-transformers/all-MiniLM-L6-v2`
+- `STASH_AUTO_TAGS_BACKEND=python` (`rule` fallback mode is also supported)
+- `STASH_AUTO_TAGS_PYTHON=python3` (optional override)
+- `STASH_AUTO_TAGS_HELPER=./scripts/auto-tags-embed.py` (optional override)
+
+Notes:
+- Existing URLs are supported (`save --auto-tags` re-runs auto-tagging on existing items).
+- Auto-tag refresh replaces stale auto-only tags and preserves manual tags.
+- Tag provenance is tracked in `item_tags` (`is_manual`, `is_auto`, plus auto metadata fields).
+- Python setup instructions: `docs/AUTO_TAGS_SETUP.md`
 
 ## TTS Export
 
@@ -435,6 +471,25 @@ Typical `tts doctor` JSON response:
 }
 ```
 
+Typical `tags doctor` JSON response:
+
+```json
+{
+  "ok": true,
+  "backend": "python",
+  "healthy": true,
+  "model": "sentence-transformers/all-MiniLM-L6-v2",
+  "helper_path": "/path/to/scripts/auto-tags-embed.py",
+  "python_path": "/usr/bin/python3",
+  "checks": [
+    { "id": "python", "required": true, "ok": true, "path": "/usr/bin/python3", "message": null },
+    { "id": "helper_script", "required": true, "ok": true, "path": "/path/to/scripts/auto-tags-embed.py", "message": null },
+    { "id": "sentence_transformers", "required": true, "ok": true, "path": "/usr/bin/python3", "message": null },
+    { "id": "helper_runtime", "required": true, "ok": true, "path": "/path/to/scripts/auto-tags-embed.py", "message": null }
+  ]
+}
+```
+
 ## JSON Output Contract
 
 Most commands support `--json`.
@@ -488,6 +543,11 @@ Typical list response:
   }
 }
 ```
+
+When `--auto-tags` is used on `save` or `extract`, successful JSON responses may also include:
+- `auto_tags: string[]`
+- `auto_tag_scores: Array<{ tag, score, source }>`
+- `auto_tag_warning?: string`
 
 ## Exit Codes
 

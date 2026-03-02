@@ -9,6 +9,8 @@ import type {
   SaveItemInput,
   SaveItemResult,
 } from "../../types.js"
+import { resolveAutoTagsRequested } from "../auto-tags/config.js"
+import { applyAutoTags } from "../auto-tags/service.js"
 import {
   ensureTagId,
   getExtractedContentForItem,
@@ -34,6 +36,7 @@ export async function saveItem(
 ): Promise<SaveItemResult> {
   const parsedUrl = parseUrl(input.url)
   const normalizedTags = normalizeTags(input.tags ?? [])
+  const runAutoTags = resolveAutoTagsRequested(input.autoTags)
 
   return withReadyDbAsync(context.dbPath, context.migrationsDir, async (db) => {
     const existing = db
@@ -88,8 +91,19 @@ export async function saveItem(
             itemId,
             tagId,
             createdAt: timestamp,
+            isManual: true,
+            isAuto: false,
+            autoScore: null,
+            autoSource: null,
+            autoModel: null,
+            autoUpdatedAt: null,
           })
-          .onConflictDoNothing()
+          .onConflictDoUpdate({
+            target: [schema.itemTags.itemId, schema.itemTags.tagId],
+            set: {
+              isManual: true,
+            },
+          })
           .run()
       }
     })
@@ -98,7 +112,18 @@ export async function saveItem(
       throw new Error("Saved item id could not be determined.")
     }
 
-    if (input.extract !== false && created) {
+    const existingNote = db
+      .select({
+        content: schema.notes.content,
+      })
+      .from(schema.notes)
+      .where(eq(schema.notes.itemId, itemId))
+      .get()
+    const hasNoteContent = (existingNote?.content ?? "").trim().length > 0
+    const shouldExtract =
+      input.extract !== false && (created || (runAutoTags && !hasNoteContent))
+
+    if (shouldExtract) {
       try {
         const extracted = await extractContent(parsedUrl.toString())
         if (extracted?.textContent) {
@@ -141,12 +166,34 @@ export async function saveItem(
       }
     }
 
+    let autoTagResult: Awaited<ReturnType<typeof applyAutoTags>> | null = null
+    if (runAutoTags) {
+      const refreshed = getItemRowById(db, itemId)
+      if (refreshed) {
+        const note = db
+          .select({
+            content: schema.notes.content,
+          })
+          .from(schema.notes)
+          .where(eq(schema.notes.itemId, itemId))
+          .get()
+
+        autoTagResult = await applyAutoTags(db, {
+          itemId,
+          url: refreshed.url,
+          title: refreshed.title,
+          domain: refreshed.domain,
+          content: note?.content ?? null,
+        })
+      }
+    }
+
     const row = getItemRowById(db, itemId)
     if (!row) {
       throw new Error("Saved item could not be reloaded.")
     }
 
-    return {
+    const result: SaveItemResult = {
       created,
       item: serializeItem(
         row,
@@ -155,6 +202,15 @@ export async function saveItem(
         getItemAudioForItem(db, row.id),
       ),
     }
+    if (autoTagResult) {
+      result.auto_tags = autoTagResult.applied
+      result.auto_tag_scores = autoTagResult.scores
+      if (autoTagResult.warning) {
+        result.auto_tag_warning = autoTagResult.warning
+      }
+    }
+
+    return result
   })
 }
 

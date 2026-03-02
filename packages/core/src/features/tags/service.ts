@@ -49,24 +49,43 @@ export function addTag(
   return withReadyDb(context.dbPath, context.migrationsDir, (db) => {
     ensureItemExists(db, itemId)
     const timestamp = new Date(nowMs())
+    const existing = db
+      .select({
+        isManual: schema.itemTags.isManual,
+      })
+      .from(schema.itemTags)
+      .innerJoin(schema.tags, eq(schema.tags.id, schema.itemTags.tagId))
+      .where(and(eq(schema.itemTags.itemId, itemId), eq(schema.tags.name, normalizedTag)))
+      .get()
 
-    const result = db.transaction((tx) => {
+    db.transaction((tx) => {
       const tagId = ensureTagId(tx, normalizedTag, timestamp)
-      return tx
+      tx
         .insert(schema.itemTags)
         .values({
           itemId,
           tagId,
           createdAt: timestamp,
+          isManual: true,
+          isAuto: false,
+          autoScore: null,
+          autoSource: null,
+          autoModel: null,
+          autoUpdatedAt: null,
         })
-        .onConflictDoNothing()
+        .onConflictDoUpdate({
+          target: [schema.itemTags.itemId, schema.itemTags.tagId],
+          set: {
+            isManual: true,
+          },
+        })
         .run()
     })
 
     return {
       item_id: itemId,
       tag: normalizedTag,
-      added: Number(result.changes) > 0,
+      added: !existing || !existing.isManual,
     }
   })
 }

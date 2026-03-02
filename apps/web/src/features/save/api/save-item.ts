@@ -6,6 +6,7 @@ export type SavePayload = {
   title?: string
   tags?: string[]
   extract?: boolean
+  autoTags?: boolean
 }
 
 export type SaveResponse = {

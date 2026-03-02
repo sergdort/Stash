@@ -189,6 +189,7 @@ stash db doctor --json
 - Public X/Twitter `status/<id>` extraction via Playwright Chromium (headless, public-only)
 - Extract or re-extract content for existing items
 - Organize with tags
+- Optional local auto-tagging (`--auto-tags`) with provenance tracking
 - Mark items as read/unread
 - Generate TTS audio from extracted article content
 - Play previously generated TTS audio in the web UI
@@ -200,21 +201,39 @@ stash db doctor --json
 ```bash
 stash save https://example.com --tag typescript --tag cli
 stash save https://example.com --no-extract  # skip content extraction
+stash save https://example.com --auto-tags --json
 stash list --status unread --tag typescript --tag-mode all
 stash list --json
 stash tags list --json
+stash tags doctor --json
 stash tag add 1 productivity
 stash tag rm 1 productivity
 stash mark read 1
 stash mark unread 1
 stash extract 1  # extract content + thumbnail metadata for an existing item
 stash extract 1 --force  # re-extract even if content exists
+stash extract 1 --auto-tags --json
 stash tts 1 --json
 stash tts 1 --wait --json
 stash tts status 12 --json
 stash tts doctor --json
 stash jobs worker --once --json
 ```
+
+## Auto Tags
+
+- Auto-tags are opt-in by default:
+  - `stash save <url> --auto-tags`
+  - `stash extract <id> --auto-tags`
+- Disable explicitly with `--no-auto-tags`.
+- Existing URLs are supported: `stash save <existing-url> --auto-tags` re-runs auto-tagging and refreshes auto-only tags.
+- Provenance is tracked in `item_tags` (`is_manual`, `is_auto`, score/source/model metadata).
+- Manual tags are never removed by auto-tag refresh.
+- Web save form behavior: when tag input is left empty, web save requests auto-tagging automatically.
+- Runtime health check:
+  - `stash tags doctor --json`
+- Python setup instructions:
+  - `docs/AUTO_TAGS_SETUP.md`
 
 ## X / Twitter Extraction (Headless Browser)
 
