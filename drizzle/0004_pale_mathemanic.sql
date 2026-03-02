@@ -18,7 +18,7 @@ CREATE TABLE `__new_item_tags` (
 );
 --> statement-breakpoint
 INSERT INTO `__new_item_tags`("item_id", "tag_id", "created_at", "is_manual", "is_auto", "auto_score", "auto_source", "auto_model", "auto_updated_at")
-SELECT it."item_id", it."tag_id", CAST(strftime('%s','now') AS integer), 1, 0, NULL, NULL, NULL, NULL
+SELECT it."item_id", it."tag_id", it."created_at", 1, 0, NULL, NULL, NULL, NULL
 FROM `item_tags` it
 INNER JOIN `items` i ON i."id" = it."item_id"
 INNER JOIN `tags` t ON t."id" = it."tag_id";--> statement-breakpoint

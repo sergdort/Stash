@@ -121,7 +121,7 @@ Add env/config controls:
 - `STASH_AUTO_TAGS_ENABLED=false`
 - `STASH_AUTO_TAGS_MAX=3`
 - `STASH_AUTO_TAGS_MIN_SCORE=0.62`
-- `STASH_AUTO_TAGS_MODEL=all-MiniLM-L6-v2`
+- `STASH_AUTO_TAGS_MODEL=sentence-transformers/all-MiniLM-L6-v2`
 
 Optional runtime backend selector:
 
@@ -135,7 +135,7 @@ Optional runtime backend selector:
 
 Use `sentence-transformers` in a small Python helper script:
 
-- load `all-MiniLM-L6-v2`
+- load `sentence-transformers/all-MiniLM-L6-v2`
 - accept JSON payload (article + candidates)
 - return ranked scores JSON
 

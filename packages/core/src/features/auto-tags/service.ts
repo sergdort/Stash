@@ -15,6 +15,8 @@ import type {
   AutoTagSource,
 } from "./types.js"
 
+type AutoTagWriteDb = Pick<Db, "insert" | "update" | "delete" | "select">
+
 function buildContentExcerpt(content: string | null): string {
   const normalized = (content ?? "").replaceAll(/\s+/g, " ").trim()
   if (normalized.length <= 2000) {
@@ -197,7 +199,7 @@ async function scoreCandidates(
 }
 
 function upsertAutoTag(
-  db: Db,
+  db: AutoTagWriteDb,
   itemId: number,
   tag: string,
   score: number,
@@ -231,7 +233,7 @@ function upsertAutoTag(
     .run()
 }
 
-function pruneStaleAutoTags(db: Db, itemId: number, keep: Set<string>): void {
+function pruneStaleAutoTags(db: AutoTagWriteDb, itemId: number, keep: Set<string>): void {
   const rows = db
     .select({
       tagId: schema.itemTags.tagId,
@@ -286,10 +288,12 @@ export async function applyAutoTags(db: Db, input: AutoTagInput): Promise<AutoTa
   const selectedSet = new Set(selected.map((row) => row.tag))
   const timestamp = new Date()
 
-  for (const row of selected) {
-    upsertAutoTag(db, input.itemId, row.tag, row.score, row.source, timestamp, config.model)
-  }
-  pruneStaleAutoTags(db, input.itemId, selectedSet)
+  db.transaction((tx) => {
+    for (const row of selected) {
+      upsertAutoTag(tx, input.itemId, row.tag, row.score, row.source, timestamp, config.model)
+    }
+    pruneStaleAutoTags(tx, input.itemId, selectedSet)
+  })
 
   const result: AutoTagApplyResult = {
     applied: selected.map((row) => row.tag),

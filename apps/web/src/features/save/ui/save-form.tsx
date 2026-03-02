@@ -46,7 +46,7 @@ export function SaveForm({ onSave, saving }: SaveFormProps): JSX.Element {
           title: title || undefined,
           tags: normalizedTags,
           extract,
-          autoTags: normalizedTags.length === 0 ? true : undefined,
+          autoTags: normalizedTags.length === 0,
         }).then(() => {
           setUrl("")
           setTitle("")
