@@ -12,7 +12,10 @@ function truncateMessage(value: string): string {
   return `${normalized.slice(0, 300)}...`
 }
 
-function probeBinary(pathToBinary: string, args: string[]): {
+function probeBinary(
+  pathToBinary: string,
+  args: string[],
+): {
   ok: boolean
   output: string
   message: string | null
@@ -77,10 +80,7 @@ function buildHelperCheck(helperPath: string, required: boolean): AutoTagDepende
   }
 }
 
-function buildImportCheck(
-  pythonBin: string | null,
-  required: boolean,
-): AutoTagDependencyCheck {
+function buildImportCheck(pythonBin: string | null, required: boolean): AutoTagDependencyCheck {
   if (!pythonBin) {
     return {
       id: "sentence_transformers",

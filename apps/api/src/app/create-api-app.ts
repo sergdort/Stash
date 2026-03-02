@@ -18,7 +18,7 @@ export function createApiApp(options: CreateApiAppOptions): FastifyInstance {
 
   // Fastify's default JSON parser rejects empty bodies (e.g. DELETE with Content-Type: application/json).
   // Override it to treat empty bodies as undefined instead of an error.
-  server.addContentTypeParser("application/json", { parseAs: "string" }, (req, body, done) => {
+  server.addContentTypeParser("application/json", { parseAs: "string" }, (_req, body, done) => {
     if (body === "") {
       done(null, undefined)
       return

@@ -60,8 +60,7 @@ export function addTag(
 
     db.transaction((tx) => {
       const tagId = ensureTagId(tx, normalizedTag, timestamp)
-      tx
-        .insert(schema.itemTags)
+      tx.insert(schema.itemTags)
         .values({
           itemId,
           tagId,

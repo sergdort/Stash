@@ -240,16 +240,6 @@ function withDb<T>(dbPath: string, action: (db: Db) => T): T {
   }
 }
 
-async function withDbAsync<T>(dbPath: string, action: (db: Db) => Promise<T>): Promise<T> {
-  ensureDbDirectory(dbPath)
-  const { db, sqlite } = openDb(dbPath)
-  try {
-    return await action(db)
-  } finally {
-    sqlite.close()
-  }
-}
-
 function resolveMigrationsDir(value?: string): string {
   if (!value || value.trim().length === 0) {
     return DEFAULT_MIGRATIONS_DIR
@@ -277,11 +267,6 @@ function ensureDbReady(dbPath: string): void {
 function withReadyDb<T>(dbPath: string, action: (db: Db) => T): T {
   ensureDbReady(dbPath)
   return withDb(dbPath, action)
-}
-
-async function withReadyDbAsync<T>(dbPath: string, action: (db: Db) => Promise<T>): Promise<T> {
-  ensureDbReady(dbPath)
-  return withDbAsync(dbPath, action)
 }
 
 function getTagsMap(db: Db, itemIds: number[]): Map<number, string[]> {
@@ -502,7 +487,9 @@ program
           return
         }
 
-        process.stdout.write(`${result.created ? "saved" : "exists"} #${result.item.id} ${result.item.url}\n`)
+        process.stdout.write(
+          `${result.created ? "saved" : "exists"} #${result.item.id} ${result.item.url}\n`,
+        )
         if (result.auto_tags && result.auto_tags.length > 0) {
           process.stdout.write(`auto-tags: ${result.auto_tags.join(", ")}\n`)
         }
@@ -957,7 +944,9 @@ tagCommand
         return
       }
 
-      process.stdout.write(`${result.added ? "added" : "exists"} tag '${result.tag}' on #${result.item_id}\n`)
+      process.stdout.write(
+        `${result.added ? "added" : "exists"} tag '${result.tag}' on #${result.item_id}\n`,
+      )
     })
   })
 

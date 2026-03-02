@@ -120,8 +120,7 @@ export async function saveItem(
       .where(eq(schema.notes.itemId, itemId))
       .get()
     const hasNoteContent = (existingNote?.content ?? "").trim().length > 0
-    const shouldExtract =
-      input.extract !== false && (created || (runAutoTags && !hasNoteContent))
+    const shouldExtract = input.extract !== false && (created || (runAutoTags && !hasNoteContent))
 
     if (shouldExtract) {
       try {

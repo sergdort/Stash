@@ -494,9 +494,12 @@ integrationSuite(integrationTitle, () => {
       const { dbPath, cleanup } = createTempDb()
       try {
         const url = "https://example.com/auto-tags-refresh"
-        const first = runJson<SaveResponse>(["save", url, "--title", "Refresh Item", "--no-extract"], {
-          dbPath,
-        })
+        const first = runJson<SaveResponse>(
+          ["save", url, "--title", "Refresh Item", "--no-extract"],
+          {
+            dbPath,
+          },
+        )
         expect(first.created).toBe(true)
 
         upsertNoteContent(
@@ -521,9 +524,9 @@ integrationSuite(integrationTitle, () => {
         })
         expect(second.created).toBe(false)
         expect(second.auto_tags ?? []).not.toContain("typescript")
-        expect((second.auto_tags ?? []).some((tag) => ["security", "performance"].includes(tag))).toBe(
-          true,
-        )
+        expect(
+          (second.auto_tags ?? []).some((tag) => ["security", "performance"].includes(tag)),
+        ).toBe(true)
 
         const rows = getItemTagProvenance(dbPath, first.item.id)
         const tags = rows.map((row) => row.tag)
@@ -539,14 +542,20 @@ integrationSuite(integrationTitle, () => {
       try {
         const html = `<!doctype html><html><body><article><h1>Python security reference</h1><p>${"Python security and backend API reference. ".repeat(10)}</p></article></body></html>`
         const url = buildDataHtmlUrl(html)
-        const saved = runJson<SaveResponse>(["save", url, "--title", "No extract", "--no-extract"], {
-          dbPath,
-        })
+        const saved = runJson<SaveResponse>(
+          ["save", url, "--title", "No extract", "--no-extract"],
+          {
+            dbPath,
+          },
+        )
 
-        const extracted = runJson<ExtractResponse>(["extract", String(saved.item.id), "--auto-tags"], {
-          dbPath,
-          env: autoTagsEnv,
-        })
+        const extracted = runJson<ExtractResponse>(
+          ["extract", String(saved.item.id), "--auto-tags"],
+          {
+            dbPath,
+            env: autoTagsEnv,
+          },
+        )
 
         expect(extracted.ok).toBe(true)
         expect((extracted.auto_tags ?? []).length).toBeGreaterThan(0)

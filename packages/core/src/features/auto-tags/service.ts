@@ -258,9 +258,7 @@ function pruneStaleAutoTags(db: Db, itemId: number, keep: Set<string>): void {
           autoModel: null,
           autoUpdatedAt: null,
         })
-        .where(
-          and(eq(schema.itemTags.itemId, itemId), eq(schema.itemTags.tagId, row.tagId)),
-        )
+        .where(and(eq(schema.itemTags.itemId, itemId), eq(schema.itemTags.tagId, row.tagId)))
         .run()
       continue
     }

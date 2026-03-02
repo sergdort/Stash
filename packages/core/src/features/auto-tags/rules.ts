@@ -2,7 +2,16 @@ import type { AutoTagCandidate, AutoTagScore } from "./types.js"
 
 const STOPLIST = new Set(["news", "article", "general"])
 const DOMAIN_BOOSTS: Record<string, string[]> = {
-  "github.com": ["code", "devops", "open-source", "typescript", "javascript", "python", "rust", "go"],
+  "github.com": [
+    "code",
+    "devops",
+    "open-source",
+    "typescript",
+    "javascript",
+    "python",
+    "rust",
+    "go",
+  ],
   "docs.": ["reference", "api", "tutorial"],
 }
 
@@ -61,7 +70,9 @@ export function scoreTagsWithRules(options: {
 
     const descriptorTokens = tokenize(candidate.descriptor)
     if (descriptorTokens.length > 0) {
-      const matched = descriptorTokens.filter((token) => token.length > 1 && haystack.includes(token))
+      const matched = descriptorTokens.filter(
+        (token) => token.length > 1 && haystack.includes(token),
+      )
       const ratio = matched.length / descriptorTokens.length
       score += Math.min(0.35, ratio * 0.35)
     }

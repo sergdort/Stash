@@ -71,7 +71,11 @@ function createTag(context: OperationContext, tag: string): number {
       })
       .onConflictDoNothing({ target: schema.tags.name })
       .run()
-    const row = db.select({ id: schema.tags.id }).from(schema.tags).where(eq(schema.tags.name, tag)).get()
+    const row = db
+      .select({ id: schema.tags.id })
+      .from(schema.tags)
+      .where(eq(schema.tags.name, tag))
+      .get()
     if (!row) {
       throw new Error(`missing tag ${tag}`)
     }
