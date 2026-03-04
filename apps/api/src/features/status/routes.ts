@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify"
 
-import type { StatusService } from "../../../../../packages/core/src/services/contracts.js"
+import type { StatusService } from "@stash/core"
 import { parseItemId, parseStatusBody } from "./dto.js"
 
 const statusParamsSchema = {

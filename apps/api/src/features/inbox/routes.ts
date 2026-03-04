@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify"
 
-import type { ItemsService } from "../../../../../packages/core/src/services/contracts.js"
+import type { ItemsService } from "@stash/core"
 import { getSearchParams } from "../../shared/request/search-params.js"
 import { parseInboxQuery } from "./dto.js"
 

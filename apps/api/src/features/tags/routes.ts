@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify"
 
-import type { TagsService } from "../../../../../packages/core/src/services/contracts.js"
+import type { TagsService } from "@stash/core"
 import { getSearchParams } from "../../shared/request/search-params.js"
 import { parseItemId, parseTagBody, parseTagParam, parseTagsListQuery } from "./dto.js"
 

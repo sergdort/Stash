@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify"
 
-import type { ItemsService } from "../../../../../packages/core/src/services/contracts.js"
+import type { ItemsService } from "@stash/core"
 import { parseSaveBody } from "./dto.js"
 
 const saveBodySchema = {

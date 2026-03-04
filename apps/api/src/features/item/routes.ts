@@ -1,7 +1,6 @@
 import type { FastifyPluginAsync } from "fastify"
 
-import { StashError } from "../../../../../packages/core/src/errors.js"
-import type { ItemsService } from "../../../../../packages/core/src/services/contracts.js"
+import { StashError, type ItemsService } from "@stash/core"
 import { parseItemId } from "./dto.js"
 
 const itemParamsSchema = {

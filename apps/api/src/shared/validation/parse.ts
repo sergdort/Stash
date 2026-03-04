@@ -1,4 +1,4 @@
-import { StashError } from "../../../../../packages/core/src/errors.js"
+import { StashError } from "@stash/core"
 
 export function asPositiveInt(value: string | undefined, field: string): number {
   const parsed = Number.parseInt(value ?? "", 10)

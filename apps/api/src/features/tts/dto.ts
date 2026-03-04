@@ -1,4 +1,4 @@
-import { StashError } from "../../../../../packages/core/src/errors.js"
+import { StashError } from "@stash/core"
 import { asNonNegativeInt, asPositiveInt } from "../../shared/validation/parse.js"
 
 export function parseItemId(params: Record<string, string>): number {

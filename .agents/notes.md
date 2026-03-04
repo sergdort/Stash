@@ -1,6 +1,6 @@
-[1] In this sandbox, dependency installs can fail for two environment reasons: `pnpm install` may require `CI=true` in non-TTY mode, and external registry resolution (`registry.npmjs.org`) may be unavailable, which blocks lockfile/dependency updates.
+[2] In this sandbox, dependency installs can fail for two environment reasons: `pnpm install` may require `CI=true` in non-TTY mode (and sometimes `--no-frozen-lockfile` when package.json changed), and external registry resolution (`registry.npmjs.org`) may be unavailable, which blocks lockfile/dependency updates.
 
-[2] In this sandbox, integration tests that bind a local HTTP listener (e.g., `startWebServer` on `127.0.0.1`) can fail with `listen EPERM`; validate those tests in a less restricted environment.
+[3] In this sandbox, integration tests or dev servers that bind a local HTTP listener (e.g., `startWebServer`/Vite on `127.0.0.1`) can fail with `listen EPERM`; validate those flows in a less restricted environment.
 
 [0] If `pnpm add` fails with `ERR_PNPM_UNEXPECTED_STORE`, rerun with `--store-dir` pointing to the store path used by current `node_modules` (for this repo: `/Users/sergiishulga/Library/pnpm/store/v10`).
 
@@ -36,7 +36,7 @@
 [0] When adding a new DB migration, update CLI integration assertions that hard-code `db doctor` migration counts (e.g., expected `applied_count`) to prevent false negatives.
 [0] In sandboxed tests, default `~/.stash/audio` can be unwritable; set `STASH_AUDIO_DIR` to a temp path for worker-based TTS tests/commands.
 [0] Coqui CLI variants differ: some support `--text_file`, others only `--text`. Keep provider invocation backward compatible by retrying with inline `--text` when `--text_file`/`--progress_bar` is rejected.
-[0] CLI integration tests execute `dist/apps/cli/src/cli.js`; always run `pnpm run build` after source edits and before targeted integration runs, otherwise tests can fail against stale command behavior.
+[0] CLI integration tests execute `apps/cli/dist/cli.js`; always run `pnpm run build` after source edits and before targeted integration runs, otherwise tests can fail against stale command behavior.
 [0] With VS Code `node-terminal` launch running `pnpm run dev -- web`, the debugger UI can show wrapper-process disconnect messages (`Debugger attached` / `Waiting for the debugger to disconnect...`) even while the actual `stash web` child process is still running; verify via `/api/health` and use an attach config for breakpoints in the real process.
 [0] `scripts/with-env.mjs` should forward `SIGINT`/`SIGTERM`/`SIGHUP` to its spawned child; otherwise VS Code stop/terminate can kill the wrapper and orphan long-running child processes (e.g., `stash web`) on their ports.
 [0] For X/Twitter pages, `page.content()` can include the `<noscript>` "JavaScript is not available" fallback even when Playwright successfully rendered the app DOM. Treat that message as non-authoritative and key extraction off rendered `data-testid` content instead.

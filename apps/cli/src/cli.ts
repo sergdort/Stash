@@ -5,17 +5,17 @@ import { fileURLToPath } from "node:url"
 
 import { Command, InvalidArgumentError } from "commander"
 
-import { getMigrationStatus, runMigrations } from "../../../packages/core/src/db/migrate.js"
-import { StashError } from "../../../packages/core/src/errors.js"
 import {
   DEFAULT_AUDIO_DIR,
   DEFAULT_DB_PATH,
+  StashError,
+  createCoreServices,
+  getMigrationStatus,
   resolveAudioDir,
   resolveDbPath,
-} from "../../../packages/core/src/lib/paths.js"
-import { createCoreServices } from "../../../packages/core/src/services/index.js"
-import type { StashItem as CoreStashItem } from "../../../packages/core/src/types.js"
-import { startWebStack } from "../../api/src/index.js"
+  runMigrations,
+  type StashItem as CoreStashItem,
+} from "@stash/core"
 
 const CLI_DIR = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_MIGRATIONS_DIR = resolveExistingPath([
@@ -49,6 +49,24 @@ type StashItem = {
   read_at: string | null
   archived_at: string | null
 }
+
+type StartWebStackOptions = {
+  host: string
+  apiPort: number
+  pwaPort: number
+  dbPath: string
+  migrationsDir: string
+  webDistDir: string
+  audioDir?: string
+}
+
+type StartedWebStack = {
+  api: { host: string; port: number }
+  pwa: { host: string; port: number }
+  close: () => Promise<void>
+}
+
+type StartWebStackFn = (options: StartWebStackOptions) => Promise<StartedWebStack>
 
 class CliError extends Error {
   code: string
@@ -88,6 +106,40 @@ function resolveExistingPath(candidates: string[]): string {
     }
   }
   return candidates[0] as string
+}
+
+function isModuleResolutionError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+  const withCode = error as Error & { code?: string }
+  return (
+    withCode.code === "ERR_MODULE_NOT_FOUND" ||
+    error.message.includes("Cannot find module") ||
+    error.message.includes("Cannot find package")
+  )
+}
+
+async function loadStartWebStack(): Promise<StartWebStackFn> {
+  const candidates = ["../../api/dist/index.js", "../../api/src/index.js"]
+  for (const specifier of candidates) {
+    try {
+      const apiModule = (await import(specifier)) as { startWebStack?: StartWebStackFn }
+      if (typeof apiModule.startWebStack === "function") {
+        return apiModule.startWebStack
+      }
+    } catch (error) {
+      if (!isModuleResolutionError(error)) {
+        throw error
+      }
+    }
+  }
+
+  throw new CliError(
+    "Failed to load API web stack module. Run `pnpm run build` and try again.",
+    "INTERNAL_ERROR",
+    1,
+  )
 }
 
 function printJson(value: unknown): void {
@@ -1033,6 +1085,7 @@ program
 
       const dbPath = resolveDbPath(program.opts().dbPath as string)
       const migrationsDir = resolveMigrationsDir()
+      const startWebStack = await loadStartWebStack()
       const web = await startWebStack({
         host: options.host,
         apiPort: options.apiPort,

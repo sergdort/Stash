@@ -298,8 +298,8 @@ pnpm run db:doctor -- --json
 ```
 4. Test CLI behavior from compiled output:
 ```bash
-node dist/apps/cli/src/cli.js --help
-node dist/apps/cli/src/cli.js list --help
+node apps/cli/dist/cli.js --help
+node apps/cli/dist/cli.js list --help
 ```
 
 ## Documentation Maintenance Rule
@@ -371,3 +371,4 @@ Updates should include:
 - Use raw SQL string queries only when Drizzle does not support the required functionality clearly or safely (for example, specialized migration-runner behavior).
 - Prefer explicit return types on functions and methods (especially exported/public APIs and non-trivial helpers).
 - Dependency injection pattern: prefer `createXService`/`createCoreServices` factory objects over classes, and inject least-privilege service slices into API route plugins and command handlers.
+- In this sandbox, local listener startup (for example Vite/dev servers on `127.0.0.1`) may fail with `listen EPERM`; validate listener-bound flows in a less restricted environment when needed.

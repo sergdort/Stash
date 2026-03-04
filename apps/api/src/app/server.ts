@@ -1,7 +1,6 @@
 import http from "node:http"
 
-import { startTtsWorker } from "../../../../packages/core/src/features/tts/jobs.js"
-import { resolveAudioDir } from "../../../../packages/core/src/lib/paths.js"
+import { resolveAudioDir, startTtsWorker } from "@stash/core"
 import { createApiApp } from "./create-api-app.js"
 import { serveStatic } from "./static.js"
 

@@ -55,9 +55,17 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@22.19.11)(tsx@4.21.0)
 
-  apps/api: {}
+  apps/api:
+    dependencies:
+      '@stash/core':
+        specifier: workspace:*
+        version: link:../../packages/core
 
-  apps/cli: {}
+  apps/cli:
+    dependencies:
+      '@stash/core':
+        specifier: workspace:*
+        version: link:../../packages/core
 
   apps/web:
     dependencies:

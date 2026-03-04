@@ -3,8 +3,7 @@ import path from "node:path"
 
 import type { FastifyPluginAsync } from "fastify"
 
-import { StashError } from "../../../../../packages/core/src/errors.js"
-import type { TtsJobsService } from "../../../../../packages/core/src/services/contracts.js"
+import { StashError, type TtsJobsService } from "@stash/core"
 import { getSearchParams } from "../../shared/request/search-params.js"
 import { parseFileName, parseItemId, parseJobListQuery, parseTtsBody } from "./dto.js"
 

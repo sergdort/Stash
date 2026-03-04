@@ -165,7 +165,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const fixturesDir = path.join(__dirname, "fixtures")
 const repoRoot = path.resolve(__dirname, "../../..")
-const cliPath = path.join(repoRoot, "dist", "apps", "cli", "src", "cli.js")
+const cliPath = path.join(repoRoot, "apps", "cli", "dist", "cli.js")
 const articleUrl = "https://example.com/article"
 
 function runCli(args: string[], options: RunCliOptions): CliResult {
@@ -186,7 +186,7 @@ function runCli(args: string[], options: RunCliOptions): CliResult {
 
   if (result.status !== expectedCode) {
     throw new Error(
-      `Command failed: node dist/apps/cli/src/cli.js ${args.join(" ")}
+      `Command failed: node apps/cli/dist/cli.js ${args.join(" ")}
 expected exit code: ${expectedCode}
 actual exit code: ${String(result.status)}
 stdout:

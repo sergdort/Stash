@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify"
 
-import type { ExtractService } from "../../../../../packages/core/src/services/contracts.js"
+import type { ExtractService } from "@stash/core"
 import { parseAutoTags, parseForce, parseItemId } from "./dto.js"
 
 const extractParamsSchema = {
