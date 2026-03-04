@@ -1,7 +1,6 @@
 import type { FastifyPluginAsync } from "fastify"
 
-import { markRead, markUnread } from "../../../../../packages/core/src/features/status/service.js"
-import type { ApiRouteOptions } from "../options.js"
+import type { StatusService } from "../../../../../packages/core/src/services/contracts.js"
 import { parseItemId, parseStatusBody } from "./dto.js"
 
 const statusParamsSchema = {
@@ -23,7 +22,7 @@ const statusBodySchema = {
   required: ["status"],
 } as const
 
-export const statusRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, options) => {
+export const statusRoutes: FastifyPluginAsync<StatusRoutesOptions> = async (fastify, options) => {
   fastify.patch(
     "/items/:id/status",
     {
@@ -39,20 +38,8 @@ export const statusRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify,
 
       const result =
         status === "read"
-          ? markRead(
-              {
-                dbPath: options.dbPath,
-                migrationsDir: options.migrationsDir,
-              },
-              itemId,
-            )
-          : markUnread(
-              {
-                dbPath: options.dbPath,
-                migrationsDir: options.migrationsDir,
-              },
-              itemId,
-            )
+          ? options.statusService.markRead(itemId)
+          : options.statusService.markUnread(itemId)
 
       return {
         ok: true,
@@ -60,4 +47,8 @@ export const statusRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify,
       }
     },
   )
+}
+
+export type StatusRoutesOptions = {
+  statusService: Pick<StatusService, "markRead" | "markUnread">
 }

@@ -626,6 +626,37 @@ integrationSuite(integrationTitle, () => {
       }
     })
 
+    it("keeps `stash list --json` item shape stable", () => {
+      const { dbPath, cleanup } = createTempDb()
+      try {
+        seedSavedItem(dbPath)
+
+        const list = runJson<ListResponse>(["list"], { dbPath })
+        expect(list.ok).toBe(true)
+        expect(list.items.length).toBe(1)
+
+        const first = list.items[0] as unknown as Record<string, unknown>
+        expect(Object.keys(first).sort()).toEqual([
+          "archived_at",
+          "created_at",
+          "domain",
+          "id",
+          "is_starred",
+          "read_at",
+          "status",
+          "tags",
+          "title",
+          "updated_at",
+          "url",
+        ])
+        expect(first.thumbnail_url).toBeUndefined()
+        expect(first.has_extracted_content).toBeUndefined()
+        expect(first.tts_audio).toBeUndefined()
+      } finally {
+        cleanup()
+      }
+    })
+
     it("lists tags and keeps add/rm idempotent", () => {
       const { dbPath, cleanup } = createTempDb()
       try {

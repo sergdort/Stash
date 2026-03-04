@@ -3,14 +3,8 @@ import path from "node:path"
 
 import type { FastifyPluginAsync } from "fastify"
 
-import {
-  enqueueTtsJob,
-  getTtsJob,
-  listTtsJobsForItem,
-  waitForTtsJob,
-} from "../../../../../packages/core/src/features/tts/jobs.js"
 import { StashError } from "../../../../../packages/core/src/errors.js"
-import type { ApiRouteOptions } from "../options.js"
+import type { TtsJobsService } from "../../../../../packages/core/src/services/contracts.js"
 import { getSearchParams } from "../../shared/request/search-params.js"
 import { parseFileName, parseItemId, parseJobListQuery, parseTtsBody } from "./dto.js"
 
@@ -60,7 +54,7 @@ function mapJobFailureToHttp(errorCode: string | null): number {
   }
 }
 
-export const ttsRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, options) => {
+export const ttsRoutes: FastifyPluginAsync<TtsRoutesOptions> = async (fastify, options) => {
   fastify.post(
     "/items/:id/tts",
     {
@@ -84,25 +78,12 @@ export const ttsRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, op
         enqueueInput.format = body.format
       }
 
-      const enqueue = enqueueTtsJob(
-        {
-          dbPath: options.dbPath,
-          migrationsDir: options.migrationsDir,
-        },
-        enqueueInput,
-      )
+      const enqueue = options.ttsJobsService.enqueueTtsJob(enqueueInput)
 
       if (body.wait) {
-        const job = await waitForTtsJob(
-          {
-            dbPath: options.dbPath,
-            migrationsDir: options.migrationsDir,
-          },
-          enqueue.job.id,
-          {
-            pollMs: enqueue.poll_interval_ms,
-          },
-        )
+        const job = await options.ttsJobsService.waitForTtsJob(enqueue.job.id, {
+          pollMs: enqueue.poll_interval_ms,
+        })
 
         if (job.status === "failed") {
           throw new StashError(
@@ -203,13 +184,7 @@ export const ttsRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, op
     },
     async (request) => {
       const jobId = parseItemId(request.params as Record<string, string>)
-      const job = getTtsJob(
-        {
-          dbPath: options.dbPath,
-          migrationsDir: options.migrationsDir,
-        },
-        jobId,
-      )
+      const job = options.ttsJobsService.getTtsJob(jobId)
 
       return {
         ok: true,
@@ -229,15 +204,7 @@ export const ttsRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, op
     async (request) => {
       const itemId = parseItemId(request.params as Record<string, string>)
       const { limit, offset } = parseJobListQuery(getSearchParams(request))
-      const jobs = listTtsJobsForItem(
-        {
-          dbPath: options.dbPath,
-          migrationsDir: options.migrationsDir,
-        },
-        itemId,
-        limit,
-        offset,
-      )
+      const jobs = options.ttsJobsService.listTtsJobsForItem(itemId, limit, offset)
 
       return {
         ok: true,
@@ -250,4 +217,12 @@ export const ttsRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, op
       }
     },
   )
+}
+
+export type TtsRoutesOptions = {
+  ttsJobsService: Pick<
+    TtsJobsService,
+    "enqueueTtsJob" | "waitForTtsJob" | "getTtsJob" | "listTtsJobsForItem"
+  >
+  audioDir: string
 }

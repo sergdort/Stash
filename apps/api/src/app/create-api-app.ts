@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance } from "fastify"
 import { extractRoutes } from "../features/extract/routes.js"
 import { inboxRoutes } from "../features/inbox/routes.js"
 import { itemRoutes } from "../features/item/routes.js"
+import { createCoreServices } from "../../../../packages/core/src/services/index.js"
 import type { ApiRouteOptions } from "../features/options.js"
 import { saveRoutes } from "../features/save/routes.js"
 import { statusRoutes } from "../features/status/routes.js"
@@ -14,6 +15,10 @@ export type CreateApiAppOptions = ApiRouteOptions
 export function createApiApp(options: CreateApiAppOptions): FastifyInstance {
   const server = Fastify({
     logger: false,
+  })
+  const services = createCoreServices({
+    dbPath: options.dbPath,
+    migrationsDir: options.migrationsDir,
   })
 
   // Fastify's default JSON parser rejects empty bodies (e.g. DELETE with Content-Type: application/json).
@@ -36,13 +41,16 @@ export function createApiApp(options: CreateApiAppOptions): FastifyInstance {
     async (api) => {
       api.get("/health", async () => ({ ok: true }))
 
-      api.register(inboxRoutes, options)
-      api.register(itemRoutes, options)
-      api.register(saveRoutes, options)
-      api.register(tagsRoutes, options)
-      api.register(statusRoutes, options)
-      api.register(extractRoutes, options)
-      api.register(ttsRoutes, options)
+      api.register(inboxRoutes, { itemsService: services.items })
+      api.register(itemRoutes, { itemsService: services.items })
+      api.register(saveRoutes, { itemsService: services.items })
+      api.register(tagsRoutes, { tagsService: services.tags })
+      api.register(statusRoutes, { statusService: services.status })
+      api.register(extractRoutes, { extractService: services.extract })
+      api.register(ttsRoutes, {
+        ttsJobsService: services.ttsJobs,
+        audioDir: options.audioDir,
+      })
     },
     { prefix: "/api" },
   )

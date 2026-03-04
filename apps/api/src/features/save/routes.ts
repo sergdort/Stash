@@ -1,7 +1,6 @@
 import type { FastifyPluginAsync } from "fastify"
 
-import { saveItem } from "../../../../../packages/core/src/features/items/service.js"
-import type { ApiRouteOptions } from "../options.js"
+import type { ItemsService } from "../../../../../packages/core/src/services/contracts.js"
 import { parseSaveBody } from "./dto.js"
 
 const saveBodySchema = {
@@ -19,7 +18,7 @@ const saveBodySchema = {
   required: ["url"],
 } as const
 
-export const saveRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, options) => {
+export const saveRoutes: FastifyPluginAsync<SaveRoutesOptions> = async (fastify, options) => {
   fastify.post(
     "/items",
     {
@@ -28,13 +27,7 @@ export const saveRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, o
       },
     },
     async (request) => {
-      const result = await saveItem(
-        {
-          dbPath: options.dbPath,
-          migrationsDir: options.migrationsDir,
-        },
-        parseSaveBody(request.body),
-      )
+      const result = await options.itemsService.saveItem(parseSaveBody(request.body))
 
       return {
         ok: true,
@@ -42,4 +35,8 @@ export const saveRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, o
       }
     },
   )
+}
+
+export type SaveRoutesOptions = {
+  itemsService: Pick<ItemsService, "saveItem">
 }

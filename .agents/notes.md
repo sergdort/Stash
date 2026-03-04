@@ -50,3 +50,4 @@
 [0] In SQLite table-rebuild migrations (`__new_*` + rename), `CHECK` constraints must reference unqualified column names; qualifiers like `__new_table.column` can break after rename.
 [0] Drizzle SQLite migrator runs migrations in a transaction; `PRAGMA foreign_keys=OFF` inside migration SQL may not disable FK checks. Table-copy migrations should filter/clean orphan rows explicitly (e.g., `INNER JOIN` parents) instead of relying on that pragma.
 [0] CI `validate` workflow currently runs `format:check`, `lint`, `test`, and `apps/web` build. Before pushing, run all four locally to avoid fast-follow CI fix commits.
+[0] `stash db doctor` does not create parent directories for a missing DB path; if `STASH_DB_PATH` points to a non-existent directory, command can fail with `unable to open database file`.

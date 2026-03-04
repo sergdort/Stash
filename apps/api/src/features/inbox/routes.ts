@@ -1,7 +1,6 @@
 import type { FastifyPluginAsync } from "fastify"
 
-import { listItems } from "../../../../../packages/core/src/features/items/service.js"
-import type { ApiRouteOptions } from "../options.js"
+import type { ItemsService } from "../../../../../packages/core/src/services/contracts.js"
 import { getSearchParams } from "../../shared/request/search-params.js"
 import { parseInboxQuery } from "./dto.js"
 
@@ -24,7 +23,7 @@ const inboxQuerySchema = {
   },
 } as const
 
-export const inboxRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, options) => {
+export const inboxRoutes: FastifyPluginAsync<InboxRoutesOptions> = async (fastify, options) => {
   fastify.get(
     "/items",
     {
@@ -33,13 +32,7 @@ export const inboxRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, 
       },
     },
     async (request) => {
-      const result = listItems(
-        {
-          dbPath: options.dbPath,
-          migrationsDir: options.migrationsDir,
-        },
-        parseInboxQuery(getSearchParams(request)),
-      )
+      const result = options.itemsService.listItems(parseInboxQuery(getSearchParams(request)))
 
       return {
         ok: true,
@@ -47,4 +40,8 @@ export const inboxRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, 
       }
     },
   )
+}
+
+export type InboxRoutesOptions = {
+  itemsService: Pick<ItemsService, "listItems">
 }

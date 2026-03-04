@@ -1,8 +1,7 @@
 import type { FastifyPluginAsync } from "fastify"
 
-import { getItem } from "../../../../../packages/core/src/features/items/service.js"
 import { StashError } from "../../../../../packages/core/src/errors.js"
-import type { ApiRouteOptions } from "../options.js"
+import type { ItemsService } from "../../../../../packages/core/src/services/contracts.js"
 import { parseItemId } from "./dto.js"
 
 const itemParamsSchema = {
@@ -13,7 +12,7 @@ const itemParamsSchema = {
   required: ["id"],
 } as const
 
-export const itemRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, options) => {
+export const itemRoutes: FastifyPluginAsync<ItemRoutesOptions> = async (fastify, options) => {
   fastify.get(
     "/items/:id",
     {
@@ -23,13 +22,7 @@ export const itemRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, o
     },
     async (request) => {
       const itemId = parseItemId(request.params as Record<string, string>)
-      const item = getItem(
-        {
-          dbPath: options.dbPath,
-          migrationsDir: options.migrationsDir,
-        },
-        itemId,
-      )
+      const item = options.itemsService.getItem(itemId)
 
       if (!item) {
         throw new StashError(`Item ${itemId} not found.`, "NOT_FOUND", 3, 404)
@@ -41,4 +34,8 @@ export const itemRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, o
       }
     },
   )
+}
+
+export type ItemRoutesOptions = {
+  itemsService: Pick<ItemsService, "getItem">
 }
