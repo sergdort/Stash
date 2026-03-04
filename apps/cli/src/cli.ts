@@ -272,13 +272,6 @@ function ensureMigrationsDirExists(migrationsDir: string): void {
   }
 }
 
-function ensureDbReady(dbPath: string): void {
-  const migrationsDir = resolveMigrationsDir()
-  ensureMigrationsDirExists(migrationsDir)
-  ensureDbDirectory(dbPath)
-  runMigrations(dbPath, migrationsDir)
-}
-
 function runDbAction<T>(jsonMode: boolean, action: () => T | Promise<T>): T | Promise<T> {
   try {
     const result = action()

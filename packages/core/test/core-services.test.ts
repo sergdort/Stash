@@ -96,23 +96,19 @@ describe("createCoreServices", () => {
     const workerHandle = {
       stop: async (): Promise<void> => {},
     }
-    const startWorkerSpy = vi
-      .spyOn(ttsJobsModule, "startTtsWorker")
-      .mockReturnValue(workerHandle)
+    const startWorkerSpy = vi.spyOn(ttsJobsModule, "startTtsWorker").mockReturnValue(workerHandle)
     const runOnceSpy = vi.spyOn(ttsJobsModule, "runTtsWorkerOnce").mockResolvedValue(null)
 
-    const ttsDoctorSpy = vi
-      .spyOn(ttsDoctorModule, "inspectCoquiTtsHealth")
-      .mockReturnValue({
-        provider: "coqui",
-        healthy: true,
-        checks: [],
-        coqui_cli_features: {
-          supports_text_file: true,
-          supports_progress_bar: true,
-        },
-        invocation_strategy: "text_file_then_fallback_text",
-      })
+    const ttsDoctorSpy = vi.spyOn(ttsDoctorModule, "inspectCoquiTtsHealth").mockReturnValue({
+      provider: "coqui",
+      healthy: true,
+      checks: [],
+      coqui_cli_features: {
+        supports_text_file: true,
+        supports_progress_bar: true,
+      },
+      invocation_strategy: "text_file_then_fallback_text",
+    })
     const autoTagsDoctorSpy = vi
       .spyOn(autoTagsDoctorModule, "inspectAutoTagsHealth")
       .mockReturnValue({
