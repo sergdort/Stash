@@ -1,8 +1,4 @@
-import type {
-  ListItemsInput,
-  ListItemsStatusFilter,
-  TagMode,
-} from "../../../../../packages/core/src/types.js"
+import type { ListItemsInput, ListItemsStatusFilter, TagMode } from "@stash/core"
 import { asNonNegativeInt, asPositiveInt } from "../../shared/validation/parse.js"
 
 export function parseInboxQuery(query: URLSearchParams): ListItemsInput {

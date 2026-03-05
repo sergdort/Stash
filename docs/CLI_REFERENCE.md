@@ -65,7 +65,7 @@ pnpm run setup
 Run compiled CLI:
 
 ```bash
-node dist/apps/cli/src/cli.js --help
+node apps/cli/dist/cli.js --help
 ```
 
 Command help:
@@ -114,7 +114,7 @@ Override with:
 Example:
 
 ```bash
-STASH_DB_PATH=./.local/stash.db node dist/apps/cli/src/cli.js list --json
+STASH_DB_PATH=./.local/stash.db node apps/cli/dist/cli.js list --json
 ```
 
 ## Local Dev Environment

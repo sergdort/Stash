@@ -5,11 +5,11 @@
   "type": "module",
   "packageManager": "pnpm@10.16.1",
   "bin": {
-    "stash": "dist/apps/cli/src/cli.js"
+    "stash": "apps/cli/dist/cli.js"
   },
   "scripts": {
-    "setup": "pnpm run build && pnpm exec playwright install chromium && node scripts/with-env.mjs node dist/apps/cli/src/cli.js db migrate --json",
-    "build": "tsc -p tsconfig.json",
+    "setup": "pnpm run build && pnpm exec playwright install chromium && node scripts/with-env.mjs node apps/cli/dist/cli.js db migrate --json",
+    "build": "pnpm --filter @stash/core build && pnpm --filter stash-api-app build && pnpm --filter stash-cli-app build",
     "check": "pnpm run lint && pnpm run format:check && pnpm run build",
     "dev": "node scripts/with-env.mjs tsx apps/cli/src/cli.ts",
     "dev:api": "pnpm run dev -- web",
@@ -23,13 +23,13 @@
     "format:check": "biome format .",
     "test": "pnpm run build && vitest run",
     "test:integration": "pnpm run build && vitest run apps/cli/test/integration.test.ts",
-    "start": "node scripts/with-env.mjs node dist/apps/cli/src/cli.js",
-    "web": "pnpm run build && pnpm --dir apps/web build && node scripts/with-env.mjs node dist/apps/cli/src/cli.js web",
+    "start": "node scripts/with-env.mjs node apps/cli/dist/cli.js",
+    "web": "pnpm run build && pnpm --dir apps/web build && node scripts/with-env.mjs node apps/cli/dist/cli.js web",
     "db:generate": "drizzle-kit generate",
     "predb:migrate": "pnpm run build",
-    "db:migrate": "node scripts/with-env.mjs node dist/apps/cli/src/cli.js db migrate",
+    "db:migrate": "node scripts/with-env.mjs node apps/cli/dist/cli.js db migrate",
     "predb:doctor": "pnpm run build",
-    "db:doctor": "node scripts/with-env.mjs node dist/apps/cli/src/cli.js db doctor"
+    "db:doctor": "node scripts/with-env.mjs node apps/cli/dist/cli.js db doctor"
   },
   "engines": {
     "node": ">=22 <23"

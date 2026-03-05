@@ -1,7 +1,6 @@
 import type { FastifyPluginAsync } from "fastify"
 
-import { extractItem } from "../../../../../packages/core/src/features/extract/service.js"
-import type { ApiRouteOptions } from "../options.js"
+import type { ExtractService } from "@stash/core"
 import { parseAutoTags, parseForce, parseItemId } from "./dto.js"
 
 const extractParamsSchema = {
@@ -20,7 +19,7 @@ const extractBodySchema = {
   },
 } as const
 
-export const extractRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, options) => {
+export const extractRoutes: FastifyPluginAsync<ExtractRoutesOptions> = async (fastify, options) => {
   fastify.post(
     "/items/:id/extract",
     {
@@ -31,11 +30,7 @@ export const extractRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify
     },
     async (request) => {
       const autoTags = parseAutoTags(request.body)
-      const result = await extractItem(
-        {
-          dbPath: options.dbPath,
-          migrationsDir: options.migrationsDir,
-        },
+      const result = await options.extractService.extractItem(
         parseItemId(request.params as Record<string, string>),
         {
           force: parseForce(request.body),
@@ -49,4 +44,8 @@ export const extractRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify
       }
     },
   )
+}
+
+export type ExtractRoutesOptions = {
+  extractService: Pick<ExtractService, "extractItem">
 }

@@ -1,5 +1,4 @@
-import { StashError } from "../../../../../packages/core/src/errors.js"
-import type { SaveItemInput } from "../../../../../packages/core/src/types.js"
+import { StashError, type SaveItemInput } from "@stash/core"
 
 export function parseSaveBody(body: unknown): SaveItemInput {
   if (!body || typeof body !== "object") {

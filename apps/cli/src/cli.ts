@@ -4,31 +4,18 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { Command, InvalidArgumentError } from "commander"
-import { and, asc, desc, eq, exists, inArray, type SQL, sql } from "drizzle-orm"
 
-import { openDb, type StashDb } from "../../../packages/core/src/db/client.js"
-import { getMigrationStatus, runMigrations } from "../../../packages/core/src/db/migrate.js"
-import * as schema from "../../../packages/core/src/db/schema.js"
-import { StashError } from "../../../packages/core/src/errors.js"
-import { inspectAutoTagsHealth } from "../../../packages/core/src/features/auto-tags/doctor.js"
-import { extractItem } from "../../../packages/core/src/features/extract/service.js"
-import { saveItem } from "../../../packages/core/src/features/items/service.js"
-import { addTag, listTags, removeTag } from "../../../packages/core/src/features/tags/service.js"
-import { inspectCoquiTtsHealth } from "../../../packages/core/src/features/tts/doctor.js"
-import {
-  enqueueTtsJob,
-  getTtsJob,
-  runTtsWorkerOnce,
-  startTtsWorker,
-  waitForTtsJob,
-} from "../../../packages/core/src/features/tts/jobs.js"
 import {
   DEFAULT_AUDIO_DIR,
   DEFAULT_DB_PATH,
+  StashError,
+  createCoreServices,
+  getMigrationStatus,
   resolveAudioDir,
   resolveDbPath,
-} from "../../../packages/core/src/lib/paths.js"
-import { startWebStack } from "../../api/src/index.js"
+  runMigrations,
+  type StashItem as CoreStashItem,
+} from "@stash/core"
 
 const CLI_DIR = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_MIGRATIONS_DIR = resolveExistingPath([
@@ -49,9 +36,6 @@ const DEFAULT_TTS_VOICE = "tts_models/en/vctk/vits|p241" // Coqui male voice
 type ItemStatus = "unread" | "read" | "archived"
 type TagMode = "any" | "all"
 
-type ItemRow = typeof schema.items.$inferSelect & { status: ItemStatus }
-type Db = StashDb
-
 type StashItem = {
   id: number
   url: string
@@ -65,6 +49,24 @@ type StashItem = {
   read_at: string | null
   archived_at: string | null
 }
+
+type StartWebStackOptions = {
+  host: string
+  apiPort: number
+  pwaPort: number
+  dbPath: string
+  migrationsDir: string
+  webDistDir: string
+  audioDir?: string
+}
+
+type StartedWebStack = {
+  api: { host: string; port: number }
+  pwa: { host: string; port: number }
+  close: () => Promise<void>
+}
+
+type StartWebStackFn = (options: StartWebStackOptions) => Promise<StartedWebStack>
 
 class CliError extends Error {
   code: string
@@ -106,6 +108,40 @@ function resolveExistingPath(candidates: string[]): string {
   return candidates[0] as string
 }
 
+function isModuleResolutionError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+  const withCode = error as Error & { code?: string }
+  return (
+    withCode.code === "ERR_MODULE_NOT_FOUND" ||
+    error.message.includes("Cannot find module") ||
+    error.message.includes("Cannot find package")
+  )
+}
+
+async function loadStartWebStack(): Promise<StartWebStackFn> {
+  const candidates = ["../../api/dist/index.js", "../../api/src/index.js"]
+  for (const specifier of candidates) {
+    try {
+      const apiModule = (await import(specifier)) as { startWebStack?: StartWebStackFn }
+      if (typeof apiModule.startWebStack === "function") {
+        return apiModule.startWebStack
+      }
+    } catch (error) {
+      if (!isModuleResolutionError(error)) {
+        throw error
+      }
+    }
+  }
+
+  throw new CliError(
+    "Failed to load API web stack module. Run `pnpm run build` and try again.",
+    "INTERNAL_ERROR",
+    1,
+  )
+}
+
 function printJson(value: unknown): void {
   process.stdout.write(`${JSON.stringify(value, null, 2)}\n`)
 }
@@ -128,17 +164,6 @@ function printError(message: string, jsonMode: boolean, code: string, exitCode: 
 function ensureDbDirectory(dbPath: string): void {
   const dir = path.dirname(dbPath)
   fs.mkdirSync(dir, { recursive: true })
-}
-
-function nowMs(): number {
-  return Date.now()
-}
-
-function toIso(value: Date | number | null): string | null {
-  if (value === null) {
-    return null
-  }
-  return (value instanceof Date ? value : new Date(value)).toISOString()
 }
 
 function normalizeTag(tag: string): string {
@@ -170,19 +195,19 @@ function parsePort(value: string): number {
   return port
 }
 
-function serializeItem(row: ItemRow, tags: string[]): StashItem {
+function toCliListItem(item: CoreStashItem): StashItem {
   return {
-    id: row.id,
-    url: row.url,
-    title: row.title,
-    domain: row.domain,
-    status: row.status,
-    is_starred: row.isStarred,
-    tags,
-    created_at: toIso(row.createdAt) as string,
-    updated_at: toIso(row.updatedAt) as string,
-    read_at: toIso(row.readAt),
-    archived_at: toIso(row.archivedAt),
+    id: item.id,
+    url: item.url,
+    title: item.title,
+    domain: item.domain,
+    status: item.status,
+    is_starred: item.is_starred,
+    tags: item.tags,
+    created_at: item.created_at,
+    updated_at: item.updated_at,
+    read_at: item.read_at,
+    archived_at: item.archived_at,
   }
 }
 
@@ -230,16 +255,6 @@ function handleActionError(error: unknown, jsonMode: boolean): never {
   printError(message, jsonMode, "INTERNAL_ERROR", 1)
 }
 
-function withDb<T>(dbPath: string, action: (db: Db) => T): T {
-  ensureDbDirectory(dbPath)
-  const { db, sqlite } = openDb(dbPath)
-  try {
-    return action(db)
-  } finally {
-    sqlite.close()
-  }
-}
-
 function resolveMigrationsDir(value?: string): string {
   if (!value || value.trim().length === 0) {
     return DEFAULT_MIGRATIONS_DIR
@@ -255,44 +270,6 @@ function ensureMigrationsDirExists(migrationsDir: string): void {
       2,
     )
   }
-}
-
-function ensureDbReady(dbPath: string): void {
-  const migrationsDir = resolveMigrationsDir()
-  ensureMigrationsDirExists(migrationsDir)
-  ensureDbDirectory(dbPath)
-  runMigrations(dbPath, migrationsDir)
-}
-
-function withReadyDb<T>(dbPath: string, action: (db: Db) => T): T {
-  ensureDbReady(dbPath)
-  return withDb(dbPath, action)
-}
-
-function getTagsMap(db: Db, itemIds: number[]): Map<number, string[]> {
-  const map = new Map<number, string[]>()
-  if (itemIds.length === 0) {
-    return map
-  }
-
-  const rows = db
-    .select({
-      itemId: schema.itemTags.itemId,
-      name: schema.tags.name,
-    })
-    .from(schema.itemTags)
-    .innerJoin(schema.tags, eq(schema.tags.id, schema.itemTags.tagId))
-    .where(inArray(schema.itemTags.itemId, itemIds))
-    .orderBy(asc(schema.tags.name))
-    .all()
-
-  for (const row of rows) {
-    const values = map.get(row.itemId) ?? []
-    values.push(row.name)
-    map.set(row.itemId, values)
-  }
-
-  return map
 }
 
 function runDbAction<T>(jsonMode: boolean, action: () => T | Promise<T>): T | Promise<T> {
@@ -468,6 +445,7 @@ program
         dbPath: resolveDbPath(program.opts().dbPath as string),
         migrationsDir: resolveMigrationsDir(),
       }
+      const services = createCoreServices(context)
 
       return runDbAction(jsonMode, async () => {
         const saveInput = {
@@ -477,7 +455,7 @@ program
           ...(options.extract !== undefined ? { extract: options.extract } : {}),
           ...(options.autoTags !== undefined ? { autoTags: options.autoTags } : {}),
         }
-        const result = await saveItem(context, saveInput)
+        const result = await services.items.saveItem(saveInput)
 
         if (jsonMode) {
           printJson({
@@ -528,6 +506,7 @@ program
         dbPath,
         migrationsDir: resolveMigrationsDir(),
       }
+      const services = createCoreServices(context)
 
       return runDbAction(jsonMode, async () => {
         if (id === "doctor") {
@@ -539,7 +518,7 @@ program
             )
           }
 
-          const report = inspectCoquiTtsHealth()
+          const report = services.doctor.inspectCoquiTtsHealth()
           if (jsonMode) {
             printJson({
               ok: true,
@@ -579,7 +558,7 @@ program
             )
           }
           const parsedJobId = parseItemId(jobId)
-          const job = getTtsJob(context, parsedJobId)
+          const job = services.ttsJobs.getTtsJob(parsedJobId)
 
           if (jsonMode) {
             printJson({
@@ -603,7 +582,7 @@ program
         }
 
         const itemId = parseItemId(id)
-        const enqueue = enqueueTtsJob(context, {
+        const enqueue = services.ttsJobs.enqueueTtsJob({
           itemId,
           voice: options.voice,
           format: options.format,
@@ -628,13 +607,13 @@ program
         }
 
         const audioDir = resolveAudioDir(process.env.STASH_AUDIO_DIR ?? DEFAULT_AUDIO_DIR)
-        const worker = startTtsWorker(context, {
+        const worker = services.ttsJobs.startTtsWorker({
           pollMs: options.pollMs,
           audioDir,
         })
 
         try {
-          const completed = await waitForTtsJob(context, enqueue.job.id, {
+          const completed = await services.ttsJobs.waitForTtsJob(enqueue.job.id, {
             pollMs: options.pollMs,
           })
 
@@ -687,6 +666,7 @@ program
       dbPath: resolveDbPath(program.opts().dbPath as string),
       migrationsDir: resolveMigrationsDir(),
     }
+    const services = createCoreServices(context)
     const itemId = parseItemId(id)
 
     return runDbAction(jsonMode, async () => {
@@ -694,7 +674,7 @@ program
         ...(options.force !== undefined ? { force: options.force } : {}),
         ...(options.autoTags !== undefined ? { autoTags: options.autoTags } : {}),
       }
-      const result = await extractItem(context, itemId, extractOptions)
+      const result = await services.extract.extractItem(itemId, extractOptions)
 
       if (jsonMode) {
         printJson({
@@ -748,80 +728,48 @@ program
         printError("Invalid tag mode. Use any or all.", jsonMode, "VALIDATION_ERROR", 2)
       }
 
-      runDbAction(jsonMode, () =>
-        withReadyDb(resolveDbPath(program.opts().dbPath as string), (db) => {
-          const tags = normalizeTags(options.tag ?? [])
-          const conditions: SQL[] = []
+      const context = {
+        dbPath: resolveDbPath(program.opts().dbPath as string),
+        migrationsDir: resolveMigrationsDir(),
+      }
+      const services = createCoreServices(context)
 
-          if (status) {
-            conditions.push(eq(schema.items.status, status))
-          }
+      runDbAction(jsonMode, () => {
+        const tags = normalizeTags(options.tag ?? [])
+        const listInput = {
+          tags,
+          tagMode,
+          limit: options.limit,
+          offset: options.offset,
+          ...(status ? { status } : {}),
+        }
+        const result = services.items.listItems(listInput)
+        const items = result.items.map(toCliListItem)
 
-          if (tags.length > 0) {
-            if (tagMode === "any") {
-              const subquery = db
-                .select({ one: sql<number>`1` })
-                .from(schema.itemTags)
-                .innerJoin(schema.tags, eq(schema.tags.id, schema.itemTags.tagId))
-                .where(
-                  and(eq(schema.itemTags.itemId, schema.items.id), inArray(schema.tags.name, tags)),
-                )
-              conditions.push(exists(subquery))
-            } else {
-              for (const tag of tags) {
-                const subquery = db
-                  .select({ one: sql<number>`1` })
-                  .from(schema.itemTags)
-                  .innerJoin(schema.tags, eq(schema.tags.id, schema.itemTags.tagId))
-                  .where(
-                    and(eq(schema.itemTags.itemId, schema.items.id), eq(schema.tags.name, tag)),
-                  )
-                conditions.push(exists(subquery))
-              }
-            }
-          }
+        if (jsonMode) {
+          printJson({
+            ok: true,
+            items,
+            paging: {
+              limit: options.limit,
+              offset: options.offset,
+              returned: items.length,
+            },
+          })
+          return
+        }
 
-          const whereClause = conditions.length > 0 ? and(...conditions) : undefined
-          const rows = db
-            .select()
-            .from(schema.items)
-            .where(whereClause)
-            .orderBy(desc(schema.items.createdAt), desc(schema.items.id))
-            .limit(options.limit)
-            .offset(options.offset)
-            .all() as ItemRow[]
+        if (items.length === 0) {
+          process.stdout.write("No items found.\n")
+          return
+        }
 
-          const tagsMap = getTagsMap(
-            db,
-            rows.map((row) => row.id),
-          )
-          const items = rows.map((row) => serializeItem(row, tagsMap.get(row.id) ?? []))
-
-          if (jsonMode) {
-            printJson({
-              ok: true,
-              items,
-              paging: {
-                limit: options.limit,
-                offset: options.offset,
-                returned: items.length,
-              },
-            })
-            return
-          }
-
-          if (items.length === 0) {
-            process.stdout.write("No items found.\n")
-            return
-          }
-
-          for (const item of items) {
-            const displayTitle = item.title ?? item.url
-            const displayTags = item.tags.length > 0 ? ` [${item.tags.join(", ")}]` : ""
-            process.stdout.write(`#${item.id} ${item.status} ${displayTitle}${displayTags}\n`)
-          }
-        }),
-      )
+        for (const item of items) {
+          const displayTitle = item.title ?? item.url
+          const displayTags = item.tags.length > 0 ? ` [${item.tags.join(", ")}]` : ""
+          process.stdout.write(`#${item.id} ${item.status} ${displayTitle}${displayTags}\n`)
+        }
+      })
     },
   )
 
@@ -849,9 +797,10 @@ tagsCommand
       dbPath: resolveDbPath(program.opts().dbPath as string),
       migrationsDir: resolveMigrationsDir(),
     }
+    const services = createCoreServices(context)
 
     runDbAction(jsonMode, () => {
-      const result = listTags(context, {
+      const result = services.tags.listTags({
         limit: options.limit,
         offset: options.offset,
       })
@@ -881,9 +830,14 @@ tagsCommand
   .option("--json", "Print machine-readable JSON output")
   .action((options: { json?: boolean }) => {
     const jsonMode = Boolean(options.json)
+    const context = {
+      dbPath: resolveDbPath(program.opts().dbPath as string),
+      migrationsDir: resolveMigrationsDir(),
+    }
+    const services = createCoreServices(context)
 
     runDbAction(jsonMode, () => {
-      const report = inspectAutoTagsHealth()
+      const report = services.doctor.inspectAutoTagsHealth()
 
       if (jsonMode) {
         printJson({
@@ -933,9 +887,10 @@ tagCommand
       dbPath: resolveDbPath(program.opts().dbPath as string),
       migrationsDir: resolveMigrationsDir(),
     }
+    const services = createCoreServices(context)
 
     runDbAction(jsonMode, () => {
-      const result = addTag(context, parseItemId(id), tag)
+      const result = services.tags.addTag(parseItemId(id), tag)
       if (jsonMode) {
         printJson({
           ok: true,
@@ -960,9 +915,10 @@ tagCommand
       dbPath: resolveDbPath(program.opts().dbPath as string),
       migrationsDir: resolveMigrationsDir(),
     }
+    const services = createCoreServices(context)
 
     runDbAction(jsonMode, () => {
-      const result = removeTag(context, parseItemId(id), tag)
+      const result = services.tags.removeTag(parseItemId(id), tag)
       if (jsonMode) {
         printJson({
           ok: true,
@@ -976,45 +932,6 @@ tagCommand
       )
     })
   })
-
-function markItemStatus(
-  status: Exclude<ItemStatus, "archived">,
-  itemId: number,
-): { itemId: number; status: ItemStatus } {
-  const dbPath = resolveDbPath(program.opts().dbPath as string)
-
-  return withReadyDb(dbPath, (db) => {
-    const timestamp = new Date(nowMs())
-    const update =
-      status === "read"
-        ? db
-            .update(schema.items)
-            .set({
-              status: "read",
-              readAt: timestamp,
-              archivedAt: null,
-              updatedAt: timestamp,
-            })
-            .where(eq(schema.items.id, itemId))
-            .run()
-        : db
-            .update(schema.items)
-            .set({
-              status: "unread",
-              readAt: null,
-              archivedAt: null,
-              updatedAt: timestamp,
-            })
-            .where(eq(schema.items.id, itemId))
-            .run()
-
-    if (Number(update.changes) === 0) {
-      throw new CliError(`Item ${itemId} not found.`, "NOT_FOUND", 3)
-    }
-
-    return { itemId, status }
-  })
-}
 
 const markCommand = program.command("mark").description("Mark item states")
 
@@ -1033,20 +950,23 @@ markCommand
   .option("--json", "Print machine-readable JSON output")
   .action((id: string, options: { json?: boolean }) => {
     const jsonMode = Boolean(options.json)
+    const context = {
+      dbPath: resolveDbPath(program.opts().dbPath as string),
+      migrationsDir: resolveMigrationsDir(),
+    }
+    const services = createCoreServices(context)
 
     runDbAction(jsonMode, () => {
       const itemId = parseItemId(id)
-      const result = markItemStatus("read", itemId)
+      const result = services.status.markRead(itemId)
       if (jsonMode) {
         printJson({
           ok: true,
-          item_id: result.itemId,
-          action: "mark_read",
-          status: result.status,
+          ...result,
         })
         return
       }
-      process.stdout.write(`marked #${result.itemId} as read\n`)
+      process.stdout.write(`marked #${result.item_id} as read\n`)
     })
   })
 
@@ -1056,20 +976,23 @@ markCommand
   .option("--json", "Print machine-readable JSON output")
   .action((id: string, options: { json?: boolean }) => {
     const jsonMode = Boolean(options.json)
+    const context = {
+      dbPath: resolveDbPath(program.opts().dbPath as string),
+      migrationsDir: resolveMigrationsDir(),
+    }
+    const services = createCoreServices(context)
 
     runDbAction(jsonMode, () => {
       const itemId = parseItemId(id)
-      const result = markItemStatus("unread", itemId)
+      const result = services.status.markUnread(itemId)
       if (jsonMode) {
         printJson({
           ok: true,
-          item_id: result.itemId,
-          action: "mark_unread",
-          status: result.status,
+          ...result,
         })
         return
       }
-      process.stdout.write(`marked #${result.itemId} as unread\n`)
+      process.stdout.write(`marked #${result.item_id} as unread\n`)
     })
   })
 
@@ -1089,10 +1012,11 @@ jobsCommand
         dbPath: resolveDbPath(program.opts().dbPath as string),
         migrationsDir: resolveMigrationsDir(),
       }
+      const services = createCoreServices(context)
       const audioDir = resolveAudioDir(process.env.STASH_AUDIO_DIR ?? DEFAULT_AUDIO_DIR)
 
       if (options.once) {
-        const processed = await runTtsWorkerOnce(context, { audioDir })
+        const processed = await services.ttsJobs.runTtsWorkerOnce({ audioDir })
         if (jsonMode) {
           printJson({
             ok: true,
@@ -1111,7 +1035,7 @@ jobsCommand
         return
       }
 
-      const worker = startTtsWorker(context, {
+      const worker = services.ttsJobs.startTtsWorker({
         pollMs: options.pollMs,
         audioDir,
       })
@@ -1154,6 +1078,7 @@ program
 
       const dbPath = resolveDbPath(program.opts().dbPath as string)
       const migrationsDir = resolveMigrationsDir()
+      const startWebStack = await loadStartWebStack()
       const web = await startWebStack({
         host: options.host,
         apiPort: options.apiPort,
@@ -1194,19 +1119,22 @@ program
   .option("--json", "Print machine-readable JSON output")
   .action((id: string, options: { json?: boolean }) => {
     const jsonMode = Boolean(options.json)
+    const context = {
+      dbPath: resolveDbPath(program.opts().dbPath as string),
+      migrationsDir: resolveMigrationsDir(),
+    }
+    const services = createCoreServices(context)
     runDbAction(jsonMode, () => {
       const itemId = parseItemId(id)
-      const result = markItemStatus("read", itemId)
+      const result = services.status.markRead(itemId)
       if (jsonMode) {
         printJson({
           ok: true,
-          item_id: result.itemId,
-          action: "mark_read",
-          status: result.status,
+          ...result,
         })
         return
       }
-      process.stdout.write(`marked #${result.itemId} as read\n`)
+      process.stdout.write(`marked #${result.item_id} as read\n`)
     })
   })
 
@@ -1216,19 +1144,22 @@ program
   .option("--json", "Print machine-readable JSON output")
   .action((id: string, options: { json?: boolean }) => {
     const jsonMode = Boolean(options.json)
+    const context = {
+      dbPath: resolveDbPath(program.opts().dbPath as string),
+      migrationsDir: resolveMigrationsDir(),
+    }
+    const services = createCoreServices(context)
     runDbAction(jsonMode, () => {
       const itemId = parseItemId(id)
-      const result = markItemStatus("unread", itemId)
+      const result = services.status.markUnread(itemId)
       if (jsonMode) {
         printJson({
           ok: true,
-          item_id: result.itemId,
-          action: "mark_unread",
-          status: result.status,
+          ...result,
         })
         return
       }
-      process.stdout.write(`marked #${result.itemId} as unread\n`)
+      process.stdout.write(`marked #${result.item_id} as unread\n`)
     })
   })
 

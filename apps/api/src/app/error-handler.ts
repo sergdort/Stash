@@ -1,6 +1,6 @@
 import type { FastifyError, FastifyInstance, FastifyReply } from "fastify"
 
-import { StashError } from "../../../../packages/core/src/errors.js"
+import { StashError } from "@stash/core"
 
 function sendError(reply: FastifyReply, statusCode: number, code: string, message: string): void {
   void reply.code(statusCode).send({

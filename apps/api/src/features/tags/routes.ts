@@ -1,11 +1,6 @@
 import type { FastifyPluginAsync } from "fastify"
 
-import {
-  addTag,
-  listTags,
-  removeTag,
-} from "../../../../../packages/core/src/features/tags/service.js"
-import type { ApiRouteOptions } from "../options.js"
+import type { TagsService } from "@stash/core"
 import { getSearchParams } from "../../shared/request/search-params.js"
 import { parseItemId, parseTagBody, parseTagParam, parseTagsListQuery } from "./dto.js"
 
@@ -42,7 +37,7 @@ const addTagBodySchema = {
   required: ["tag"],
 } as const
 
-export const tagsRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, options) => {
+export const tagsRoutes: FastifyPluginAsync<TagsRoutesOptions> = async (fastify, options) => {
   fastify.get(
     "/tags",
     {
@@ -51,13 +46,7 @@ export const tagsRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, o
       },
     },
     async (request) => {
-      const result = listTags(
-        {
-          dbPath: options.dbPath,
-          migrationsDir: options.migrationsDir,
-        },
-        parseTagsListQuery(getSearchParams(request)),
-      )
+      const result = options.tagsService.listTags(parseTagsListQuery(getSearchParams(request)))
 
       return {
         ok: true,
@@ -76,14 +65,7 @@ export const tagsRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, o
     },
     async (request) => {
       const params = request.params as Record<string, string>
-      const result = addTag(
-        {
-          dbPath: options.dbPath,
-          migrationsDir: options.migrationsDir,
-        },
-        parseItemId(params),
-        parseTagBody(request.body),
-      )
+      const result = options.tagsService.addTag(parseItemId(params), parseTagBody(request.body))
 
       return {
         ok: true,
@@ -101,14 +83,7 @@ export const tagsRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, o
     },
     async (request) => {
       const params = request.params as Record<string, string>
-      const result = removeTag(
-        {
-          dbPath: options.dbPath,
-          migrationsDir: options.migrationsDir,
-        },
-        parseItemId(params),
-        parseTagParam(params),
-      )
+      const result = options.tagsService.removeTag(parseItemId(params), parseTagParam(params))
 
       return {
         ok: true,
@@ -116,4 +91,8 @@ export const tagsRoutes: FastifyPluginAsync<ApiRouteOptions> = async (fastify, o
       }
     },
   )
+}
+
+export type TagsRoutesOptions = {
+  tagsService: Pick<TagsService, "listTags" | "addTag" | "removeTag">
 }

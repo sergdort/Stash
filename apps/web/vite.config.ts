@@ -28,6 +28,10 @@ export default defineConfig(({ mode }) => {
   return {
     envDir: REPO_ROOT,
     plugins: [react()],
+    optimizeDeps: {
+      // Avoid intermittent missing prebundle chunk warnings from react-router-dom in dev.
+      exclude: ["react-router-dom"],
+    },
     server: {
       host,
       port: pwaPort,
