@@ -302,6 +302,15 @@ node apps/cli/dist/cli.js --help
 node apps/cli/dist/cli.js list --help
 ```
 
+## Pre-PR Handoff Gate
+
+Before opening a PR/MR, run local quality gates and keep them green.
+
+- Code changes: must run `pnpm run check` and fix all failures before PR/MR creation.
+- Docs-only changes: must run `pnpm run format:check` before PR/MR creation.
+- PR flow: use existing `gh` tooling (`gh pr create`), then watch checks with `gh pr checks --watch`.
+- If CI fails, fix locally, re-run the local gate, push, and re-check until all required checks are green.
+
 ## Documentation Maintenance Rule
 
 ⚠️ **When adding new features or modifying existing CLI behavior, update ALL THREE documentation files in the same change:**
