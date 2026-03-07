@@ -2,12 +2,7 @@ import { and, desc, eq, exists, inArray, sql, type SQL } from "drizzle-orm"
 
 import * as schema from "../../db/schema.js"
 import { extractContent } from "../../lib/extract.js"
-import type {
-  ListItemsInput,
-  ListItemsResult,
-  SaveItemInput,
-  SaveItemResult,
-} from "../../types.js"
+import type { ListItemsInput, ListItemsResult, SaveItemInput, SaveItemResult } from "../../types.js"
 import { resolveAutoTagsRequested } from "../auto-tags/config.js"
 import { applyAutoTags } from "../auto-tags/service.js"
 import {

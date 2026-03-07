@@ -263,9 +263,7 @@ function resolveMigrationsDir(value?: string): string {
   return path.resolve(value)
 }
 
-function withCoreRuntime<T>(
-  action: (services: CoreServices) => T | Promise<T>,
-): T | Promise<T> {
+function withCoreRuntime<T>(action: (services: CoreServices) => T | Promise<T>): T | Promise<T> {
   const runtime = createCoreRuntime({
     dbPath: resolveDbPath(program.opts().dbPath as string),
     migrationsDir: resolveMigrationsDir(),
@@ -544,9 +542,7 @@ program
                 const requirement = check.required ? "required" : "optional"
                 const status = check.ok ? "ok" : "failed"
                 const resolvedPath = check.path ?? "-"
-                process.stdout.write(
-                  `${check.id} (${requirement}): ${status} [${resolvedPath}]\n`,
-                )
+                process.stdout.write(`${check.id} (${requirement}): ${status} [${resolvedPath}]\n`)
                 if (check.message) {
                   process.stdout.write(`  ${check.message}\n`)
                 }

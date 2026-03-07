@@ -167,12 +167,7 @@ export function getTtsJob(db: Db, jobId: number): TtsJob {
   return serializeTtsJob(row)
 }
 
-export function listTtsJobsForItem(
-  db: Db,
-  itemId: number,
-  limit = 10,
-  offset = 0,
-): TtsJob[] {
+export function listTtsJobsForItem(db: Db, itemId: number, limit = 10, offset = 0): TtsJob[] {
   const item = db
     .select({ id: schema.items.id })
     .from(schema.items)
@@ -394,7 +389,10 @@ export function startTtsWorker(db: Db, options: TtsWorkerOptions = {}): TtsWorke
   }
 }
 
-export async function runTtsWorkerOnce(db: Db, options: { audioDir?: string } = {}): Promise<TtsJob | null> {
+export async function runTtsWorkerOnce(
+  db: Db,
+  options: { audioDir?: string } = {},
+): Promise<TtsJob | null> {
   markStaleRunningJobsFailed(db)
   pruneOldTerminalJobs(db)
   return await processNextTtsJob(db, options)

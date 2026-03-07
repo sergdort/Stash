@@ -121,10 +121,7 @@ function resolveTtsOutputPath(
   return ensureUniqueFilePath(path.join(resolvedAudioDir, fileName))
 }
 
-export async function executeTtsForItem(
-  db: Db,
-  input: GenerateTtsInput,
-): Promise<TtsResult> {
+export async function executeTtsForItem(db: Db, input: GenerateTtsInput): Promise<TtsResult> {
   const format = parseTtsFormat(input.format ?? "mp3")
   const voice = input.voice?.trim() ?? "tts_models/en/vctk/vits|p241"
   if (voice.length === 0) {
