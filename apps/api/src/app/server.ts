@@ -1,7 +1,7 @@
 import http from "node:http"
 
 import type { FastifyInstance } from "fastify"
-import { createCoreRuntime, resolveAudioDir } from "@stash/core"
+import { createCoreRuntime, resolveAudioDir, type TtsWorkerHandle } from "@stash/core"
 import { createApiApp } from "./create-api-app.js"
 import { serveStatic } from "./static.js"
 
@@ -203,6 +203,26 @@ function sendJson(res: http.ServerResponse, statusCode: number, value: unknown):
   res.end(body)
 }
 
+async function shutdownApiResources(
+  server: FastifyInstance,
+  ttsWorker: TtsWorkerHandle,
+  closeRuntime: () => void,
+): Promise<void> {
+  const results = await Promise.allSettled([ttsWorker.stop(), server.close()])
+  closeRuntime()
+
+  const errors = results
+    .filter((result): result is PromiseRejectedResult => result.status === "rejected")
+    .map((result) => result.reason)
+
+  if (errors.length === 1) {
+    throw errors[0]
+  }
+  if (errors.length > 1) {
+    throw new AggregateError(errors, "Failed to shutdown API server resources.")
+  }
+}
+
 export async function startApiServer(options: StartApiServerOptions): Promise<StartedApiServer> {
   const audioDir = resolveAudioDir(options.audioDir)
   const workerOptions = { audioDir } as { audioDir: string; pollMs?: number }
@@ -230,9 +250,11 @@ export async function startApiServer(options: StartApiServerOptions): Promise<St
   try {
     resolvedPort = await listenApiServer(server, options.host, options.port)
   } catch (error) {
-    await server.close()
-    await ttsWorker.stop()
-    runtime.close()
+    try {
+      await shutdownApiResources(server, ttsWorker, runtime.close)
+    } catch {
+      // Preserve the original listen failure while still attempting full cleanup.
+    }
     throw error
   }
 
@@ -242,9 +264,7 @@ export async function startApiServer(options: StartApiServerOptions): Promise<St
     port: resolvedPort,
     audioDir,
     close: async () => {
-      await ttsWorker.stop()
-      await server.close()
-      runtime.close()
+      await shutdownApiResources(server, ttsWorker, runtime.close)
     },
   }
 }

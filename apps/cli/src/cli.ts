@@ -268,20 +268,36 @@ function withCoreRuntime<T>(action: (services: CoreServices) => T | Promise<T>):
     dbPath: resolveDbPath(program.opts().dbPath as string),
     migrationsDir: resolveMigrationsDir(),
   })
+  let closed = false
+  const closeRuntime = (): void => {
+    if (closed) {
+      return
+    }
+    closed = true
+    runtime.close()
+  }
 
   try {
     const result = action(runtime.services)
-    if (result instanceof Promise) {
-      return result.finally(() => {
-        runtime.close()
+    if (isPromiseLike(result)) {
+      return Promise.resolve(result).finally(() => {
+        closeRuntime()
       })
     }
-    runtime.close()
+    closeRuntime()
     return result
   } catch (error) {
-    runtime.close()
+    closeRuntime()
     throw error
   }
+}
+
+function isPromiseLike<T>(value: unknown): value is PromiseLike<T> {
+  return (
+    value !== null &&
+    (typeof value === "object" || typeof value === "function") &&
+    typeof (value as { then?: unknown }).then === "function"
+  )
 }
 
 function ensureMigrationsDirExists(migrationsDir: string): void {

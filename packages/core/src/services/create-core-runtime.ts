@@ -1,5 +1,5 @@
 import { openDb } from "../db/client.js"
-import { runMigrations } from "../db/migrate.js"
+import { runMigrationsWithDatabase } from "../db/migrate.js"
 import { ensureDbDirectory } from "../features/common/db.js"
 import { createCoreServices } from "./create-core-services.js"
 import type { CoreServices } from "./contracts.js"
@@ -16,9 +16,14 @@ export type CoreRuntime = {
 
 export function createCoreRuntime(options: CreateCoreRuntimeOptions): CoreRuntime {
   ensureDbDirectory(options.dbPath)
-  runMigrations(options.dbPath, options.migrationsDir)
-
   const { db, sqlite } = openDb(options.dbPath)
+  try {
+    runMigrationsWithDatabase(db, sqlite, options.migrationsDir)
+  } catch (error) {
+    sqlite.close()
+    throw error
+  }
+
   let closed = false
 
   return {
