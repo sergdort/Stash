@@ -1,6 +1,7 @@
 import http from "node:http"
 
-import { resolveAudioDir, startTtsWorker } from "@stash/core"
+import type { FastifyInstance } from "fastify"
+import { createCoreRuntime, resolveAudioDir } from "@stash/core"
 import { createApiApp } from "./create-api-app.js"
 import { serveStatic } from "./static.js"
 
@@ -102,7 +103,7 @@ async function listenServer(
 }
 
 async function listenApiServer(
-  server: ReturnType<typeof createApiApp>,
+  server: FastifyInstance,
   host: string,
   port: number,
 ): Promise<number> {
@@ -209,18 +210,21 @@ export async function startApiServer(options: StartApiServerOptions): Promise<St
     workerOptions.pollMs = options.ttsWorkerPollMs
   }
 
-  const ttsWorker = startTtsWorker(
-    {
-      dbPath: options.dbPath,
-      migrationsDir: options.migrationsDir,
-    },
-    workerOptions,
-  )
-  const server = createApiApp({
+  const runtime = createCoreRuntime({
     dbPath: options.dbPath,
     migrationsDir: options.migrationsDir,
-    audioDir,
   })
+  let server: FastifyInstance
+  try {
+    server = createApiApp({
+      services: runtime.services,
+      audioDir,
+    })
+  } catch (error) {
+    runtime.close()
+    throw error
+  }
+  const ttsWorker = runtime.services.ttsJobs.startTtsWorker(workerOptions)
 
   let resolvedPort = options.port
   try {
@@ -228,6 +232,7 @@ export async function startApiServer(options: StartApiServerOptions): Promise<St
   } catch (error) {
     await server.close()
     await ttsWorker.stop()
+    runtime.close()
     throw error
   }
 
@@ -239,6 +244,7 @@ export async function startApiServer(options: StartApiServerOptions): Promise<St
     close: async () => {
       await ttsWorker.stop()
       await server.close()
+      runtime.close()
     },
   }
 }
