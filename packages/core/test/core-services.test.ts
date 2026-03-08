@@ -7,6 +7,7 @@ import * as statusModule from "../src/features/status/service.js"
 import * as tagsModule from "../src/features/tags/service.js"
 import * as ttsDoctorModule from "../src/features/tts/doctor.js"
 import * as ttsJobsModule from "../src/features/tts/jobs.js"
+import type { StashDb } from "../src/db/client.js"
 import { createCoreServices } from "../src/services/create-core-services.js"
 import type { TtsJob } from "../src/types.js"
 
@@ -14,10 +15,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-const context = {
-  dbPath: "/tmp/stash-test.db",
-  migrationsDir: "/tmp/stash-migrations",
-}
+const db = {} as StashDb
 
 function buildTtsJob(id: number): TtsJob {
   return {
@@ -37,7 +35,7 @@ function buildTtsJob(id: number): TtsJob {
 }
 
 describe("createCoreServices", () => {
-  it("delegates all service methods to existing feature functions with bound context", async () => {
+  it("delegates all service methods to existing feature functions with bound db", async () => {
     const saveSpy = vi.spyOn(itemsModule, "saveItem").mockResolvedValue({
       created: true,
       item: {} as never,
@@ -120,7 +118,7 @@ describe("createCoreServices", () => {
         checks: [],
       })
 
-    const services = createCoreServices(context)
+    const services = createCoreServices({ db })
 
     const saveInput = { url: "https://example.com" }
     const listInput = { limit: 5, offset: 0 }
@@ -154,25 +152,25 @@ describe("createCoreServices", () => {
     services.doctor.inspectCoquiTtsHealth()
     services.doctor.inspectAutoTagsHealth()
 
-    expect(saveSpy).toHaveBeenCalledWith(context, saveInput)
-    expect(listSpy).toHaveBeenCalledWith(context, listInput)
-    expect(getItemSpy).toHaveBeenCalledWith(context, 1)
+    expect(saveSpy).toHaveBeenCalledWith(db, saveInput)
+    expect(listSpy).toHaveBeenCalledWith(db, listInput)
+    expect(getItemSpy).toHaveBeenCalledWith(db, 1)
 
-    expect(extractSpy).toHaveBeenCalledWith(context, 1, extractOptions)
+    expect(extractSpy).toHaveBeenCalledWith(db, 1, extractOptions)
 
-    expect(listTagsSpy).toHaveBeenCalledWith(context, listTagsInput)
-    expect(addTagSpy).toHaveBeenCalledWith(context, 1, "ai")
-    expect(removeTagSpy).toHaveBeenCalledWith(context, 1, "ai")
+    expect(listTagsSpy).toHaveBeenCalledWith(db, listTagsInput)
+    expect(addTagSpy).toHaveBeenCalledWith(db, 1, "ai")
+    expect(removeTagSpy).toHaveBeenCalledWith(db, 1, "ai")
 
-    expect(markReadSpy).toHaveBeenCalledWith(context, 1)
-    expect(markUnreadSpy).toHaveBeenCalledWith(context, 1)
+    expect(markReadSpy).toHaveBeenCalledWith(db, 1)
+    expect(markUnreadSpy).toHaveBeenCalledWith(db, 1)
 
-    expect(enqueueSpy).toHaveBeenCalledWith(context, enqueueInput)
-    expect(getJobSpy).toHaveBeenCalledWith(context, 10)
-    expect(listJobsSpy).toHaveBeenCalledWith(context, 1, 10, 0)
-    expect(waitSpy).toHaveBeenCalledWith(context, 10, waitOptions)
-    expect(startWorkerSpy).toHaveBeenCalledWith(context, startWorkerOptions)
-    expect(runOnceSpy).toHaveBeenCalledWith(context, runOnceOptions)
+    expect(enqueueSpy).toHaveBeenCalledWith(db, enqueueInput)
+    expect(getJobSpy).toHaveBeenCalledWith(db, 10)
+    expect(listJobsSpy).toHaveBeenCalledWith(db, 1, 10, 0)
+    expect(waitSpy).toHaveBeenCalledWith(db, 10, waitOptions)
+    expect(startWorkerSpy).toHaveBeenCalledWith(db, startWorkerOptions)
+    expect(runOnceSpy).toHaveBeenCalledWith(db, runOnceOptions)
 
     expect(ttsDoctorSpy).toHaveBeenCalled()
     expect(autoTagsDoctorSpy).toHaveBeenCalled()

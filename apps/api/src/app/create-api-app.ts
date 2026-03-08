@@ -1,25 +1,24 @@
 import Fastify, { type FastifyInstance } from "fastify"
-import { createCoreServices } from "@stash/core"
+import type { CoreServices } from "@stash/core"
 import { extractRoutes } from "../features/extract/routes.js"
 import { inboxRoutes } from "../features/inbox/routes.js"
 import { itemRoutes } from "../features/item/routes.js"
-import type { ApiRouteOptions } from "../features/options.js"
 import { saveRoutes } from "../features/save/routes.js"
 import { statusRoutes } from "../features/status/routes.js"
 import { tagsRoutes } from "../features/tags/routes.js"
 import { ttsRoutes } from "../features/tts/routes.js"
 import { registerApiErrorHandlers } from "./error-handler.js"
 
-export type CreateApiAppOptions = ApiRouteOptions
+export type CreateApiAppOptions = {
+  services: CoreServices
+  audioDir: string
+}
 
 export function createApiApp(options: CreateApiAppOptions): FastifyInstance {
   const server = Fastify({
     logger: false,
   })
-  const services = createCoreServices({
-    dbPath: options.dbPath,
-    migrationsDir: options.migrationsDir,
-  })
+  const { services } = options
 
   // Fastify's default JSON parser rejects empty bodies (e.g. DELETE with Content-Type: application/json).
   // Override it to treat empty bodies as undefined instead of an error.

@@ -6,14 +6,15 @@ import { fileURLToPath } from "node:url"
 import { Command, InvalidArgumentError } from "commander"
 
 import {
+  createCoreRuntime,
   DEFAULT_AUDIO_DIR,
   DEFAULT_DB_PATH,
   StashError,
-  createCoreServices,
   getMigrationStatus,
   resolveAudioDir,
   resolveDbPath,
   runMigrations,
+  type CoreServices,
   type StashItem as CoreStashItem,
 } from "@stash/core"
 
@@ -262,6 +263,43 @@ function resolveMigrationsDir(value?: string): string {
   return path.resolve(value)
 }
 
+function withCoreRuntime<T>(action: (services: CoreServices) => T | Promise<T>): T | Promise<T> {
+  const runtime = createCoreRuntime({
+    dbPath: resolveDbPath(program.opts().dbPath as string),
+    migrationsDir: resolveMigrationsDir(),
+  })
+  let closed = false
+  const closeRuntime = (): void => {
+    if (closed) {
+      return
+    }
+    closed = true
+    runtime.close()
+  }
+
+  try {
+    const result = action(runtime.services)
+    if (isPromiseLike(result)) {
+      return Promise.resolve(result).finally(() => {
+        closeRuntime()
+      })
+    }
+    closeRuntime()
+    return result
+  } catch (error) {
+    closeRuntime()
+    throw error
+  }
+}
+
+function isPromiseLike<T>(value: unknown): value is PromiseLike<T> {
+  return (
+    value !== null &&
+    (typeof value === "object" || typeof value === "function") &&
+    typeof (value as { then?: unknown }).then === "function"
+  )
+}
+
 function ensureMigrationsDirExists(migrationsDir: string): void {
   if (!fs.existsSync(migrationsDir)) {
     throw new CliError(
@@ -441,40 +479,36 @@ program
       },
     ) => {
       const jsonMode = Boolean(options.json)
-      const context = {
-        dbPath: resolveDbPath(program.opts().dbPath as string),
-        migrationsDir: resolveMigrationsDir(),
-      }
-      const services = createCoreServices(context)
+      return runDbAction(jsonMode, () =>
+        withCoreRuntime(async (services) => {
+          const saveInput = {
+            url,
+            tags: options.tag ?? [],
+            ...(options.title !== undefined ? { title: options.title } : {}),
+            ...(options.extract !== undefined ? { extract: options.extract } : {}),
+            ...(options.autoTags !== undefined ? { autoTags: options.autoTags } : {}),
+          }
+          const result = await services.items.saveItem(saveInput)
 
-      return runDbAction(jsonMode, async () => {
-        const saveInput = {
-          url,
-          tags: options.tag ?? [],
-          ...(options.title !== undefined ? { title: options.title } : {}),
-          ...(options.extract !== undefined ? { extract: options.extract } : {}),
-          ...(options.autoTags !== undefined ? { autoTags: options.autoTags } : {}),
-        }
-        const result = await services.items.saveItem(saveInput)
+          if (jsonMode) {
+            printJson({
+              ok: true,
+              ...result,
+            })
+            return
+          }
 
-        if (jsonMode) {
-          printJson({
-            ok: true,
-            ...result,
-          })
-          return
-        }
-
-        process.stdout.write(
-          `${result.created ? "saved" : "exists"} #${result.item.id} ${result.item.url}\n`,
-        )
-        if (result.auto_tags && result.auto_tags.length > 0) {
-          process.stdout.write(`auto-tags: ${result.auto_tags.join(", ")}\n`)
-        }
-        if (result.auto_tag_warning) {
-          process.stdout.write(`auto-tags warning: ${result.auto_tag_warning}\n`)
-        }
-      })
+          process.stdout.write(
+            `${result.created ? "saved" : "exists"} #${result.item.id} ${result.item.url}\n`,
+          )
+          if (result.auto_tags && result.auto_tags.length > 0) {
+            process.stdout.write(`auto-tags: ${result.auto_tags.join(", ")}\n`)
+          }
+          if (result.auto_tag_warning) {
+            process.stdout.write(`auto-tags warning: ${result.auto_tag_warning}\n`)
+          }
+        }),
+      )
     },
   )
 
@@ -501,158 +535,152 @@ program
       },
     ) => {
       const jsonMode = Boolean(options.json)
-      const dbPath = resolveDbPath(program.opts().dbPath as string)
-      const context = {
-        dbPath,
-        migrationsDir: resolveMigrationsDir(),
-      }
-      const services = createCoreServices(context)
+      return runDbAction(jsonMode, () =>
+        withCoreRuntime(async (services) => {
+          if (id === "doctor") {
+            if (jobId !== undefined) {
+              throw new CliError(
+                "Unexpected extra argument for `stash tts doctor`.",
+                "VALIDATION_ERROR",
+                2,
+              )
+            }
 
-      return runDbAction(jsonMode, async () => {
-        if (id === "doctor") {
+            const report = services.doctor.inspectCoquiTtsHealth()
+            if (jsonMode) {
+              printJson({
+                ok: true,
+                ...report,
+              })
+            } else {
+              process.stdout.write(`tts doctor: ${report.healthy ? "healthy" : "unhealthy"}\n`)
+              for (const check of report.checks) {
+                const requirement = check.required ? "required" : "optional"
+                const status = check.ok ? "ok" : "failed"
+                const resolvedPath = check.path ?? "-"
+                process.stdout.write(`${check.id} (${requirement}): ${status} [${resolvedPath}]\n`)
+                if (check.message) {
+                  process.stdout.write(`  ${check.message}\n`)
+                }
+              }
+              process.stdout.write(
+                `coqui flags: --text_file=${report.coqui_cli_features.supports_text_file ? "yes" : "no"} --progress_bar=${report.coqui_cli_features.supports_progress_bar ? "yes" : "no"}\n`,
+              )
+              process.stdout.write(
+                `invocation strategy: ${report.invocation_strategy.replaceAll("_", " ")}\n`,
+              )
+            }
+
+            if (!report.healthy) {
+              process.exitCode = 2
+            }
+            return
+          }
+
+          if (id === "status") {
+            if (!jobId) {
+              throw new CliError(
+                "Job id is required: stash tts status <jobId>",
+                "VALIDATION_ERROR",
+                2,
+              )
+            }
+            const parsedJobId = parseItemId(jobId)
+            const job = services.ttsJobs.getTtsJob(parsedJobId)
+
+            if (jsonMode) {
+              printJson({
+                ok: true,
+                job,
+              })
+              return
+            }
+
+            const suffix = job.error_message ? ` (${job.error_message})` : ""
+            process.stdout.write(`tts job #${job.id} ${job.status}${suffix}\n`)
+            return
+          }
+
           if (jobId !== undefined) {
             throw new CliError(
-              "Unexpected extra argument for `stash tts doctor`.",
+              "Unexpected extra argument for `stash tts <id>`.",
               "VALIDATION_ERROR",
               2,
             )
           }
 
-          const report = services.doctor.inspectCoquiTtsHealth()
-          if (jsonMode) {
-            printJson({
-              ok: true,
-              ...report,
-            })
-          } else {
-            process.stdout.write(`tts doctor: ${report.healthy ? "healthy" : "unhealthy"}\n`)
-            for (const check of report.checks) {
-              const requirement = check.required ? "required" : "optional"
-              const status = check.ok ? "ok" : "failed"
-              const resolvedPath = check.path ?? "-"
-              process.stdout.write(`${check.id} (${requirement}): ${status} [${resolvedPath}]\n`)
-              if (check.message) {
-                process.stdout.write(`  ${check.message}\n`)
-              }
-            }
-            process.stdout.write(
-              `coqui flags: --text_file=${report.coqui_cli_features.supports_text_file ? "yes" : "no"} --progress_bar=${report.coqui_cli_features.supports_progress_bar ? "yes" : "no"}\n`,
-            )
-            process.stdout.write(
-              `invocation strategy: ${report.invocation_strategy.replaceAll("_", " ")}\n`,
-            )
-          }
-
-          if (!report.healthy) {
-            process.exitCode = 2
-          }
-          return
-        }
-
-        if (id === "status") {
-          if (!jobId) {
-            throw new CliError(
-              "Job id is required: stash tts status <jobId>",
-              "VALIDATION_ERROR",
-              2,
-            )
-          }
-          const parsedJobId = parseItemId(jobId)
-          const job = services.ttsJobs.getTtsJob(parsedJobId)
-
-          if (jsonMode) {
-            printJson({
-              ok: true,
-              job,
-            })
-            return
-          }
-
-          const suffix = job.error_message ? ` (${job.error_message})` : ""
-          process.stdout.write(`tts job #${job.id} ${job.status}${suffix}\n`)
-          return
-        }
-
-        if (jobId !== undefined) {
-          throw new CliError(
-            "Unexpected extra argument for `stash tts <id>`.",
-            "VALIDATION_ERROR",
-            2,
-          )
-        }
-
-        const itemId = parseItemId(id)
-        const enqueue = services.ttsJobs.enqueueTtsJob({
-          itemId,
-          voice: options.voice,
-          format: options.format,
-        })
-
-        if (!options.wait) {
-          if (jsonMode) {
-            printJson({
-              ok: true,
-              created: enqueue.created,
-              job_id: enqueue.job.id,
-              status: enqueue.job.status,
-              poll_interval_ms: enqueue.poll_interval_ms,
-            })
-            return
-          }
-
-          process.stdout.write(
-            `${enqueue.created ? "queued" : "existing"} tts job #${enqueue.job.id} for item #${itemId}\n`,
-          )
-          return
-        }
-
-        const audioDir = resolveAudioDir(process.env.STASH_AUDIO_DIR ?? DEFAULT_AUDIO_DIR)
-        const worker = services.ttsJobs.startTtsWorker({
-          pollMs: options.pollMs,
-          audioDir,
-        })
-
-        try {
-          const completed = await services.ttsJobs.waitForTtsJob(enqueue.job.id, {
-            pollMs: options.pollMs,
+          const itemId = parseItemId(id)
+          const enqueue = services.ttsJobs.enqueueTtsJob({
+            itemId,
+            voice: options.voice,
+            format: options.format,
           })
 
-          if (completed.status === "failed") {
-            const code = completed.error_code ?? "INTERNAL_ERROR"
-            const exitCode = code === "NO_CONTENT" ? 2 : code === "NOT_FOUND" ? 3 : 1
-            throw new CliError(completed.error_message ?? "TTS job failed.", code, exitCode)
-          }
+          if (!options.wait) {
+            if (jsonMode) {
+              printJson({
+                ok: true,
+                created: enqueue.created,
+                job_id: enqueue.job.id,
+                status: enqueue.job.status,
+                poll_interval_ms: enqueue.poll_interval_ms,
+              })
+              return
+            }
 
-          const fileName = completed.output_file_name
-          if (!fileName) {
-            throw new CliError(
-              `TTS job ${completed.id} completed without output file.`,
-              "INTERNAL_ERROR",
-              1,
+            process.stdout.write(
+              `${enqueue.created ? "queued" : "existing"} tts job #${enqueue.job.id} for item #${itemId}\n`,
             )
-          }
-          const outputPath = path.join(audioDir, fileName)
-
-          if (jsonMode) {
-            printJson({
-              ok: true,
-              job_id: completed.id,
-              item_id: completed.item_id,
-              status: completed.status,
-              output_file_name: fileName,
-              output_path: outputPath,
-            })
             return
           }
 
-          process.stdout.write(`generated #${completed.item_id} ${outputPath}\n`)
-        } finally {
-          await worker.stop()
-        }
-      })
+          const audioDir = resolveAudioDir(process.env.STASH_AUDIO_DIR ?? DEFAULT_AUDIO_DIR)
+          const worker = services.ttsJobs.startTtsWorker({
+            pollMs: options.pollMs,
+            audioDir,
+          })
+
+          try {
+            const completed = await services.ttsJobs.waitForTtsJob(enqueue.job.id, {
+              pollMs: options.pollMs,
+            })
+
+            if (completed.status === "failed") {
+              const code = completed.error_code ?? "INTERNAL_ERROR"
+              const exitCode = code === "NO_CONTENT" ? 2 : code === "NOT_FOUND" ? 3 : 1
+              throw new CliError(completed.error_message ?? "TTS job failed.", code, exitCode)
+            }
+
+            const fileName = completed.output_file_name
+            if (!fileName) {
+              throw new CliError(
+                `TTS job ${completed.id} completed without output file.`,
+                "INTERNAL_ERROR",
+                1,
+              )
+            }
+            const outputPath = path.join(audioDir, fileName)
+
+            if (jsonMode) {
+              printJson({
+                ok: true,
+                job_id: completed.id,
+                item_id: completed.item_id,
+                status: completed.status,
+                output_file_name: fileName,
+                output_path: outputPath,
+              })
+              return
+            }
+
+            process.stdout.write(`generated #${completed.item_id} ${outputPath}\n`)
+          } finally {
+            await worker.stop()
+          }
+        }),
+      )
     },
   )
-
 program
   .command("extract <id>")
   .description("Extract or re-extract content for an item")
@@ -662,36 +690,33 @@ program
   .option("--json", "Print machine-readable JSON output")
   .action(async (id: string, options: { force?: boolean; autoTags?: boolean; json?: boolean }) => {
     const jsonMode = Boolean(options.json)
-    const context = {
-      dbPath: resolveDbPath(program.opts().dbPath as string),
-      migrationsDir: resolveMigrationsDir(),
-    }
-    const services = createCoreServices(context)
     const itemId = parseItemId(id)
 
-    return runDbAction(jsonMode, async () => {
-      const extractOptions = {
-        ...(options.force !== undefined ? { force: options.force } : {}),
-        ...(options.autoTags !== undefined ? { autoTags: options.autoTags } : {}),
-      }
-      const result = await services.extract.extractItem(itemId, extractOptions)
+    return runDbAction(jsonMode, () =>
+      withCoreRuntime(async (services) => {
+        const extractOptions = {
+          ...(options.force !== undefined ? { force: options.force } : {}),
+          ...(options.autoTags !== undefined ? { autoTags: options.autoTags } : {}),
+        }
+        const result = await services.extract.extractItem(itemId, extractOptions)
 
-      if (jsonMode) {
-        printJson({
-          ok: true,
-          ...result,
-        })
-        return
-      }
+        if (jsonMode) {
+          printJson({
+            ok: true,
+            ...result,
+          })
+          return
+        }
 
-      process.stdout.write(`extracted #${itemId} (${result.content_length} chars)\n`)
-      if (result.auto_tags && result.auto_tags.length > 0) {
-        process.stdout.write(`auto-tags: ${result.auto_tags.join(", ")}\n`)
-      }
-      if (result.auto_tag_warning) {
-        process.stdout.write(`auto-tags warning: ${result.auto_tag_warning}\n`)
-      }
-    })
+        process.stdout.write(`extracted #${itemId} (${result.content_length} chars)\n`)
+        if (result.auto_tags && result.auto_tags.length > 0) {
+          process.stdout.write(`auto-tags: ${result.auto_tags.join(", ")}\n`)
+        }
+        if (result.auto_tag_warning) {
+          process.stdout.write(`auto-tags warning: ${result.auto_tag_warning}\n`)
+        }
+      }),
+    )
   })
 
 program
@@ -728,48 +753,44 @@ program
         printError("Invalid tag mode. Use any or all.", jsonMode, "VALIDATION_ERROR", 2)
       }
 
-      const context = {
-        dbPath: resolveDbPath(program.opts().dbPath as string),
-        migrationsDir: resolveMigrationsDir(),
-      }
-      const services = createCoreServices(context)
+      runDbAction(jsonMode, () =>
+        withCoreRuntime((services) => {
+          const tags = normalizeTags(options.tag ?? [])
+          const listInput = {
+            tags,
+            tagMode,
+            limit: options.limit,
+            offset: options.offset,
+            ...(status ? { status } : {}),
+          }
+          const result = services.items.listItems(listInput)
+          const items = result.items.map(toCliListItem)
 
-      runDbAction(jsonMode, () => {
-        const tags = normalizeTags(options.tag ?? [])
-        const listInput = {
-          tags,
-          tagMode,
-          limit: options.limit,
-          offset: options.offset,
-          ...(status ? { status } : {}),
-        }
-        const result = services.items.listItems(listInput)
-        const items = result.items.map(toCliListItem)
+          if (jsonMode) {
+            printJson({
+              ok: true,
+              items,
+              paging: {
+                limit: options.limit,
+                offset: options.offset,
+                returned: items.length,
+              },
+            })
+            return
+          }
 
-        if (jsonMode) {
-          printJson({
-            ok: true,
-            items,
-            paging: {
-              limit: options.limit,
-              offset: options.offset,
-              returned: items.length,
-            },
-          })
-          return
-        }
+          if (items.length === 0) {
+            process.stdout.write("No items found.\n")
+            return
+          }
 
-        if (items.length === 0) {
-          process.stdout.write("No items found.\n")
-          return
-        }
-
-        for (const item of items) {
-          const displayTitle = item.title ?? item.url
-          const displayTags = item.tags.length > 0 ? ` [${item.tags.join(", ")}]` : ""
-          process.stdout.write(`#${item.id} ${item.status} ${displayTitle}${displayTags}\n`)
-        }
-      })
+          for (const item of items) {
+            const displayTitle = item.title ?? item.url
+            const displayTags = item.tags.length > 0 ? ` [${item.tags.join(", ")}]` : ""
+            process.stdout.write(`#${item.id} ${item.status} ${displayTitle}${displayTags}\n`)
+          }
+        }),
+      )
     },
   )
 
@@ -793,35 +814,31 @@ tagsCommand
   .option("--json", "Print machine-readable JSON output")
   .action((options: { limit: number; offset: number; json?: boolean }) => {
     const jsonMode = Boolean(options.json)
-    const context = {
-      dbPath: resolveDbPath(program.opts().dbPath as string),
-      migrationsDir: resolveMigrationsDir(),
-    }
-    const services = createCoreServices(context)
-
-    runDbAction(jsonMode, () => {
-      const result = services.tags.listTags({
-        limit: options.limit,
-        offset: options.offset,
-      })
-
-      if (jsonMode) {
-        printJson({
-          ok: true,
-          ...result,
+    runDbAction(jsonMode, () =>
+      withCoreRuntime((services) => {
+        const result = services.tags.listTags({
+          limit: options.limit,
+          offset: options.offset,
         })
-        return
-      }
 
-      if (result.tags.length === 0) {
-        process.stdout.write("No tags found.\n")
-        return
-      }
+        if (jsonMode) {
+          printJson({
+            ok: true,
+            ...result,
+          })
+          return
+        }
 
-      for (const tag of result.tags) {
-        process.stdout.write(`${tag.name}\t${tag.item_count}\n`)
-      }
-    })
+        if (result.tags.length === 0) {
+          process.stdout.write("No tags found.\n")
+          return
+        }
+
+        for (const tag of result.tags) {
+          process.stdout.write(`${tag.name}\t${tag.item_count}\n`)
+        }
+      }),
+    )
   })
 
 tagsCommand
@@ -830,40 +847,36 @@ tagsCommand
   .option("--json", "Print machine-readable JSON output")
   .action((options: { json?: boolean }) => {
     const jsonMode = Boolean(options.json)
-    const context = {
-      dbPath: resolveDbPath(program.opts().dbPath as string),
-      migrationsDir: resolveMigrationsDir(),
-    }
-    const services = createCoreServices(context)
+    runDbAction(jsonMode, () =>
+      withCoreRuntime((services) => {
+        const report = services.doctor.inspectAutoTagsHealth()
 
-    runDbAction(jsonMode, () => {
-      const report = services.doctor.inspectAutoTagsHealth()
-
-      if (jsonMode) {
-        printJson({
-          ok: true,
-          ...report,
-        })
-      } else {
-        process.stdout.write(`tags doctor: ${report.healthy ? "healthy" : "unhealthy"}\n`)
-        process.stdout.write(`backend: ${report.backend}\n`)
-        process.stdout.write(`model: ${report.model}\n`)
-        process.stdout.write(`helper: ${report.helper_path}\n`)
-        process.stdout.write(`python: ${report.python_path ?? "-"}\n`)
-        for (const check of report.checks) {
-          const requirement = check.required ? "required" : "optional"
-          const status = check.ok ? "ok" : "failed"
-          process.stdout.write(`${check.id} (${requirement}): ${status} [${check.path ?? "-"}]\n`)
-          if (check.message) {
-            process.stdout.write(`  ${check.message}\n`)
+        if (jsonMode) {
+          printJson({
+            ok: true,
+            ...report,
+          })
+        } else {
+          process.stdout.write(`tags doctor: ${report.healthy ? "healthy" : "unhealthy"}\n`)
+          process.stdout.write(`backend: ${report.backend}\n`)
+          process.stdout.write(`model: ${report.model}\n`)
+          process.stdout.write(`helper: ${report.helper_path}\n`)
+          process.stdout.write(`python: ${report.python_path ?? "-"}\n`)
+          for (const check of report.checks) {
+            const requirement = check.required ? "required" : "optional"
+            const status = check.ok ? "ok" : "failed"
+            process.stdout.write(`${check.id} (${requirement}): ${status} [${check.path ?? "-"}]\n`)
+            if (check.message) {
+              process.stdout.write(`  ${check.message}\n`)
+            }
           }
         }
-      }
 
-      if (!report.healthy) {
-        process.exitCode = 2
-      }
-    })
+        if (!report.healthy) {
+          process.exitCode = 2
+        }
+      }),
+    )
   })
 
 const tagCommand = program.command("tag").description("Manage item tags")
@@ -883,26 +896,22 @@ tagCommand
   .option("--json", "Print machine-readable JSON output")
   .action((id: string, tag: string, options: { json?: boolean }) => {
     const jsonMode = Boolean(options.json)
-    const context = {
-      dbPath: resolveDbPath(program.opts().dbPath as string),
-      migrationsDir: resolveMigrationsDir(),
-    }
-    const services = createCoreServices(context)
+    runDbAction(jsonMode, () =>
+      withCoreRuntime((services) => {
+        const result = services.tags.addTag(parseItemId(id), tag)
+        if (jsonMode) {
+          printJson({
+            ok: true,
+            ...result,
+          })
+          return
+        }
 
-    runDbAction(jsonMode, () => {
-      const result = services.tags.addTag(parseItemId(id), tag)
-      if (jsonMode) {
-        printJson({
-          ok: true,
-          ...result,
-        })
-        return
-      }
-
-      process.stdout.write(
-        `${result.added ? "added" : "exists"} tag '${result.tag}' on #${result.item_id}\n`,
-      )
-    })
+        process.stdout.write(
+          `${result.added ? "added" : "exists"} tag '${result.tag}' on #${result.item_id}\n`,
+        )
+      }),
+    )
   })
 
 tagCommand
@@ -911,26 +920,22 @@ tagCommand
   .option("--json", "Print machine-readable JSON output")
   .action((id: string, tag: string, options: { json?: boolean }) => {
     const jsonMode = Boolean(options.json)
-    const context = {
-      dbPath: resolveDbPath(program.opts().dbPath as string),
-      migrationsDir: resolveMigrationsDir(),
-    }
-    const services = createCoreServices(context)
+    runDbAction(jsonMode, () =>
+      withCoreRuntime((services) => {
+        const result = services.tags.removeTag(parseItemId(id), tag)
+        if (jsonMode) {
+          printJson({
+            ok: true,
+            ...result,
+          })
+          return
+        }
 
-    runDbAction(jsonMode, () => {
-      const result = services.tags.removeTag(parseItemId(id), tag)
-      if (jsonMode) {
-        printJson({
-          ok: true,
-          ...result,
-        })
-        return
-      }
-
-      process.stdout.write(
-        `${result.removed ? "removed" : "missing"} tag '${result.tag}' on #${result.item_id}\n`,
-      )
-    })
+        process.stdout.write(
+          `${result.removed ? "removed" : "missing"} tag '${result.tag}' on #${result.item_id}\n`,
+        )
+      }),
+    )
   })
 
 const markCommand = program.command("mark").description("Mark item states")
@@ -950,24 +955,20 @@ markCommand
   .option("--json", "Print machine-readable JSON output")
   .action((id: string, options: { json?: boolean }) => {
     const jsonMode = Boolean(options.json)
-    const context = {
-      dbPath: resolveDbPath(program.opts().dbPath as string),
-      migrationsDir: resolveMigrationsDir(),
-    }
-    const services = createCoreServices(context)
-
-    runDbAction(jsonMode, () => {
-      const itemId = parseItemId(id)
-      const result = services.status.markRead(itemId)
-      if (jsonMode) {
-        printJson({
-          ok: true,
-          ...result,
-        })
-        return
-      }
-      process.stdout.write(`marked #${result.item_id} as read\n`)
-    })
+    runDbAction(jsonMode, () =>
+      withCoreRuntime((services) => {
+        const itemId = parseItemId(id)
+        const result = services.status.markRead(itemId)
+        if (jsonMode) {
+          printJson({
+            ok: true,
+            ...result,
+          })
+          return
+        }
+        process.stdout.write(`marked #${result.item_id} as read\n`)
+      }),
+    )
   })
 
 markCommand
@@ -976,24 +977,20 @@ markCommand
   .option("--json", "Print machine-readable JSON output")
   .action((id: string, options: { json?: boolean }) => {
     const jsonMode = Boolean(options.json)
-    const context = {
-      dbPath: resolveDbPath(program.opts().dbPath as string),
-      migrationsDir: resolveMigrationsDir(),
-    }
-    const services = createCoreServices(context)
-
-    runDbAction(jsonMode, () => {
-      const itemId = parseItemId(id)
-      const result = services.status.markUnread(itemId)
-      if (jsonMode) {
-        printJson({
-          ok: true,
-          ...result,
-        })
-        return
-      }
-      process.stdout.write(`marked #${result.item_id} as unread\n`)
-    })
+    runDbAction(jsonMode, () =>
+      withCoreRuntime((services) => {
+        const itemId = parseItemId(id)
+        const result = services.status.markUnread(itemId)
+        if (jsonMode) {
+          printJson({
+            ok: true,
+            ...result,
+          })
+          return
+        }
+        process.stdout.write(`marked #${result.item_id} as unread\n`)
+      }),
+    )
   })
 
 const jobsCommand = program.command("jobs").description("Background job workers")
@@ -1007,61 +1004,58 @@ jobsCommand
   .action(async (options: { pollMs: number; once?: boolean; json?: boolean }) => {
     const jsonMode = Boolean(options.json)
 
-    return runDbAction(jsonMode, async () => {
-      const context = {
-        dbPath: resolveDbPath(program.opts().dbPath as string),
-        migrationsDir: resolveMigrationsDir(),
-      }
-      const services = createCoreServices(context)
-      const audioDir = resolveAudioDir(process.env.STASH_AUDIO_DIR ?? DEFAULT_AUDIO_DIR)
+    return runDbAction(jsonMode, () =>
+      withCoreRuntime(async (services) => {
+        const audioDir = resolveAudioDir(process.env.STASH_AUDIO_DIR ?? DEFAULT_AUDIO_DIR)
 
-      if (options.once) {
-        const processed = await services.ttsJobs.runTtsWorkerOnce({ audioDir })
+        if (options.once) {
+          const processed = await services.ttsJobs.runTtsWorkerOnce({ audioDir })
+          if (jsonMode) {
+            printJson({
+              ok: true,
+              processed: Boolean(processed),
+              job: processed,
+            })
+            return
+          }
+
+          if (!processed) {
+            process.stdout.write("No queued TTS jobs.\n")
+            return
+          }
+
+          process.stdout.write(`Processed tts job #${processed.id} (${processed.status}).\n`)
+          return
+        }
+
+        const worker = services.ttsJobs.startTtsWorker({
+          pollMs: options.pollMs,
+          audioDir,
+        })
+
         if (jsonMode) {
           printJson({
             ok: true,
-            processed: Boolean(processed),
-            job: processed,
+            status: "running",
+            poll_ms: options.pollMs,
           })
-          return
+        } else {
+          process.stdout.write(`tts worker running (poll ${options.pollMs}ms)\n`)
         }
 
-        if (!processed) {
-          process.stdout.write("No queued TTS jobs.\n")
-          return
-        }
-
-        process.stdout.write(`Processed tts job #${processed.id} (${processed.status}).\n`)
-        return
-      }
-
-      const worker = services.ttsJobs.startTtsWorker({
-        pollMs: options.pollMs,
-        audioDir,
-      })
-
-      if (jsonMode) {
-        printJson({
-          ok: true,
-          status: "running",
-          poll_ms: options.pollMs,
+        await new Promise<void>((resolve) => {
+          const stop = (): void => {
+            void worker.stop().finally(() => {
+              process.off("SIGINT", stop)
+              process.off("SIGTERM", stop)
+              resolve()
+            })
+          }
+          process.on("SIGINT", stop)
+          process.on("SIGTERM", stop)
         })
-      } else {
-        process.stdout.write(`tts worker running (poll ${options.pollMs}ms)\n`)
-      }
-
-      await new Promise<void>((resolve) => {
-        const stop = (): void => {
-          void worker.stop().finally(() => {
-            process.off("SIGINT", stop)
-            process.off("SIGTERM", stop)
-            resolve()
-          })
-        }
-        process.on("SIGINT", stop)
-        process.on("SIGTERM", stop)
-      })
-    })
+      }),
+    )
   })
 
 program
@@ -1119,23 +1113,20 @@ program
   .option("--json", "Print machine-readable JSON output")
   .action((id: string, options: { json?: boolean }) => {
     const jsonMode = Boolean(options.json)
-    const context = {
-      dbPath: resolveDbPath(program.opts().dbPath as string),
-      migrationsDir: resolveMigrationsDir(),
-    }
-    const services = createCoreServices(context)
-    runDbAction(jsonMode, () => {
-      const itemId = parseItemId(id)
-      const result = services.status.markRead(itemId)
-      if (jsonMode) {
-        printJson({
-          ok: true,
-          ...result,
-        })
-        return
-      }
-      process.stdout.write(`marked #${result.item_id} as read\n`)
-    })
+    runDbAction(jsonMode, () =>
+      withCoreRuntime((services) => {
+        const itemId = parseItemId(id)
+        const result = services.status.markRead(itemId)
+        if (jsonMode) {
+          printJson({
+            ok: true,
+            ...result,
+          })
+          return
+        }
+        process.stdout.write(`marked #${result.item_id} as read\n`)
+      }),
+    )
   })
 
 program
@@ -1144,23 +1135,20 @@ program
   .option("--json", "Print machine-readable JSON output")
   .action((id: string, options: { json?: boolean }) => {
     const jsonMode = Boolean(options.json)
-    const context = {
-      dbPath: resolveDbPath(program.opts().dbPath as string),
-      migrationsDir: resolveMigrationsDir(),
-    }
-    const services = createCoreServices(context)
-    runDbAction(jsonMode, () => {
-      const itemId = parseItemId(id)
-      const result = services.status.markUnread(itemId)
-      if (jsonMode) {
-        printJson({
-          ok: true,
-          ...result,
-        })
-        return
-      }
-      process.stdout.write(`marked #${result.item_id} as unread\n`)
-    })
+    runDbAction(jsonMode, () =>
+      withCoreRuntime((services) => {
+        const itemId = parseItemId(id)
+        const result = services.status.markUnread(itemId)
+        if (jsonMode) {
+          printJson({
+            ok: true,
+            ...result,
+          })
+          return
+        }
+        process.stdout.write(`marked #${result.item_id} as unread\n`)
+      }),
+    )
   })
 
 program.configureOutput({

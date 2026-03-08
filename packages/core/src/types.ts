@@ -122,8 +122,3 @@ export type TtsJob = {
   finished_at: string | null
   updated_at: string
 }
-
-export type OperationContext = {
-  dbPath: string
-  migrationsDir: string
-}

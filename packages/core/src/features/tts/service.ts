@@ -9,9 +9,9 @@ import { DEFAULT_AUDIO_DIR, resolveAudioDir } from "../../lib/paths.js"
 import { buildFriendlyFilename, ensureUniqueFilePath } from "../../lib/tts/files.js"
 import { coquiTtsProvider } from "../../lib/tts/providers/coqui.js"
 import { TtsProviderError, type TtsFormat } from "../../lib/tts/types.js"
-import type { OperationContext, TtsResult } from "../../types.js"
+import type { TtsResult } from "../../types.js"
 import { parseTtsFormat } from "../common/validation.js"
-import { nowMs, withReadyDb } from "../common/db.js"
+import { type Db, nowMs } from "../common/db.js"
 
 export type GenerateTtsInput = {
   itemId: number
@@ -31,41 +31,36 @@ function resolveCliPath(input: string): string {
   return path.resolve(input)
 }
 
-function getItemTextForTts(
-  context: OperationContext,
-  itemId: number,
-): { title: string | null; text: string } {
-  return withReadyDb(context.dbPath, context.migrationsDir, (db) => {
-    const row = db
-      .select({
-        id: schema.items.id,
-        title: schema.items.title,
-        content: schema.notes.content,
-      })
-      .from(schema.items)
-      .leftJoin(schema.notes, eq(schema.notes.itemId, schema.items.id))
-      .where(eq(schema.items.id, itemId))
-      .get()
+function getItemTextForTts(db: Db, itemId: number): { title: string | null; text: string } {
+  const row = db
+    .select({
+      id: schema.items.id,
+      title: schema.items.title,
+      content: schema.notes.content,
+    })
+    .from(schema.items)
+    .leftJoin(schema.notes, eq(schema.notes.itemId, schema.items.id))
+    .where(eq(schema.items.id, itemId))
+    .get()
 
-    if (!row) {
-      throw new StashError(`Item ${itemId} not found.`, "NOT_FOUND", 3, 404)
-    }
+  if (!row) {
+    throw new StashError(`Item ${itemId} not found.`, "NOT_FOUND", 3, 404)
+  }
 
-    const text = row.content?.trim() ?? ""
-    if (text.length === 0) {
-      throw new StashError(
-        `No extracted content found for item ${itemId}. Save without --no-extract or re-save the URL.`,
-        "NO_CONTENT",
-        2,
-        400,
-      )
-    }
+  const text = row.content?.trim() ?? ""
+  if (text.length === 0) {
+    throw new StashError(
+      `No extracted content found for item ${itemId}. Save without --no-extract or re-save the URL.`,
+      "NO_CONTENT",
+      2,
+      400,
+    )
+  }
 
-    return {
-      title: row.title,
-      text,
-    }
-  })
+  return {
+    title: row.title,
+    text,
+  }
 }
 
 function resolveTtsOutputPath(
@@ -126,17 +121,14 @@ function resolveTtsOutputPath(
   return ensureUniqueFilePath(path.join(resolvedAudioDir, fileName))
 }
 
-export async function executeTtsForItem(
-  context: OperationContext,
-  input: GenerateTtsInput,
-): Promise<TtsResult> {
+export async function executeTtsForItem(db: Db, input: GenerateTtsInput): Promise<TtsResult> {
   const format = parseTtsFormat(input.format ?? "mp3")
   const voice = input.voice?.trim() ?? "tts_models/en/vctk/vits|p241"
   if (voice.length === 0) {
     throw new StashError("Voice cannot be empty.", "VALIDATION_ERROR", 2, 400)
   }
 
-  const { title, text } = getItemTextForTts(context, input.itemId)
+  const { title, text } = getItemTextForTts(db, input.itemId)
 
   let audioBuffer: Buffer
   let provider = "coqui"
@@ -179,30 +171,28 @@ export async function executeTtsForItem(
   const fileName = path.basename(outputPath)
   const generatedAt = new Date(nowMs())
 
-  withReadyDb(context.dbPath, context.migrationsDir, (db) => {
-    db.insert(schema.itemAudio)
-      .values({
-        itemId: input.itemId,
+  db.insert(schema.itemAudio)
+    .values({
+      itemId: input.itemId,
+      fileName,
+      provider,
+      voice,
+      format,
+      bytes: audioBuffer.length,
+      generatedAt,
+    })
+    .onConflictDoUpdate({
+      target: schema.itemAudio.itemId,
+      set: {
         fileName,
         provider,
         voice,
         format,
         bytes: audioBuffer.length,
         generatedAt,
-      })
-      .onConflictDoUpdate({
-        target: schema.itemAudio.itemId,
-        set: {
-          fileName,
-          provider,
-          voice,
-          format,
-          bytes: audioBuffer.length,
-          generatedAt,
-        },
-      })
-      .run()
-  })
+      },
+    })
+    .run()
 
   return {
     item_id: input.itemId,
@@ -215,9 +205,6 @@ export async function executeTtsForItem(
   }
 }
 
-export async function generateTts(
-  context: OperationContext,
-  input: GenerateTtsInput,
-): Promise<TtsResult> {
-  return await executeTtsForItem(context, input)
+export async function generateTts(db: Db, input: GenerateTtsInput): Promise<TtsResult> {
+  return await executeTtsForItem(db, input)
 }

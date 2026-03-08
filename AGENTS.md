@@ -302,6 +302,15 @@ node apps/cli/dist/cli.js --help
 node apps/cli/dist/cli.js list --help
 ```
 
+## Pre-PR Handoff Gate
+
+Before opening a PR/MR, run local quality gates and keep them green.
+
+- Code changes: must run `pnpm run check` and fix all failures before PR/MR creation.
+- Docs-only changes: must run `pnpm run format:check` before PR/MR creation.
+- PR flow: use existing `gh` tooling (`gh pr create`), then watch checks with `gh pr checks --watch`.
+- If CI fails, fix locally, re-run the local gate, push, and re-check until all required checks are green.
+
 ## Documentation Maintenance Rule
 
 ⚠️ **When adding new features or modifying existing CLI behavior, update ALL THREE documentation files in the same change:**
@@ -370,5 +379,6 @@ Updates should include:
 - Prefer Drizzle ORM for database access in application/runtime code.
 - Use raw SQL string queries only when Drizzle does not support the required functionality clearly or safely (for example, specialized migration-runner behavior).
 - Prefer explicit return types on functions and methods (especially exported/public APIs and non-trivial helpers).
+- Prefer explicit named types over inferred meta-types like `ReturnType<typeof ...>` in app/core code and tests.
 - Dependency injection pattern: prefer `createXService`/`createCoreServices` factory objects over classes, and inject least-privilege service slices into API route plugins and command handlers.
 - In this sandbox, local listener startup (for example Vite/dev servers on `127.0.0.1`) may fail with `listen EPERM`; validate listener-bound flows in a less restricted environment when needed.

@@ -1,42 +1,40 @@
 import { and, asc, eq, sql } from "drizzle-orm"
 
 import * as schema from "../../db/schema.js"
-import type { OperationContext, TagsListInput, TagsListResult } from "../../types.js"
-import { ensureItemExists, ensureTagId, normalizeTag, nowMs, withReadyDb } from "../common/db.js"
+import type { TagsListInput, TagsListResult } from "../../types.js"
+import { type Db, ensureItemExists, ensureTagId, normalizeTag, nowMs } from "../common/db.js"
 
-export function listTags(context: OperationContext, input: TagsListInput): TagsListResult {
+export function listTags(db: Db, input: TagsListInput): TagsListResult {
   const limit = input.limit ?? 50
   const offset = input.offset ?? 0
 
-  return withReadyDb(context.dbPath, context.migrationsDir, (db) => {
-    const rows = db
-      .select({
-        name: schema.tags.name,
-        itemCount: sql<number>`count(${schema.itemTags.itemId})`,
-      })
-      .from(schema.tags)
-      .leftJoin(schema.itemTags, eq(schema.itemTags.tagId, schema.tags.id))
-      .groupBy(schema.tags.id)
-      .orderBy(asc(schema.tags.name))
-      .limit(limit)
-      .offset(offset)
-      .all()
+  const rows = db
+    .select({
+      name: schema.tags.name,
+      itemCount: sql<number>`count(${schema.itemTags.itemId})`,
+    })
+    .from(schema.tags)
+    .leftJoin(schema.itemTags, eq(schema.itemTags.tagId, schema.tags.id))
+    .groupBy(schema.tags.id)
+    .orderBy(asc(schema.tags.name))
+    .limit(limit)
+    .offset(offset)
+    .all()
 
-    const tags = rows.map((row) => ({ name: row.name, item_count: Number(row.itemCount) }))
+  const tags = rows.map((row) => ({ name: row.name, item_count: Number(row.itemCount) }))
 
-    return {
-      tags,
-      paging: {
-        limit,
-        offset,
-        returned: tags.length,
-      },
-    }
-  })
+  return {
+    tags,
+    paging: {
+      limit,
+      offset,
+      returned: tags.length,
+    },
+  }
 }
 
 export function addTag(
-  context: OperationContext,
+  db: Db,
   itemId: number,
   tag: string,
 ): {
@@ -46,51 +44,49 @@ export function addTag(
 } {
   const normalizedTag = normalizeTag(tag)
 
-  return withReadyDb(context.dbPath, context.migrationsDir, (db) => {
-    ensureItemExists(db, itemId)
-    const timestamp = new Date(nowMs())
-    const existing = db
-      .select({
-        isManual: schema.itemTags.isManual,
-      })
-      .from(schema.itemTags)
-      .innerJoin(schema.tags, eq(schema.tags.id, schema.itemTags.tagId))
-      .where(and(eq(schema.itemTags.itemId, itemId), eq(schema.tags.name, normalizedTag)))
-      .get()
-
-    db.transaction((tx) => {
-      const tagId = ensureTagId(tx, normalizedTag, timestamp)
-      tx.insert(schema.itemTags)
-        .values({
-          itemId,
-          tagId,
-          createdAt: timestamp,
-          isManual: true,
-          isAuto: false,
-          autoScore: null,
-          autoSource: null,
-          autoModel: null,
-          autoUpdatedAt: null,
-        })
-        .onConflictDoUpdate({
-          target: [schema.itemTags.itemId, schema.itemTags.tagId],
-          set: {
-            isManual: true,
-          },
-        })
-        .run()
+  ensureItemExists(db, itemId)
+  const timestamp = new Date(nowMs())
+  const existing = db
+    .select({
+      isManual: schema.itemTags.isManual,
     })
+    .from(schema.itemTags)
+    .innerJoin(schema.tags, eq(schema.tags.id, schema.itemTags.tagId))
+    .where(and(eq(schema.itemTags.itemId, itemId), eq(schema.tags.name, normalizedTag)))
+    .get()
 
-    return {
-      item_id: itemId,
-      tag: normalizedTag,
-      added: !existing || !existing.isManual,
-    }
+  db.transaction((tx) => {
+    const tagId = ensureTagId(tx, normalizedTag, timestamp)
+    tx.insert(schema.itemTags)
+      .values({
+        itemId,
+        tagId,
+        createdAt: timestamp,
+        isManual: true,
+        isAuto: false,
+        autoScore: null,
+        autoSource: null,
+        autoModel: null,
+        autoUpdatedAt: null,
+      })
+      .onConflictDoUpdate({
+        target: [schema.itemTags.itemId, schema.itemTags.tagId],
+        set: {
+          isManual: true,
+        },
+      })
+      .run()
   })
+
+  return {
+    item_id: itemId,
+    tag: normalizedTag,
+    added: !existing || !existing.isManual,
+  }
 }
 
 export function removeTag(
-  context: OperationContext,
+  db: Db,
   itemId: number,
   tag: string,
 ): {
@@ -100,28 +96,26 @@ export function removeTag(
 } {
   const normalizedTag = normalizeTag(tag)
 
-  return withReadyDb(context.dbPath, context.migrationsDir, (db) => {
-    ensureItemExists(db, itemId)
+  ensureItemExists(db, itemId)
 
-    const row = db
-      .select({ id: schema.tags.id })
-      .from(schema.tags)
-      .where(eq(schema.tags.name, normalizedTag))
-      .get()
+  const row = db
+    .select({ id: schema.tags.id })
+    .from(schema.tags)
+    .where(eq(schema.tags.name, normalizedTag))
+    .get()
 
-    let removed = false
-    if (row) {
-      const result = db
-        .delete(schema.itemTags)
-        .where(and(eq(schema.itemTags.itemId, itemId), eq(schema.itemTags.tagId, row.id)))
-        .run()
-      removed = Number(result.changes) > 0
-    }
+  let removed = false
+  if (row) {
+    const result = db
+      .delete(schema.itemTags)
+      .where(and(eq(schema.itemTags.itemId, itemId), eq(schema.itemTags.tagId, row.id)))
+      .run()
+    removed = Number(result.changes) > 0
+  }
 
-    return {
-      item_id: itemId,
-      tag: normalizedTag,
-      removed,
-    }
-  })
+  return {
+    item_id: itemId,
+    tag: normalizedTag,
+    removed,
+  }
 }
