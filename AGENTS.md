@@ -107,7 +107,8 @@ pnpm exec playwright install chromium
 ```
 
 Web server defaults (overridable in `.env` or CLI flags):
-- `STASH_WEB_HOST=127.0.0.1`
+- `STASH_WEB_HOST=0.0.0.0` is the recommended daemon/Tailnet-friendly override.
+- When `STASH_WEB_HOST` is unset, foreground `stash web` defaults to `127.0.0.1` and `stash web --daemon` defaults to `0.0.0.0`.
 - `STASH_API_PORT=4173`
 - `STASH_PWA_PORT=5173`
 
@@ -332,8 +333,17 @@ Updates should include:
 - Auto-tags env controls:
   - `STASH_AUTO_TAGS_ENABLED`, `STASH_AUTO_TAGS_MAX`, `STASH_AUTO_TAGS_MIN_SCORE`
   - `STASH_AUTO_TAGS_MODEL`, `STASH_AUTO_TAGS_BACKEND`, `STASH_AUTO_TAGS_PYTHON`, `STASH_AUTO_TAGS_HELPER`
-- `stash web` now accepts `--host`, `--api-port`, `--pwa-port` (`--port` removed).
-- `stash web` runs split listeners (API + PWA) and fails fast on port conflicts or identical API/PWA ports.
+- `stash web` now supports foreground and daemon control flags:
+  - `stash web` / `stash web --foreground` run attached in the current terminal.
+  - `stash web --daemon` starts a detached supervisor that restarts the combined web runner on unexpected exit.
+  - `stash web --status` reads daemon state/log metadata.
+  - `stash web --stop` sends `SIGTERM` to the daemon supervisor and waits for shutdown.
+- `stash web` accepts `--host`, `--api-port`, `--pwa-port`; `--status`/`--stop` reject host/port overrides.
+- `stash web --daemon` is idempotent for agent callers: a second start returns the existing daemon state instead of failing.
+- `stash web` keeps API + PWA in one runtime process; the daemon supervises that single runner rather than separate API/PWA children.
+- `stash web` persists daemon files under `~/.stash/` with workspace fallback `.stash/` (`web-daemon.pid`, `web-daemon.log`, `web-daemon.state.json`).
+- `stash web` startup/status output includes local URLs and best-effort Tailnet URLs from `tailscale status --json`; loopback binds warn that Tailnet access is unavailable.
+- `stash web` still fails fast on identical API/PWA ports.
 - Web dev (`apps/web` Vite) reads the same root `.env` port variables and uses strict port binding.
 - `pnpm run dev:stack` starts API (`pnpm run dev:api`, default API port `4173`) and Vite HMR (`pnpm run dev:web`, default `5173`) together for frontend hot reload.
 - Web UI uses a single mobile-first, single-column layout path across all viewport sizes; desktop split-pane rendering paths were intentionally removed.
