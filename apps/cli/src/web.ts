@@ -228,6 +228,10 @@ const resolveDaemonPaths = (mode: "read" | "write"): DaemonPaths => {
 
 let cachedDaemonPaths: DaemonPaths | undefined
 
+const resetDaemonPathsCache = (): void => {
+  cachedDaemonPaths = undefined
+}
+
 const getDaemonPaths = (mode: "read" | "write" = "read"): DaemonPaths => {
   if (cachedDaemonPaths) {
     if (mode === "read") {
@@ -278,10 +282,13 @@ const readJsonFile = <T>(filePath: string): T | undefined => {
   try {
     return JSON.parse(fs.readFileSync(filePath, "utf8")) as T
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code
-    if (code === "ENOENT") {
+    const nodeError = error as NodeJS.ErrnoException
+    if (nodeError.code === "ENOENT") {
       return undefined
     }
+    process.stderr.write(
+      `Failed to read JSON file at ${filePath}: ${nodeError.message ?? String(error)}\n`,
+    )
     return undefined
   }
 }
@@ -476,12 +483,7 @@ const resolveWebAccessInfo = (host: string, apiPort: number, pwaPort: number): W
   }
 }
 
-const createDaemonState = (
-  _runtime: ResolvedWebRuntime,
-  runId: string,
-  pid: number,
-  access: WebAccessInfo,
-): WebDaemonState => ({
+const createDaemonState = (runId: string, pid: number, access: WebAccessInfo): WebDaemonState => ({
   version: 1,
   runId,
   pid,
@@ -587,8 +589,8 @@ const emitDaemonStartResult = (
   if (daemon.state?.access) {
     emitAccessSummary(daemon.state.access)
   }
-  process.stdout.write("Status: stash --json web --status\n")
-  process.stdout.write("Stop: stash --json web --stop\n")
+  process.stdout.write("Status: stash web --status --json\n")
+  process.stdout.write("Stop: stash web --stop --json\n")
 }
 
 const stopWebDaemon = async (): Promise<{
@@ -865,9 +867,11 @@ const runSupervisorLoop = async (
     process.on("SIGTERM", handleSignal)
 
     startRunner()
-    state.status = "running"
-    state.lastEvent = "Supervisor started web runner."
-    persist()
+    if (!settled) {
+      state.status = "running"
+      state.lastEvent = "Supervisor started web runner."
+      persist()
+    }
   })
 }
 
@@ -1052,7 +1056,7 @@ const startWebDaemon = async (runtime: ResolvedWebRuntime, jsonMode: boolean): P
 
   writeDaemonPid(supervisor.pid)
 
-  const state = createDaemonState(runtime, runId, supervisor.pid, access)
+  const state = createDaemonState(runId, supervisor.pid, access)
   state.lastEvent = "Daemon supervisor spawned."
   persistDaemonState(state)
 
@@ -1085,7 +1089,7 @@ export const runWebSupervisorCommand = async (
     audioDir: options.audioDir,
   }
   const access = resolveWebAccessInfo(runtime.host, runtime.apiPort, runtime.pwaPort)
-  const state = createDaemonState(runtime, options.runId ?? randomUUID(), process.pid, access)
+  const state = createDaemonState(options.runId ?? randomUUID(), process.pid, access)
   state.lastEvent = "Daemon supervisor booting."
 
   writeDaemonPid(process.pid)
@@ -1210,4 +1214,5 @@ export const __testing__ = {
   readWebDaemonStatus,
   buildDaemonPaths,
   isLoopbackHost,
+  resetDaemonPathsCache,
 }

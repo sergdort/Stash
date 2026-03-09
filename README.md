@@ -64,8 +64,8 @@ Or override at runtime:
 ```bash
 stash web --host 127.0.0.1 --api-port 4173 --pwa-port 5173
 stash web --daemon --host 0.0.0.0 --api-port 4173 --pwa-port 5173
-stash --json web --status
-stash --json web --stop
+stash web --status --json
+stash web --stop --json
 ```
 
 Runtime notes:

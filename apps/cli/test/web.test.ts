@@ -338,6 +338,7 @@ describe("web helper behavior", () => {
   it("cleans up stale daemon pid files when the process is not running", () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "stash-web-status-"))
     const previousDaemonDir = process.env.STASH_WEB_DAEMON_DIR
+    __testing__.resetDaemonPathsCache()
     process.env.STASH_WEB_DAEMON_DIR = tempDir
 
     try {
@@ -394,6 +395,7 @@ describe("web helper behavior", () => {
       } else {
         process.env.STASH_WEB_DAEMON_DIR = previousDaemonDir
       }
+      __testing__.resetDaemonPathsCache()
       fs.rmSync(tempDir, { recursive: true, force: true })
     }
   })
