@@ -5,6 +5,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { describe, expect, it } from "vitest"
+import { createCoreRuntime } from "@stash/core"
 
 import { createApiApp } from "../src/app/create-api-app.js"
 
@@ -169,9 +170,12 @@ const integrationTitle = sqliteBindingsMissing
 integrationSuite(integrationTitle, () => {
   it("keeps endpoint response contracts stable across save/list/item/status/extract/tags/tts flows", async () => {
     const { dbPath, audioDir, cleanup } = createTempPaths()
-    const app = createApiApp({
+    const runtime = createCoreRuntime({
       dbPath,
       migrationsDir,
+    })
+    const app = createApiApp({
+      services: runtime.services,
       audioDir,
     })
 
@@ -322,6 +326,7 @@ integrationSuite(integrationTitle, () => {
       expect(itemJobsBody.jobs[0]?.id).toBe(enqueueTtsBody.job.id)
     } finally {
       await app.close()
+      runtime.close()
       cleanup()
     }
   })

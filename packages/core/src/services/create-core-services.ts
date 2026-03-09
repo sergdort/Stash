@@ -12,36 +12,41 @@ import {
   startTtsWorker,
   waitForTtsJob,
 } from "../features/tts/jobs.js"
-import type { OperationContext } from "../types.js"
+import type { StashDb } from "../db/client.js"
 import type { CoreServices } from "./contracts.js"
 
-export function createCoreServices(context: OperationContext): CoreServices {
+export type CreateCoreServicesOptions = {
+  db: StashDb
+}
+
+export function createCoreServices(options: CreateCoreServicesOptions): CoreServices {
+  const { db } = options
+
   return {
     items: {
-      saveItem: async (input) => await saveItem(context, input),
-      listItems: (input) => listItems(context, input),
-      getItem: (itemId) => getItem(context, itemId),
+      saveItem: async (input) => await saveItem(db, input),
+      listItems: (input) => listItems(db, input),
+      getItem: (itemId) => getItem(db, itemId),
     },
     extract: {
-      extractItem: async (itemId, options = {}) => await extractItem(context, itemId, options),
+      extractItem: async (itemId, options = {}) => await extractItem(db, itemId, options),
     },
     tags: {
-      listTags: (input) => listTags(context, input),
-      addTag: (itemId, tag) => addTag(context, itemId, tag),
-      removeTag: (itemId, tag) => removeTag(context, itemId, tag),
+      listTags: (input) => listTags(db, input),
+      addTag: (itemId, tag) => addTag(db, itemId, tag),
+      removeTag: (itemId, tag) => removeTag(db, itemId, tag),
     },
     status: {
-      markRead: (itemId) => markRead(context, itemId),
-      markUnread: (itemId) => markUnread(context, itemId),
+      markRead: (itemId) => markRead(db, itemId),
+      markUnread: (itemId) => markUnread(db, itemId),
     },
     ttsJobs: {
-      enqueueTtsJob: (input) => enqueueTtsJob(context, input),
-      getTtsJob: (jobId) => getTtsJob(context, jobId),
-      listTtsJobsForItem: (itemId, limit, offset) =>
-        listTtsJobsForItem(context, itemId, limit, offset),
-      waitForTtsJob: async (jobId, options) => await waitForTtsJob(context, jobId, options),
-      startTtsWorker: (options) => startTtsWorker(context, options),
-      runTtsWorkerOnce: async (options = {}) => await runTtsWorkerOnce(context, options),
+      enqueueTtsJob: (input) => enqueueTtsJob(db, input),
+      getTtsJob: (jobId) => getTtsJob(db, jobId),
+      listTtsJobsForItem: (itemId, limit, offset) => listTtsJobsForItem(db, itemId, limit, offset),
+      waitForTtsJob: async (jobId, options) => await waitForTtsJob(db, jobId, options),
+      startTtsWorker: (options) => startTtsWorker(db, options),
+      runTtsWorkerOnce: async (options = {}) => await runTtsWorkerOnce(db, options),
     },
     doctor: {
       inspectCoquiTtsHealth: () => inspectCoquiTtsHealth(),

@@ -9,10 +9,12 @@ import { openDb } from "../src/db/client.js"
 import { runMigrations } from "../src/db/migrate.js"
 import * as schema from "../src/db/schema.js"
 import { applyAutoTags } from "../src/features/auto-tags/service.js"
-import type { OperationContext } from "../src/types.js"
 
 type TempContext = {
-  context: OperationContext
+  context: {
+    dbPath: string
+    migrationsDir: string
+  }
   tempDir: string
 }
 
@@ -27,7 +29,7 @@ function createTempContext(): TempContext {
   }
 }
 
-function createItem(context: OperationContext, slug: string, note: string): number {
+function createItem(context: TempContext["context"], slug: string, note: string): number {
   runMigrations(context.dbPath, context.migrationsDir)
   const { db, sqlite } = openDb(context.dbPath)
   try {
@@ -60,7 +62,7 @@ function createItem(context: OperationContext, slug: string, note: string): numb
   }
 }
 
-function createTag(context: OperationContext, tag: string): number {
+function createTag(context: TempContext["context"], tag: string): number {
   const { db, sqlite } = openDb(context.dbPath)
   try {
     const timestamp = new Date()
@@ -86,7 +88,7 @@ function createTag(context: OperationContext, tag: string): number {
 }
 
 function attachTag(
-  context: OperationContext,
+  context: TempContext["context"],
   options: {
     itemId: number
     tagId: number

@@ -3,8 +3,7 @@ import path from "node:path"
 
 import { and, asc, eq, inArray, type SQL } from "drizzle-orm"
 
-import { openDb, type StashDb } from "../../db/client.js"
-import { runMigrations } from "../../db/migrate.js"
+import type { StashDb } from "../../db/client.js"
 import * as schema from "../../db/schema.js"
 import { StashError } from "../../errors.js"
 import type { ItemStatus, ItemTtsAudio, StashItem } from "../../types.js"
@@ -20,45 +19,6 @@ export function nowMs(): number {
 
 export function ensureDbDirectory(dbPath: string): void {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true })
-}
-
-export function ensureDbReady(dbPath: string, migrationsDir: string): void {
-  ensureDbDirectory(dbPath)
-  runMigrations(dbPath, migrationsDir)
-}
-
-export function withDb<T>(dbPath: string, action: (db: Db) => T): T {
-  ensureDbDirectory(dbPath)
-  const { db, sqlite } = openDb(dbPath)
-  try {
-    return action(db)
-  } finally {
-    sqlite.close()
-  }
-}
-
-export async function withDbAsync<T>(dbPath: string, action: (db: Db) => Promise<T>): Promise<T> {
-  ensureDbDirectory(dbPath)
-  const { db, sqlite } = openDb(dbPath)
-  try {
-    return await action(db)
-  } finally {
-    sqlite.close()
-  }
-}
-
-export function withReadyDb<T>(dbPath: string, migrationsDir: string, action: (db: Db) => T): T {
-  ensureDbReady(dbPath, migrationsDir)
-  return withDb(dbPath, action)
-}
-
-export async function withReadyDbAsync<T>(
-  dbPath: string,
-  migrationsDir: string,
-  action: (db: Db) => Promise<T>,
-): Promise<T> {
-  ensureDbReady(dbPath, migrationsDir)
-  return withDbAsync(dbPath, action)
 }
 
 export function toIso(value: Date | number | null): string | null {

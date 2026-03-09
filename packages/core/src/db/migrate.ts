@@ -3,7 +3,7 @@ import path from "node:path"
 
 import { migrate as drizzleMigrate } from "drizzle-orm/better-sqlite3/migrator"
 
-import { openDb, openSqlite, type SqliteDatabase } from "./client.js"
+import { openDb, openSqlite, type SqliteDatabase, type StashDb } from "./client.js"
 
 type MigrationStatus = {
   applied: string[]
@@ -120,30 +120,45 @@ function getMigrationStatusFromJournal(
 }
 
 export function getMigrationStatus(dbPath: string, migrationsDir: string): MigrationStatus {
-  const entries = readJournalEntries(migrationsDir)
   const sqlite = openSqlite(dbPath)
   try {
-    ensureMigrationTableCompatibility(sqlite, migrationsDir)
-    const lastAppliedMillis = getLastAppliedMillis(sqlite)
-    return getMigrationStatusFromJournal(entries, lastAppliedMillis)
+    return getMigrationStatusForSqlite(sqlite, migrationsDir)
   } finally {
     sqlite.close()
   }
+}
+
+function getMigrationStatusForSqlite(
+  sqlite: SqliteDatabase,
+  migrationsDir: string,
+): MigrationStatus {
+  const entries = readJournalEntries(migrationsDir)
+  ensureMigrationTableCompatibility(sqlite, migrationsDir)
+  const lastAppliedMillis = getLastAppliedMillis(sqlite)
+  return getMigrationStatusFromJournal(entries, lastAppliedMillis)
+}
+
+export function runMigrationsWithDatabase(
+  db: StashDb,
+  sqlite: SqliteDatabase,
+  migrationsDir: string,
+): { appliedCount: number; applied: string[] } {
+  const status = getMigrationStatusForSqlite(sqlite, migrationsDir)
+  drizzleMigrate(db, {
+    migrationsFolder: migrationsDir,
+    migrationsTable: MIGRATIONS_TABLE,
+  })
+
+  return { appliedCount: status.pending.length, applied: status.pending }
 }
 
 export function runMigrations(
   dbPath: string,
   migrationsDir: string,
 ): { appliedCount: number; applied: string[] } {
-  const status = getMigrationStatus(dbPath, migrationsDir)
   const { db, sqlite } = openDb(dbPath)
   try {
-    drizzleMigrate(db, {
-      migrationsFolder: migrationsDir,
-      migrationsTable: MIGRATIONS_TABLE,
-    })
-
-    return { appliedCount: status.pending.length, applied: status.pending }
+    return runMigrationsWithDatabase(db, sqlite, migrationsDir)
   } finally {
     sqlite.close()
   }

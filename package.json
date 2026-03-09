@@ -10,7 +10,7 @@
   "scripts": {
     "setup": "pnpm run build && pnpm exec playwright install chromium && node scripts/with-env.mjs node apps/cli/dist/cli.js db migrate --json",
     "build": "pnpm --filter @stash/core build && pnpm --filter stash-api-app build && pnpm --filter stash-cli-app build",
-    "check": "pnpm run lint && pnpm run format:check && pnpm run build",
+    "check": "pnpm run format:check && pnpm run lint && pnpm run test && pnpm --dir apps/web build",
     "dev": "node scripts/with-env.mjs tsx apps/cli/src/cli.ts",
     "dev:api": "pnpm run dev -- web",
     "dev:web": "pnpm --dir apps/web dev",

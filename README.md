@@ -114,14 +114,17 @@ pnpm run setup
 ## Code Quality
 
 ```bash
+pnpm run check
 pnpm run lint
 pnpm run format:check
-pnpm run check
 ```
+
+For code changes, use `pnpm run check` as the local pre-PR gate.
+For docs-only changes, run `pnpm run format:check`.
 
 ## CI
 
-GitHub Actions runs on pull requests and pushes to `main` with strict checks:
+GitHub Actions runs on pull requests and pushes to `main` with strict staged checks:
 
 ```bash
 pnpm run format:check && pnpm run lint && pnpm run test && pnpm --dir apps/web build
