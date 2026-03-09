@@ -53,3 +53,4 @@
 [0] `stash db doctor` does not create parent directories for a missing DB path; if `STASH_DB_PATH` points to a non-existent directory, command can fail with `unable to open database file`.
 [0] Prefer explicit named types over `ReturnType<typeof ...>` in production code/tests for readability and easier review comments.
 [0] `tithe web` parity means flag-based daemon controls (`--daemon`, `--status`, `--stop`), not `start`/`stop` subcommands; mirror that CLI shape when porting its web supervisor flow into `stash`.
+[0] In Commander, a root/global option like `--db-path` is not reliable as a duplicate command-local option on hidden subcommands. For internal commands, pass the global flag before the subcommand (`stash --db-path ... web-supervisor`) and read it from `program.opts()` inside the action.

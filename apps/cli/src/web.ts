@@ -656,34 +656,43 @@ const stopWebDaemon = async (): Promise<{
   }
 }
 
-const buildRunnerArgs = (runtime: ResolvedWebRuntime): string[] => [
-  "web-runner",
+const buildInternalWebCommandArgs = (
+  command: "web-runner" | "web-supervisor",
+  runtime: ResolvedWebRuntime,
+  extraArgs: string[] = [],
+): string[] => [
+  "--db-path",
+  runtime.dbPath,
+  command,
   "--host",
   runtime.host,
   "--api-port",
   String(runtime.apiPort),
   "--pwa-port",
   String(runtime.pwaPort),
-  "--db-path",
-  runtime.dbPath,
   "--migrations-dir",
   runtime.migrationsDir,
   "--web-dist-dir",
   runtime.webDistDir,
   "--audio-dir",
   runtime.audioDir,
+  ...extraArgs,
 ]
 
 const startRunnerProcess = (runtime: ResolvedWebRuntime): ChildProcess => {
   const cliEntryPath = resolveCliEntryPath()
-  return spawn(process.execPath, [...process.execArgv, cliEntryPath, ...buildRunnerArgs(runtime)], {
-    cwd: workspaceRoot,
-    env: {
-      ...process.env,
-      STASH_WEB_DAEMON_DIR: getDaemonPaths("write").dir,
+  return spawn(
+    process.execPath,
+    [...process.execArgv, cliEntryPath, ...buildInternalWebCommandArgs("web-runner", runtime)],
+    {
+      cwd: workspaceRoot,
+      env: {
+        ...process.env,
+        STASH_WEB_DAEMON_DIR: getDaemonPaths("write").dir,
+      },
+      stdio: ["ignore", "inherit", "inherit"],
     },
-    stdio: ["ignore", "inherit", "inherit"],
-  })
+  )
 }
 
 const runSupervisorLoop = async (
@@ -1020,23 +1029,7 @@ const startWebDaemon = async (runtime: ResolvedWebRuntime, jsonMode: boolean): P
     [
       ...process.execArgv,
       cliEntryPath,
-      "web-supervisor",
-      "--host",
-      runtime.host,
-      "--api-port",
-      String(runtime.apiPort),
-      "--pwa-port",
-      String(runtime.pwaPort),
-      "--db-path",
-      runtime.dbPath,
-      "--migrations-dir",
-      runtime.migrationsDir,
-      "--web-dist-dir",
-      runtime.webDistDir,
-      "--audio-dir",
-      runtime.audioDir,
-      "--run-id",
-      runId,
+      ...buildInternalWebCommandArgs("web-supervisor", runtime, ["--run-id", runId]),
     ],
     {
       cwd: workspaceRoot,
@@ -1213,6 +1206,7 @@ export const __testing__ = {
   resolveWebAccessInfo,
   readWebDaemonStatus,
   buildDaemonPaths,
+  buildInternalWebCommandArgs,
   isLoopbackHost,
   resetDaemonPathsCache,
 }

@@ -1104,7 +1104,6 @@ program
   .option("--host <host>", "Host to bind API and PWA servers")
   .option("--api-port <n>", "Port to bind API server", parsePort)
   .option("--pwa-port <n>", "Port to bind PWA server", parsePort)
-  .requiredOption("--db-path <path>", "Path to SQLite database file")
   .requiredOption("--migrations-dir <path>", "Path to migrations directory")
   .requiredOption("--web-dist-dir <path>", "Path to built web assets")
   .requiredOption("--audio-dir <path>", "Path to generated audio directory")
@@ -1114,7 +1113,6 @@ program
       host?: string
       apiPort?: number
       pwaPort?: number
-      dbPath: string
       migrationsDir: string
       webDistDir: string
       audioDir: string
@@ -1133,7 +1131,7 @@ program
           host: options.host,
           apiPort: options.apiPort,
           pwaPort: options.pwaPort,
-          dbPath: options.dbPath,
+          dbPath: resolveDbPath(program.opts().dbPath as string),
           migrationsDir: options.migrationsDir,
           webDistDir: options.webDistDir,
           audioDir: options.audioDir,
@@ -1149,7 +1147,6 @@ program
   .option("--host <host>", "Host to bind API and PWA servers")
   .option("--api-port <n>", "Port to bind API server", parsePort)
   .option("--pwa-port <n>", "Port to bind PWA server", parsePort)
-  .requiredOption("--db-path <path>", "Path to SQLite database file")
   .requiredOption("--migrations-dir <path>", "Path to migrations directory")
   .requiredOption("--web-dist-dir <path>", "Path to built web assets")
   .requiredOption("--audio-dir <path>", "Path to generated audio directory")
@@ -1158,7 +1155,6 @@ program
       host?: string
       apiPort?: number
       pwaPort?: number
-      dbPath: string
       migrationsDir: string
       webDistDir: string
       audioDir: string
@@ -1177,7 +1173,7 @@ program
             host: options.host,
             apiPort: options.apiPort,
             pwaPort: options.pwaPort,
-            dbPath: options.dbPath,
+            dbPath: resolveDbPath(program.opts().dbPath as string),
             migrationsDir: options.migrationsDir,
             webDistDir: options.webDistDir,
             audioDir: options.audioDir,

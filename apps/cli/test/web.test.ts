@@ -328,6 +328,26 @@ webSuite("cli web daemon", () => {
 })
 
 describe("web helper behavior", () => {
+  it("builds internal daemon command args with the global db-path before the subcommand", () => {
+    const args = __testing__.buildInternalWebCommandArgs(
+      "web-supervisor",
+      {
+        host: "0.0.0.0",
+        apiPort: 4173,
+        pwaPort: 5173,
+        dbPath: "/tmp/stash.db",
+        migrationsDir: "/tmp/drizzle",
+        webDistDir: "/tmp/web-dist",
+        audioDir: "/tmp/audio",
+      },
+      ["--run-id", "run-123"],
+    )
+
+    expect(args.slice(0, 3)).toEqual(["--db-path", "/tmp/stash.db", "web-supervisor"])
+    expect(args).toContain("--run-id")
+    expect(args).toContain("run-123")
+  })
+
   it("returns a loopback warning instead of Tailnet URLs when bound to localhost", () => {
     const access = __testing__.resolveWebAccessInfo("127.0.0.1", 4173, 5173)
     expect(access.local.pwaUrl).toBe("http://127.0.0.1:5173")
