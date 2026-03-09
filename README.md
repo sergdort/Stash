@@ -54,7 +54,7 @@ Web UI behavior:
 You can configure these via `.env`:
 
 ```bash
-STASH_WEB_HOST=127.0.0.1
+STASH_WEB_HOST=0.0.0.0
 STASH_API_PORT=4173
 STASH_PWA_PORT=5173
 ```
@@ -63,7 +63,18 @@ Or override at runtime:
 
 ```bash
 stash web --host 127.0.0.1 --api-port 4173 --pwa-port 5173
+stash web --daemon --host 0.0.0.0 --api-port 4173 --pwa-port 5173
+stash web --status --json
+stash web --stop --json
 ```
+
+Runtime notes:
+- `stash web` runs in the foreground by default; `stash web --foreground` is an explicit alias.
+- `stash web --daemon` starts a detached supervisor that restarts the combined web runner if it crashes or is killed unexpectedly.
+- `stash web --status` and `stash web --stop` mirror the `tithe` control flow and cannot be combined with host/port overrides.
+- daemon state lives under `~/.stash/` with workspace fallback `.stash/` (`web-daemon.pid`, `web-daemon.log`, `web-daemon.state.json`).
+- daemon startup/status output includes localhost URLs plus best-effort Tailnet URLs from `tailscale status --json`.
+- when `STASH_WEB_HOST` is unset, foreground `stash web` defaults to `127.0.0.1`; daemon mode defaults to `0.0.0.0` for remote/Tailnet access.
 
 ### Web Development (Vite HMR)
 

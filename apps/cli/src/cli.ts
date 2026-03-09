@@ -17,6 +17,8 @@ import {
   type CoreServices,
   type StashItem as CoreStashItem,
 } from "@stash/core"
+import { CliError } from "./error.js"
+import { runWebCommand, runWebRunnerCommand, runWebSupervisorCommand } from "./web.js"
 
 const CLI_DIR = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_MIGRATIONS_DIR = resolveExistingPath([
@@ -29,7 +31,6 @@ const DEFAULT_WEB_DIST_DIR = resolveExistingPath([
   path.resolve(CLI_DIR, "../../../../apps/web/dist"),
   path.resolve(process.cwd(), "apps/web/dist"),
 ])
-const DEFAULT_WEB_HOST = process.env.STASH_WEB_HOST ?? "127.0.0.1"
 const DEFAULT_API_PORT = process.env.STASH_API_PORT ? parsePort(process.env.STASH_API_PORT) : 4173
 const DEFAULT_PWA_PORT = process.env.STASH_PWA_PORT ? parsePort(process.env.STASH_PWA_PORT) : 5173
 const DEFAULT_TTS_VOICE = "tts_models/en/vctk/vits|p241" // Coqui male voice
@@ -68,17 +69,6 @@ type StartedWebStack = {
 }
 
 type StartWebStackFn = (options: StartWebStackOptions) => Promise<StartedWebStack>
-
-class CliError extends Error {
-  code: string
-  exitCode: number
-
-  constructor(message: string, code: string, exitCode: number) {
-    super(message)
-    this.code = code
-    this.exitCode = exitCode
-  }
-}
 
 function parsePositiveInt(value: string): number {
   const parsed = Number.parseInt(value, 10)
@@ -353,7 +343,7 @@ Quick Reference:
   stash tts status <jobId> [--json]
   stash tts doctor [--json]
   stash jobs worker [--poll-ms <n>] [--once] [--json]
-  stash web [--host <host>] [--api-port <n>] [--pwa-port <n>]
+  stash web [--daemon|--foreground|--status|--stop] [--host <host>] [--api-port <n>] [--pwa-port <n>] [--json]
   stash db migrate [--json] [--migrations-dir <path>]
   stash db doctor [--json] [--migrations-dir <path>] [--limit <n>]
 
@@ -1061,51 +1051,139 @@ jobsCommand
 program
   .command("web")
   .description("Run local web frontend (PWA) + REST API servers")
-  .option("--host <host>", "Host to bind API and PWA servers", DEFAULT_WEB_HOST)
-  .option("--api-port <n>", "Port to bind API server", parsePort, DEFAULT_API_PORT)
-  .option("--pwa-port <n>", "Port to bind PWA server", parsePort, DEFAULT_PWA_PORT)
-  .action(async (options: { host: string; apiPort: number; pwaPort: number }) => {
-    return runDbAction(false, async () => {
-      if (options.apiPort === options.pwaPort) {
-        throw new CliError("API and PWA ports must be different.", "VALIDATION_ERROR", 2)
-      }
-
-      const dbPath = resolveDbPath(program.opts().dbPath as string)
-      const migrationsDir = resolveMigrationsDir()
-      const startWebStack = await loadStartWebStack()
-      const web = await startWebStack({
-        host: options.host,
-        apiPort: options.apiPort,
-        pwaPort: options.pwaPort,
-        dbPath,
-        migrationsDir,
-        webDistDir: DEFAULT_WEB_DIST_DIR,
-        audioDir: resolveAudioDir(process.env.STASH_AUDIO_DIR ?? DEFAULT_AUDIO_DIR),
+  .option("--host <host>", "Host to bind API and PWA servers")
+  .option("--api-port <n>", "Port to bind API server", parsePort)
+  .option("--pwa-port <n>", "Port to bind PWA server", parsePort)
+  .option("--daemon", "Run in background daemon mode with auto-restart")
+  .option("--status", "Show background web daemon status")
+  .option("--stop", "Stop background web daemon")
+  .option("--foreground", "Run in the foreground even when daemon controls are available")
+  .option("--json", "Print machine-readable JSON output")
+  .action(
+    async (options: {
+      host?: string
+      apiPort?: number
+      pwaPort?: number
+      daemon?: boolean
+      status?: boolean
+      stop?: boolean
+      foreground?: boolean
+      json?: boolean
+    }) => {
+      const jsonMode = Boolean(options.json)
+      return runDbAction(jsonMode, async () => {
+        await runWebCommand(
+          {
+            host: options.host,
+            apiPort: options.apiPort,
+            pwaPort: options.pwaPort,
+            daemon: options.daemon,
+            status: options.status,
+            stop: options.stop,
+            foreground: options.foreground,
+          },
+          {
+            json: jsonMode,
+            dbPath: resolveDbPath(program.opts().dbPath as string),
+            migrationsDir: resolveMigrationsDir(),
+            webDistDir: DEFAULT_WEB_DIST_DIR,
+            audioDir: resolveAudioDir(process.env.STASH_AUDIO_DIR ?? DEFAULT_AUDIO_DIR),
+            defaultApiPort: DEFAULT_API_PORT,
+            defaultPwaPort: DEFAULT_PWA_PORT,
+            envHost: process.env.STASH_WEB_HOST,
+            loadStartWebStack,
+          },
+        )
       })
+    },
+  )
 
-      process.stdout.write(`stash web running\n`)
-      process.stdout.write(`API: http://${web.api.host}:${web.api.port}\n`)
-      process.stdout.write(`PWA: http://${web.pwa.host}:${web.pwa.port}\n`)
-
-      await new Promise<void>((resolve) => {
-        const stop = (): void => {
-          web
-            .close()
-            .catch(() => {
-              // Ignore shutdown errors during signal handling.
-            })
-            .finally(() => {
-              process.off("SIGINT", stop)
-              process.off("SIGTERM", stop)
-              resolve()
-            })
+program
+  .command("web-supervisor")
+  .description("Internal daemon supervisor for stash web --daemon")
+  .option("--host <host>", "Host to bind API and PWA servers")
+  .option("--api-port <n>", "Port to bind API server", parsePort)
+  .option("--pwa-port <n>", "Port to bind PWA server", parsePort)
+  .requiredOption("--migrations-dir <path>", "Path to migrations directory")
+  .requiredOption("--web-dist-dir <path>", "Path to built web assets")
+  .requiredOption("--audio-dir <path>", "Path to generated audio directory")
+  .option("--run-id <runId>", "Daemon run identifier")
+  .action(
+    async (options: {
+      host?: string
+      apiPort?: number
+      pwaPort?: number
+      migrationsDir: string
+      webDistDir: string
+      audioDir: string
+      runId?: string
+    }) => {
+      return runDbAction(false, async () => {
+        if (!options.host || options.apiPort === undefined || options.pwaPort === undefined) {
+          throw new CliError(
+            "web-supervisor requires --host, --api-port, and --pwa-port.",
+            "VALIDATION_ERROR",
+            2,
+          )
         }
 
-        process.on("SIGINT", stop)
-        process.on("SIGTERM", stop)
+        await runWebSupervisorCommand({
+          host: options.host,
+          apiPort: options.apiPort,
+          pwaPort: options.pwaPort,
+          dbPath: resolveDbPath(program.opts().dbPath as string),
+          migrationsDir: options.migrationsDir,
+          webDistDir: options.webDistDir,
+          audioDir: options.audioDir,
+          runId: options.runId,
+        })
       })
-    })
-  })
+    },
+  )
+
+program
+  .command("web-runner")
+  .description("Internal daemon worker for stash web --daemon")
+  .option("--host <host>", "Host to bind API and PWA servers")
+  .option("--api-port <n>", "Port to bind API server", parsePort)
+  .option("--pwa-port <n>", "Port to bind PWA server", parsePort)
+  .requiredOption("--migrations-dir <path>", "Path to migrations directory")
+  .requiredOption("--web-dist-dir <path>", "Path to built web assets")
+  .requiredOption("--audio-dir <path>", "Path to generated audio directory")
+  .action(
+    async (options: {
+      host?: string
+      apiPort?: number
+      pwaPort?: number
+      migrationsDir: string
+      webDistDir: string
+      audioDir: string
+    }) => {
+      return runDbAction(false, async () => {
+        if (!options.host || options.apiPort === undefined || options.pwaPort === undefined) {
+          throw new CliError(
+            "web-runner requires --host, --api-port, and --pwa-port.",
+            "VALIDATION_ERROR",
+            2,
+          )
+        }
+
+        await runWebRunnerCommand(
+          {
+            host: options.host,
+            apiPort: options.apiPort,
+            pwaPort: options.pwaPort,
+            dbPath: resolveDbPath(program.opts().dbPath as string),
+            migrationsDir: options.migrationsDir,
+            webDistDir: options.webDistDir,
+            audioDir: options.audioDir,
+            runId: undefined,
+          },
+          loadStartWebStack,
+        )
+      })
+    },
+  )
 
 program
   .command("read <id>")

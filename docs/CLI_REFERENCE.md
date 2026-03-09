@@ -185,15 +185,35 @@ pnpm run web
 Equivalent CLI form:
 
 ```bash
-stash web [--host <host>] [--api-port <n>] [--pwa-port <n>]
+stash web [--foreground] [--host <host>] [--api-port <n>] [--pwa-port <n>] [--json]
+stash web --daemon [--host <host>] [--api-port <n>] [--pwa-port <n>] [--json]
+stash web --status [--json]
+stash web --stop [--json]
 ```
 
 Defaults:
-- `--host`: `127.0.0.1` (`STASH_WEB_HOST`)
+- foreground/default `--host`: `127.0.0.1` when `STASH_WEB_HOST` is unset
+- daemon default `--host`: `0.0.0.0` when `STASH_WEB_HOST` is unset
+- `STASH_WEB_HOST` overrides both modes when set
 - `--api-port`: `4173` (`STASH_API_PORT`)
 - `--pwa-port`: `5173` (`STASH_PWA_PORT`)
 
 Notes:
+- `--daemon`, `--status`, `--stop`, and `--foreground` are mutually exclusive.
+- `--status` and `--stop` cannot be combined with `--host`, `--api-port`, or `--pwa-port`.
+- `stash web --daemon` starts a detached supervisor and returns immediately.
+- repeated `stash web --daemon` calls are idempotent and return the existing daemon state.
+- daemon state is stored in `~/.stash/` with workspace fallback `.stash/`:
+  - `web-daemon.pid`
+  - `web-daemon.log`
+  - `web-daemon.state.json`
+- daemon startup/status JSON includes:
+  - lifecycle status
+  - daemon pid and file paths
+  - bind host and resolved ports
+  - local URLs
+  - best-effort Tailnet URLs or warnings
+- Tailnet URLs are derived from `tailscale status --json`; if the stack is bound to loopback, status warns that remote Tailnet access is unavailable.
 - API and PWA ports must be different.
 - Port conflicts fail fast (no automatic next-port fallback).
 - API listener is implemented in `apps/api` with Fastify.
